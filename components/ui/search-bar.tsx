@@ -1,0 +1,102 @@
+"use client";
+
+import * as React from "react";
+import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+
+function SearchBar({
+  placeholder = "Ask about",
+  suggestions = ["this project"],
+  className,
+  ...props
+}: {
+  placeholder?: string;
+  suggestions?: string[];
+  className?: string;
+} & Omit<React.ComponentProps<"input">, "placeholder">) {
+  const [value, setValue] = React.useState("");
+  const [index, setIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    if (suggestions.length <= 1) return;
+    const id = setInterval(
+      () => setIndex((i) => (i + 1) % suggestions.length),
+      3000
+    );
+    return () => clearInterval(id);
+  }, [suggestions.length]);
+
+  return (
+    <div className={cn("mx-auto w-full max-w-[400px]", className)}>
+      <form onSubmit={(e) => e.preventDefault()}>
+        <div
+          className={cn(
+            "relative h-[48px] overflow-hidden rounded-[20px]",
+            "bg-white/[0.06]",
+            "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)]",
+            "transition-shadow duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+            "focus-within:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]"
+          )}
+        >
+          {/* Ghost placeholder */}
+          {!value && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-4 right-12 flex items-center overflow-hidden whitespace-nowrap text-[0.95rem]"
+            >
+              <span className="shrink-0 text-muted-foreground/60">
+                {placeholder}
+              </span>
+              <span className="ml-1.5 inline-flex min-w-0 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={index}
+                    initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}
+                    animate={{ opacity: 0.56, y: 0, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, y: -6, filter: "blur(2px)" }}
+                    transition={{
+                      duration: 0.42,
+                      ease: [0.32, 0.72, 0, 1],
+                    }}
+                    className="truncate text-muted-foreground"
+                  >
+                    {suggestions[index]}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+            </div>
+          )}
+
+          <input
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="h-full w-full min-w-0 rounded-[20px] bg-transparent px-4 pr-12 text-[0.95rem] text-foreground outline-none"
+            {...props}
+          />
+
+          <button
+            type="submit"
+            disabled={!value}
+            className={cn(
+              "absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2",
+              "items-center justify-center rounded-full",
+              "text-muted-foreground transition-[opacity,color] duration-300",
+              "hover:text-foreground",
+              "focus-visible:outline-none",
+              "disabled:cursor-not-allowed disabled:opacity-40"
+            )}
+            aria-label="Send"
+          >
+            <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export { SearchBar };
