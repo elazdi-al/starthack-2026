@@ -3,16 +3,27 @@
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion"
 import { ChevronDown } from "lucide-react"
 
+import { triggerHaptic } from "@/lib/haptics"
 import { cn } from "@/lib/utils"
 
 function Accordion({
   className,
+  onValueChange,
   ...props
 }: AccordionPrimitive.Root.Props) {
+  const handleValueChange: AccordionPrimitive.Root.Props["onValueChange"] = (
+    value,
+    eventDetails
+  ) => {
+    onValueChange?.(value, eventDetails)
+    triggerHaptic("selection")
+  }
+
   return (
     <AccordionPrimitive.Root
       data-slot="accordion"
       className={cn("w-full", className)}
+      onValueChange={handleValueChange}
       {...props}
     />
   )
@@ -41,14 +52,14 @@ function AccordionTrigger({
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(
-          "flex flex-1 cursor-pointer items-center justify-between py-2 text-left text-base font-medium text-foreground",
+          "type-body-strong flex flex-1 cursor-pointer items-center justify-between py-2 text-left text-foreground",
           "[&[data-panel-open]>svg]:rotate-180",
           className,
         )}
         {...props}
       >
         {children}
-        <ChevronDown className="size-5 shrink-0 text-muted-foreground transition-transform duration-200" />
+        <ChevronDown className="size-5 shrink-0 text-[var(--dial-text-label)] transition-transform duration-200" />
       </AccordionPrimitive.Trigger>
     </AccordionPrimitive.Header>
   )

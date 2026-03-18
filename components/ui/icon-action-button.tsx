@@ -15,6 +15,7 @@ import {
   type HTMLMotionProps,
 } from "motion/react";
 
+import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 type IconActionButtonBehavior = "toggle" | "confirm" | "delete";
@@ -182,7 +183,11 @@ function ToggleButton({
 
     setTransitioning(true);
     toggleTimerRef.current = setTimeout(() => {
-      setToggled((value) => !value);
+      setToggled((value) => {
+        const nextValue = !value;
+        triggerHaptic(nextValue ? "success" : "selection");
+        return nextValue;
+      });
       setTransitioning(false);
       onAction?.();
     }, 300);
@@ -289,6 +294,7 @@ function ConfirmButton({
         setLoading(false);
         finishTimerRef.current = setTimeout(() => {
           setRevealed(false);
+          triggerHaptic("success");
           onAction?.();
         }, 1000);
       }, 2000);
@@ -407,6 +413,7 @@ function DeleteButton({
     setPressing(true);
     holdTimerRef.current = setTimeout(() => {
       setPressing(false);
+      triggerHaptic("heavy");
       onAction?.();
     }, 1000);
   };

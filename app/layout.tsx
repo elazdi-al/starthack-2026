@@ -4,7 +4,7 @@ import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "Design System",
-  description: "A clean, minimal design system with shadcn/ui, DialKit, and Bloom Menu",
+  description: "A clean, minimal design system with shadcn/ui and DialKit",
 };
 
 export default function RootLayout({
@@ -21,7 +21,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="antialiased">
+      <body>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {children}
       </body>

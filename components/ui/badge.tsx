@@ -5,15 +5,15 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "group/badge inline-flex h-6 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-[var(--dial-border)] bg-[var(--dial-surface)] px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap tracking-[-0.01em] text-[var(--dial-text-label)] transition-[background,color,border-color] focus-visible:border-[var(--dial-border-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-[var(--destructive)] [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge type-caption inline-flex h-6 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-[var(--dial-border)] bg-[var(--dial-surface)] px-2.5 py-0.5 whitespace-nowrap text-[var(--dial-text-label)] transition-[background,color,border-color] focus-visible:border-[var(--dial-border-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-[var(--destructive)] [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {
         default: "bg-[var(--dial-surface-active)] text-[var(--dial-text-primary)]",
         secondary:
-          "border-transparent bg-white/[0.12] text-[var(--dial-text-primary)]",
+          "border-transparent bg-[var(--accent)] text-[var(--accent-foreground)]",
         destructive:
-          "border-transparent bg-[var(--destructive-surface)] text-white hover:bg-[var(--destructive-surface-hover)]",
+          "border-transparent bg-[var(--destructive-surface)] text-[var(--destructive)] hover:bg-[var(--destructive-surface-hover)]",
         outline:
           "bg-transparent text-[var(--dial-text-label)] hover:bg-[var(--dial-surface)] hover:text-[var(--dial-text-primary)]",
         ghost:

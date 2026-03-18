@@ -1,121 +1,56 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { Menu } from "bloom-menu";
-import { DialRoot } from "dialkit";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Avatar,
   AvatarFallback,
   AvatarGroup,
 } from "@/components/ui/avatar";
-import { TogglePill } from "@/components/ui/toggle-pill";
-import { SearchBar } from "@/components/ui/search-bar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "@/components/ui/accordion";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { HoldToDeleteExample } from "@/components/examples/hold-to-delete-example";
+import { RunningWidgetExample } from "@/components/examples/running-widget-example";
+import { TypographySpecimen } from "@/components/examples/typography-specimen";
+import { WalletWidgetExample } from "@/components/examples/wallet-widget-example";
+import { SiteHeader } from "@/components/layout/site-header";
+import { CodeBlock } from "@/components/ui/code-block";
+import { HighlightTabs } from "@/components/ui/highlight-tabs";
 import { IconActionButton } from "@/components/ui/icon-action-button";
-import { HoldToDelete } from "@/components/ui/hold-to-delete";
-import { ClipPathTabs } from "@/components/ui/clip-path-tabs";
-import { THEME_STORAGE_KEY, isThemeMode, type ThemeMode } from "@/lib/theme";
+import { Input } from "@/components/ui/input";
+import { SearchBar } from "@/components/ui/search-bar";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { DialRoot } from "dialkit";
 import {
-  ArrowUp,
+  AlignCenterVertical,
+  AlignEndVertical,
+  AlignStartVertical,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
-  AlignStartVertical,
-  AlignCenterVertical,
-  AlignEndVertical,
-  Minus,
+  ArrowUp,
   ChevronRight,
   Ellipsis,
-  Moon,
-  Sparkles,
+  Minus,
   PanelsTopLeft,
-  Sun,
+  Sparkles,
   SwatchBook,
 } from "lucide-react";
 
-function BloomDemo() {
-  const [selected, setSelected] = useState<string | null>(null);
-
-  return (
-    <div className="flex flex-col items-center gap-4">
-      <Menu.Root>
-        <Menu.Container
-          buttonSize={40}
-          menuWidth={180}
-          menuRadius={12}
-          className="ui-glass-panel text-card-foreground"
-        >
-          <Menu.Trigger>
-            <div className="flex items-center justify-center">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="4" x2="20" y1="12" y2="12" />
-                <line x1="4" x2="20" y1="6" y2="6" />
-                <line x1="4" x2="20" y1="18" y2="18" />
-              </svg>
-            </div>
-          </Menu.Trigger>
-          <Menu.Content className="ui-glass-panel rounded-[var(--dial-panel-radius)] p-1.5 text-card-foreground">
-            {["Profile", "Settings", "Projects", "Archive"].map((item) => (
-              <Menu.Item
-                key={item}
-                onSelect={() => setSelected(item)}
-                className="flex cursor-pointer items-center gap-2.5 rounded-[var(--dial-radius)] px-3 py-2 text-[13px] font-medium tracking-[-0.01em] text-[var(--dial-text-secondary)] transition-colors hover:bg-[var(--dial-surface)] hover:text-[var(--dial-text-primary)]"
-              >
-                <span className="text-[var(--dial-text-tertiary)]">
-                  {item === "Profile" && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
-                  )}
-                  {item === "Settings" && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                  )}
-                  {item === "Projects" && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
-                  )}
-                  {item === "Archive" && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
-                  )}
-                </span>
-                {item}
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Container>
-      </Menu.Root>
-      {selected && (
-        <p className="text-xs text-muted-foreground animate-in fade-in slide-in-from-bottom-1 duration-200">
-          <span className="text-foreground/70">{selected}</span>
-        </p>
-      )}
-    </div>
-  );
-}
 
 function Section({
   title,
@@ -129,11 +64,11 @@ function Section({
   return (
     <section className="py-16">
       <div className="mb-8">
-        <h2 className="text-sm font-semibold tracking-tight text-foreground">
+        <h2 className="type-section-heading text-foreground">
           {title}
         </h2>
         {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="type-section-description mt-2 max-w-2xl text-[var(--dial-text-secondary)]">{description}</p>
         )}
       </div>
       {children}
@@ -144,26 +79,35 @@ function Section({
 function ComponentCard({
   title,
   mono,
+  className,
+  previewClassName,
   children,
 }: {
   title: string;
   mono?: string;
+  className?: string;
+  previewClassName?: string;
   children: React.ReactNode;
 }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-[13px]">{title}</CardTitle>
+          <CardTitle>{title}</CardTitle>
           {mono && (
-            <span className="text-[10px] font-mono text-muted-foreground">
+            <span className="text-[11px] font-mono text-muted-foreground">
               {mono}
             </span>
           )}
         </div>
       </CardHeader>
       <CardContent>
-        <div className="ui-glass-row flex min-h-[120px] items-center justify-center rounded-[var(--dial-radius)] border-white/5 p-6">
+        <div
+          className={cn(
+            "ui-glass-row flex min-h-[120px] items-center justify-center rounded-[var(--dial-radius)] border-[var(--dial-border)] p-6",
+            previewClassName
+          )}
+        >
           {children}
         </div>
       </CardContent>
@@ -200,123 +144,62 @@ function ComponentsGlyph() {
   );
 }
 
-function setDocumentTheme(theme: ThemeMode) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {}
-
-  themeListeners.forEach((listener) => listener());
-}
-
-function readThemeSnapshot(): ThemeMode | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  let storedTheme: string | null = null;
-
-  try {
-    storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-  } catch {}
-
-  if (isThemeMode(storedTheme)) {
-    return storedTheme;
-  }
-
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
-}
-
-const themeListeners = new Set<() => void>();
-
-function subscribeToTheme(listener: () => void) {
-  themeListeners.add(listener);
-
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key !== THEME_STORAGE_KEY || !isThemeMode(event.newValue)) {
-      return;
-    }
-
-    document.documentElement.classList.toggle("dark", event.newValue === "dark");
-    themeListeners.forEach((currentListener) => currentListener());
-  };
-
-  window.addEventListener("storage", handleStorage);
-
-  return () => {
-    themeListeners.delete(listener);
-    window.removeEventListener("storage", handleStorage);
-  };
-}
-
-function ThemeModeToggle() {
-  const theme = useSyncExternalStore(
-    subscribeToTheme,
-    readThemeSnapshot,
-    () => null
-  );
-
-  if (!theme) {
-    return null;
-  }
-
+function CourseArrowIcon() {
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6">
-      <div
-        role="group"
-        aria-label="Color theme"
-        className="pointer-events-auto ui-glass-panel rounded-full border-border/60 p-1.5"
-      >
-        <TogglePill
-          layoutId="theme-mode"
-          value={theme}
-          onValueChange={(value) => {
-            if (!isThemeMode(value) || value === theme) {
-              return;
-            }
-
-            setDocumentTheme(value);
-          }}
-          className="bg-transparent p-0 dark:bg-transparent"
-          options={[
-            {
-              value: "light",
-              label: "Light mode",
-              icon: <Sun className="h-4 w-4" />,
-            },
-            {
-              value: "dark",
-              label: "Dark mode",
-              icon: <Moon className="h-4 w-4" />,
-            },
-          ]}
-        />
-      </div>
-    </div>
+    <svg
+      aria-hidden="true"
+      className="h-3 w-3"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3 13L13 3M13 3H5M13 3V11"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
+const bloomInstallCommand = "npm install bloom-menu framer-motion";
 
 export default function Home() {
+  const siteHeaderLinks = [
+    { label: "Demos", href: "/demo" },
+    { label: "Skill", href: "/skill" },
+    {
+      label: "Twitter",
+      href: "https://twitter.com/intent/follow?screen_name=raphaelsalaja",
+    },
+    {
+      label: "Github",
+      href: "https://github.com/raphaelsalaja/userinterface-wiki",
+    },
+  ];
+
   const utilityButtons = [
     {
       label: "Components",
-      variant: "pill" as const,
+      variant: "secondary" as const,
       icon: <ComponentsGlyph />,
     },
     {
       label: "Patterns",
-      variant: "pill-outline" as const,
+      variant: "outline" as const,
       icon: <PanelsTopLeft className="size-4" />,
     },
     {
       label: "Tokens",
-      variant: "pill-subtle" as const,
+      variant: "secondary" as const,
+      className: "bg-muted text-foreground hover:bg-muted/80",
       icon: <SwatchBook className="size-4" />,
     },
     {
       label: "Playground",
-      variant: "pill-ghost" as const,
+      variant: "ghost" as const,
+      className: "text-muted-foreground hover:text-foreground",
       icon: <Sparkles className="size-4" />,
     },
   ];
@@ -324,17 +207,55 @@ export default function Home() {
   return (
     <div className="relative min-h-screen bg-background">
       <DialRoot position="top-right" />
+      <SiteHeader links={siteHeaderLinks} />
       <main className="mx-auto max-w-3xl px-8">
         {/* Interactive Components */}
         <Section title="Interactive" description="Spring physics and glassmorphic surfaces.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <ComponentCard title="Bloom Menu" mono="bloom-menu">
-              <BloomDemo />
-            </ComponentCard>
             <ComponentCard title="Search bar">
               <SearchBar
                 suggestions={["who built this", "pricing details", "how to get started"]}
               />
+            </ComponentCard>
+        </Section>
+
+        <Separator />
+
+        <Section
+          title="Code Blocks"
+          description="Bloom-style snippets with a compact copy action and clean feedback."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ComponentCard
+              title="Install command"
+              mono="bloom-menu"
+              className="sm:col-span-2"
+              previewClassName="min-h-0 justify-stretch border-0 bg-transparent p-0 shadow-none"
+            >
+              <CodeBlock code={bloomInstallCommand} />
+            </ComponentCard>
+          </div>
+        </Section>
+
+        <Separator />
+
+        <Section
+          title="Motion Studies"
+          description="Reusable staged widgets with the same interaction pattern applied to different Apple-style surfaces."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ComponentCard
+              title="Wallet widget"
+              mono="userinterface.wiki"
+              previewClassName="min-h-0 justify-stretch overflow-visible border-0 bg-transparent p-0 shadow-none"
+            >
+              <WalletWidgetExample />
+            </ComponentCard>
+            <ComponentCard
+              title="Running widget"
+              mono="apple-style"
+              previewClassName="min-h-0 justify-stretch overflow-visible border-0 bg-transparent p-0 shadow-none"
+            >
+              <RunningWidgetExample />
             </ComponentCard>
           </div>
         </Section>
@@ -397,20 +318,20 @@ export default function Home() {
               </div>
             </ComponentCard>
             <ComponentCard title="Hold to delete" mono="emilkowal.ski">
-              <HoldToDelete />
+              <HoldToDeleteExample />
             </ComponentCard>
           </div>
         </Section>
 
         <Separator />
 
-        {/* Toggle Pills */}
-        <Section title="Toggle pills" description="Compact icon toggles with animated sliding indicator.">
+        {/* Segmented Controls */}
+        <Section title="Segmented controls" description="Compact icon toggles with animated sliding indicator.">
           <div className="grid gap-4 sm:grid-cols-2">
             <ComponentCard title="Direction & alignment">
               <div className="flex flex-wrap items-center gap-2">
-                <TogglePill
-                  layoutId="direction"
+                <SegmentedControl
+                  indicatorId="direction"
                   defaultValue="up"
                   options={[
                     { value: "up", label: "Expand up", icon: <ArrowUp className="h-4 w-4" /> },
@@ -419,33 +340,33 @@ export default function Home() {
                     { value: "right", label: "Expand right", icon: <ArrowRight className="h-4 w-4" /> },
                   ]}
                 />
-                <TogglePill
-                  layoutId="alignment"
+                <SegmentedControl
+                  indicatorId="alignment"
                   defaultValue="center"
                   options={[
-                    { value: "start", label: "Align start", icon: <AlignStartVertical className="h-4 w-4" /> },
-                    { value: "center", label: "Align center", icon: <AlignCenterVertical className="h-4 w-4" /> },
-                    { value: "end", label: "Align end", icon: <AlignEndVertical className="h-4 w-4" /> },
+                    { value: "start", label: "Align to start", icon: <AlignStartVertical className="h-4 w-4" /> },
+                    { value: "center", label: "Align to center", icon: <AlignCenterVertical className="h-4 w-4" /> },
+                    { value: "end", label: "Align to end", icon: <AlignEndVertical className="h-4 w-4" /> },
                   ]}
                 />
               </div>
             </ComponentCard>
             <ComponentCard title="Binary toggles">
               <div className="flex flex-wrap items-center gap-2">
-                <TogglePill
-                  layoutId="submenu"
+                <SegmentedControl
+                  indicatorId="submenu"
                   defaultValue="none"
                   options={[
                     { value: "none", label: "No submenu", icon: <Minus className="h-4 w-4" /> },
                     { value: "submenu", label: "With submenu", icon: <ChevronRight className="h-4 w-4" /> },
                   ]}
                 />
-                <TogglePill
-                  layoutId="trigger"
+                <SegmentedControl
+                  indicatorId="trigger"
                   defaultValue="icon"
                   options={[
                     { value: "icon", label: "Icon trigger", icon: <Ellipsis className="h-4 w-4" /> },
-                    { value: "text", label: "Text trigger", icon: <span className="text-xs font-medium leading-none">Aa</span> },
+                    { value: "text", label: "Text trigger", icon: <span className="type-caption leading-none">Aa</span> },
                   ]}
                 />
               </div>
@@ -460,10 +381,10 @@ export default function Home() {
           title="Buttons"
           description="Core shadcn actions plus rounded utility pills built on the same base."
         >
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-4">
             <ComponentCard title="Core actions">
               <div className="flex w-full flex-col items-center gap-4">
-                <div className="flex flex-wrap items-center justify-center gap-2">
+                <div className="flex w-full flex-wrap items-center justify-center gap-2">
                   <Button>Default</Button>
                   <Button variant="outline">Outline</Button>
                   <Button variant="secondary">Secondary</Button>
@@ -471,7 +392,7 @@ export default function Home() {
                   <Button variant="destructive">Destructive</Button>
                   <Button variant="link">Link</Button>
                 </div>
-                <div className="flex flex-wrap items-center justify-center gap-2">
+                <div className="flex w-full flex-wrap items-center justify-center gap-2">
                   <Button size="xs">XS</Button>
                   <Button size="sm">Small</Button>
                   <Button>Default</Button>
@@ -479,32 +400,52 @@ export default function Home() {
                 </div>
               </div>
             </ComponentCard>
-            <ComponentCard title="Utility pills" mono="new variants">
+            <ComponentCard title="Utility pills">
               <div className="flex w-full flex-col items-center gap-4">
-                <div className="flex flex-wrap items-center justify-center gap-2">
+                <div className="flex w-full flex-wrap items-center justify-center gap-2">
                   {utilityButtons.map((button) => (
-                    <Button key={button.label} variant={button.variant}>
+                    <Button
+                      key={button.label}
+                      variant={button.variant}
+                      className={cn("gap-2", button.className)}
+                    >
                       {button.icon}
                       {button.label}
                     </Button>
                   ))}
                 </div>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button variant="pill" size="xs">
+                <div className="flex w-full flex-wrap items-center justify-center gap-2">
+                  <Button variant="secondary" size="xs" className="gap-2">
                     <ComponentsGlyph />
                     Compact
                   </Button>
-                  <Button variant="pill" size="sm">
+                  <Button variant="secondary" size="sm" className="gap-2">
                     <ComponentsGlyph />
                     Small
                   </Button>
-                  <Button variant="pill">
+                  <Button variant="secondary" className="gap-2">
                     <ComponentsGlyph />
                     Default
                   </Button>
-                  <Button variant="pill" size="lg">
+                  <Button variant="secondary" size="lg" className="gap-2">
                     <ComponentsGlyph />
                     Large
+                  </Button>
+                </div>
+                <div className="flex w-full flex-wrap items-center justify-center gap-2">
+                  <Button
+                    variant="course"
+                    nativeButton={false}
+                    render={
+                      <a
+                        href="https://animations.dev"
+                        target="_blank"
+                        rel="noreferrer"
+                      />
+                    }
+                  >
+                    Take the course
+                    <CourseArrowIcon />
                   </Button>
                 </div>
               </div>
@@ -527,15 +468,15 @@ export default function Home() {
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-3">
                   <Switch defaultChecked />
-                  <span className="text-sm text-foreground/70">Enabled</span>
+                  <span className="type-small-strong text-[var(--dial-text-secondary)]">Enabled</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <Switch />
-                  <span className="text-sm text-foreground/70">Disabled</span>
+                  <span className="type-small-strong text-[var(--dial-text-secondary)]">Disabled</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <Switch size="sm" defaultChecked />
-                  <span className="text-sm text-foreground/70">Small</span>
+                  <span className="type-small-strong text-[var(--dial-text-secondary)]">Small</span>
                 </div>
               </div>
             </ComponentCard>
@@ -545,7 +486,7 @@ export default function Home() {
         <Separator />
 
         {/* Tabs */}
-        <Section title="Tabs" description="Segmented, underline, and clip-path transition styles.">
+        <Section title="Tabs" description="Segmented, underline, and animated highlight styles.">
           <div className="grid gap-4 sm:grid-cols-2">
             <ComponentCard title="Default tabs">
               <Tabs defaultValue="design">
@@ -555,13 +496,13 @@ export default function Home() {
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                 </TabsList>
                 <TabsContent value="design">
-                  <p className="pt-3 text-xs text-muted-foreground">Visual design tools and tokens.</p>
+                  <p className="type-caption pt-3 text-[var(--dial-text-label)]">Visual design tools and tokens.</p>
                 </TabsContent>
                 <TabsContent value="code">
-                  <p className="pt-3 text-xs text-muted-foreground">Source code and implementations.</p>
+                  <p className="type-caption pt-3 text-[var(--dial-text-label)]">Source code and implementations.</p>
                 </TabsContent>
                 <TabsContent value="preview">
-                  <p className="pt-3 text-xs text-muted-foreground">Live component previews.</p>
+                  <p className="type-caption pt-3 text-[var(--dial-text-label)]">Live component previews.</p>
                 </TabsContent>
               </Tabs>
             </ComponentCard>
@@ -573,18 +514,23 @@ export default function Home() {
                   <TabsTrigger value="api">API</TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview">
-                  <p className="pt-3 text-xs text-muted-foreground">Component overview and anatomy.</p>
+                  <p className="type-caption pt-3 text-[var(--dial-text-label)]">Component overview and anatomy.</p>
                 </TabsContent>
                 <TabsContent value="usage">
-                  <p className="pt-3 text-xs text-muted-foreground">Usage guidelines and examples.</p>
+                  <p className="type-caption pt-3 text-[var(--dial-text-label)]">Usage guidelines and examples.</p>
                 </TabsContent>
                 <TabsContent value="api">
-                  <p className="pt-3 text-xs text-muted-foreground">Props and configuration.</p>
+                  <p className="type-caption pt-3 text-[var(--dial-text-label)]">Props and configuration.</p>
                 </TabsContent>
               </Tabs>
             </ComponentCard>
-            <ComponentCard title="Clip-path tabs" mono="seamless color transition">
-              <ClipPathTabs
+            <ComponentCard
+              title="Highlight tabs"
+              mono="seamless color transition"
+              className="sm:col-span-2"
+              previewClassName="min-h-[22rem] p-4 md:p-6"
+            >
+              <HighlightTabs
                 defaultValue="payments"
                 items={[
                   {
@@ -675,48 +621,6 @@ export default function Home() {
           </div>
         </Section>
 
-        <Separator />
-
-        {/* Cards */}
-        <Section title="Cards" description="Content containers with flexible layouts.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-[13px]">Minimal card</CardTitle>
-                <CardDescription>
-                  A simple container for grouped content with subtle borders.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-foreground/60">
-                  Cards use a 1px ring at 10% foreground opacity, rounded-xl corners, and consistent padding.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-[13px]">With actions</CardTitle>
-                  <Button variant="ghost" size="xs">Edit</Button>
-                </div>
-                <CardDescription>
-                  Headers support inline actions and metadata.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3">
-                  <Avatar size="sm">
-                    <AvatarFallback>DS</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium text-foreground/80">Design System</p>
-                    <p className="text-xs text-muted-foreground">Updated 2 hours ago</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </Section>
 
         <Separator />
 
@@ -731,7 +635,7 @@ export default function Home() {
                       What&apos;s the difference between basic and advanced enrichment?
                     </AccordionTrigger>
                     <AccordionContent>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
+                      <p className="type-small text-[var(--dial-text-secondary)]">
                         Basic enrichment extracts metadata like titles, descriptions, and thumbnails.
                         Advanced enrichment goes further by summarizing full page content, extracting
                         key entities, and generating semantic tags for better search and discovery.
@@ -743,7 +647,7 @@ export default function Home() {
                       What are feed and channel subscriptions?
                     </AccordionTrigger>
                     <AccordionContent>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
+                      <p className="type-small text-[var(--dial-text-secondary)]">
                         Subscriptions let you automatically save new content from RSS feeds, YouTube
                         channels, newsletters, and other sources. New items are enriched and added
                         to your library as they appear.
@@ -755,7 +659,7 @@ export default function Home() {
                       How does the X bookmarks sync work?
                     </AccordionTrigger>
                     <AccordionContent>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
+                      <p className="type-small text-[var(--dial-text-secondary)]">
                         Once connected, your X bookmarks are periodically synced and enriched.
                         Each bookmark is saved with its full thread context, media, and metadata
                         so you can search and organize them alongside everything else.
@@ -764,15 +668,15 @@ export default function Home() {
                   </AccordionItem>
                   <AccordionItem value="links">
                     <AccordionTrigger>
-                      What kinds of links can Shiori save and enrich?
+                      What kinds of links can the library save and enrich?
                     </AccordionTrigger>
                     <AccordionContent>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        Shiori can save most kinds of links, but there will always be edge cases:
-                        if a website opts out of programmatic access, or if content is gated behind
-                        a paywall, Shiori will not be able to view the page. In some cases, websites
-                        with poorly formatted HTML or incredibly long page content may not be fully
-                        saved to Shiori.
+                      <p className="type-small text-[var(--dial-text-secondary)]">
+                        The library can save most kinds of links, but there will always be edge
+                        cases: if a website opts out of programmatic access, or if content is gated
+                        behind a paywall, the app will not be able to view the page. In some cases,
+                        websites with poorly formatted HTML or incredibly long page content may not
+                        be captured in full.
                       </p>
                     </AccordionContent>
                   </AccordionItem>
@@ -785,43 +689,13 @@ export default function Home() {
         <Separator />
 
         {/* Typography */}
-        <Section title="Typography" description="System UI body, serif display accents, mono readouts.">
-          <div className="flex flex-col gap-8">
-            <div>
-              <h3 className="font-serif text-4xl font-light tracking-tight text-foreground">
-                Display Accent
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground font-mono">
-                Iowan Old Style / 36px
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold tracking-tight text-foreground">
-                Panel Header
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground font-mono">
-                System UI 600 / 20px
-              </p>
-            </div>
-            <div>
-              <p className="text-sm leading-relaxed text-foreground/70">
-                Body copy leans on the platform sans stack so the interface
-                feels native next to DialKit&apos;s control surfaces and Bloom&apos;s
-                motion-heavy interactions.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground font-mono">
-                System UI 400 / 14px
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-xs text-foreground/50">
-                const tokens = system.resolve();
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground font-mono">
-                SF Mono style stack / 12px
-              </p>
-            </div>
-          </div>
+        <Section
+          title="Typography"
+          description="A single variable sans stack now drives display, headers, body copy, and compact UI labels across the system."
+        >
+          <ComponentCard title="Typography">
+            <TypographySpecimen />
+          </ComponentCard>
         </Section>
 
         <Separator />
@@ -845,7 +719,7 @@ export default function Home() {
                   style={{ background: `var(${color.var})` }}
                 />
                 <div>
-                  <p className="text-xs font-medium text-foreground/80">{color.name}</p>
+                  <p className="type-caption text-foreground/80">{color.name}</p>
                   <p className="text-[10px] font-mono text-muted-foreground">{color.var}</p>
                 </div>
               </div>
@@ -856,14 +730,12 @@ export default function Home() {
 
       <footer className="border-t border-border/50 px-8 py-5 mt-8">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
             shadcn/ui + Bloom Menu + DialKit
           </p>
           <p className="text-[11px] text-muted-foreground font-mono">2026</p>
         </div>
       </footer>
-
-      <ThemeModeToggle />
     </div>
   );
 }

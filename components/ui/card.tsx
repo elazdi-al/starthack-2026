@@ -12,7 +12,7 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card ui-glass-panel flex flex-col gap-4 rounded-[var(--dial-panel-radius)] py-3 text-sm text-card-foreground has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-2.5 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-[var(--dial-panel-radius)] *:[img:last-child]:rounded-b-[var(--dial-panel-radius)]",
+        "group/card ui-glass-panel type-small flex flex-col gap-4 rounded-[var(--dial-panel-radius)] py-3 text-card-foreground has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-2.5 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-[var(--dial-panel-radius)] *:[img:last-child]:rounded-b-[var(--dial-panel-radius)]",
         className
       )}
       {...props}
@@ -25,7 +25,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 border-b border-white/6 px-4 pb-3 group-data-[size=sm]/card:px-3 group-data-[size=sm]/card:pb-2.5 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
+        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 border-b border-[var(--dial-border)] px-4 pb-3 group-data-[size=sm]/card:px-3 group-data-[size=sm]/card:pb-2.5 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
         className
       )}
       {...props}
@@ -38,7 +38,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "text-[13px] leading-snug font-semibold tracking-[-0.01em] text-[var(--dial-text-root)] group-data-[size=sm]/card:text-[13px]",
+        "type-label leading-snug text-[var(--dial-text-root)]",
         className
       )}
       {...props}
@@ -50,7 +50,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-[13px] text-[var(--dial-text-secondary)]", className)}
+      className={cn("type-label text-[var(--dial-text-secondary)]", className)}
       {...props}
     />
   )
@@ -84,7 +84,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-[var(--dial-panel-radius)] border-t border-white/6 bg-white/[0.02] p-4 group-data-[size=sm]/card:p-3",
+        "flex items-center rounded-b-[var(--dial-panel-radius)] border-t border-[var(--dial-border)] bg-[var(--dial-surface)] p-4 group-data-[size=sm]/card:p-3",
         className
       )}
       {...props}

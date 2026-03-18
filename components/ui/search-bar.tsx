@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { triggerHaptic } from "@/lib/haptics";
 
 function SearchBar({
   placeholder = "Ask about",
@@ -27,25 +28,33 @@ function SearchBar({
     return () => clearInterval(id);
   }, [suggestions.length]);
 
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!value.trim()) {
+      return;
+    }
+
+    triggerHaptic("nudge");
+  }
+
   return (
     <div className={cn("mx-auto w-full max-w-[400px]", className)}>
-      <form onSubmit={(e) => e.preventDefault()}>
+      <form onSubmit={handleSubmit}>
         <div
           className={cn(
-            "relative h-[48px] overflow-hidden rounded-[20px]",
-            "bg-white/[0.06]",
-            "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)]",
-            "transition-shadow duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
-            "focus-within:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]"
+            "relative h-[48px] overflow-hidden rounded-[20px] border border-input bg-[var(--card)]",
+            "transition-[background-color,border-color] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+            "focus-within:border-[var(--input-hover)] focus-within:bg-[var(--dial-surface-active)]"
           )}
         >
           {/* Ghost placeholder */}
           {!value && (
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-4 right-12 flex items-center overflow-hidden whitespace-nowrap text-[0.95rem]"
+              className="type-ui pointer-events-none absolute inset-y-0 left-4 right-12 flex items-center overflow-hidden whitespace-nowrap"
             >
-              <span className="shrink-0 text-muted-foreground/60">
+              <span className="shrink-0 text-[var(--dial-text-label)]">
                 {placeholder}
               </span>
               <span className="ml-1.5 inline-flex min-w-0 overflow-hidden">
@@ -59,7 +68,7 @@ function SearchBar({
                       duration: 0.42,
                       ease: [0.32, 0.72, 0, 1],
                     }}
-                    className="truncate text-muted-foreground"
+                    className="truncate text-[var(--dial-text-secondary)]"
                   >
                     {suggestions[index]}
                   </motion.span>
@@ -74,7 +83,7 @@ function SearchBar({
             spellCheck={false}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="h-full w-full min-w-0 rounded-[20px] bg-transparent px-4 pr-12 text-[0.95rem] text-foreground outline-none"
+            className="type-ui h-full w-full min-w-0 rounded-[20px] bg-transparent px-4 pr-12 text-foreground outline-none"
             {...props}
           />
 
@@ -84,7 +93,7 @@ function SearchBar({
             className={cn(
               "absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2",
               "items-center justify-center rounded-full",
-              "text-muted-foreground transition-[opacity,color] duration-300",
+              "text-[var(--dial-text-label)] transition-[opacity,color] duration-300",
               "hover:text-foreground",
               "focus-visible:outline-none",
               "disabled:cursor-not-allowed disabled:opacity-40"

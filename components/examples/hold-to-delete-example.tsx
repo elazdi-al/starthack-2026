@@ -19,7 +19,7 @@ function TrashIcon() {
   );
 }
 
-export function HoldToDelete({ className }: { className?: string }) {
+export function HoldToDeleteExample({ className }: { className?: string }) {
   return (
     <div
       className={cn(
@@ -28,10 +28,10 @@ export function HoldToDelete({ className }: { className?: string }) {
       )}
     >
       <div className="light flex h-[264px] w-full items-center justify-center px-4 py-6 sm:rounded-xl">
-        <button className="hold-to-delete_button__aAKjf" type="button">
+        <button className="hold-to-delete-button" type="button">
           <div
             aria-hidden="true"
-            className="hold-to-delete_deleteSection__ZIN1l"
+            className="hold-to-delete-button__overlay"
           >
             <TrashIcon />
             Hold to Delete
