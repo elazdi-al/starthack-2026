@@ -1,5 +1,3 @@
-// Core types for Mars greenhouse simulation
-
 // Sensor readings (what sensors measure)
 export interface EnvironmentState {
   timestamp: number;

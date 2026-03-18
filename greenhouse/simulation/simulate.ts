@@ -1,4 +1,4 @@
-import { EnvironmentState, GreenhouseState } from './types';
+import { EnvironmentState, GreenhouseState } from '../state/types';
 
 // Simulation function: computes next environment state from current state + machine outputs
 export function simulate(

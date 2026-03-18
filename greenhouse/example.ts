@@ -1,7 +1,7 @@
-import { simulate } from './simulator';
-import { createInitialEnvironment } from './environment';
-import { createInitialGreenhouse } from './greenhouse';
-import { EnvironmentState, GreenhouseState } from './types';
+import { simulate } from './simulation';
+import { createInitialEnvironment, createInitialGreenhouse } from './state';
+import { decide } from './decision';
+import type { EnvironmentState, GreenhouseState } from './state/types';
 
 // Example usage of the Mars greenhouse simulation
 function runExample() {
@@ -16,7 +16,9 @@ function runExample() {
   // Run simulation for 3 steps (5 minutes each)
   console.log('\n=== Running 3 simulation steps (5 min each) ===');
   for (let i = 1; i <= 3; i++) {
+    // Simulate: environment + machines → next environment
     environment = simulate(environment, greenhouse, 5);
+    
     console.log(`\nStep ${i}:`);
     console.log(`  Temp: ${environment.temperature.toFixed(1)}°C`);
     console.log(`  Humidity: ${environment.humidity.toFixed(1)}%`);
@@ -25,8 +27,8 @@ function runExample() {
     console.log(`  Plant Growth: ${environment.plantGrowth.toFixed(1)}%`);
   }
 
-  // Adjust machine outputs
-  console.log('\n=== Adjusting greenhouse controls ===');
+  // Manually adjust machine outputs
+  console.log('\n=== Manually adjusting greenhouse controls ===');
   greenhouse.waterPumpRate = 20;
   greenhouse.heatingPower = 5000;
   greenhouse.co2InjectionRate = 100;
@@ -43,6 +45,11 @@ function runExample() {
     console.log(`  CO2: ${environment.co2Level.toFixed(0)} ppm`);
     console.log(`  Plant Growth: ${environment.plantGrowth.toFixed(1)}%`);
   }
+
+  // Example with decision logic (currently just returns same state)
+  console.log('\n=== Using decision logic ===');
+  greenhouse = decide(environment, greenhouse);
+  console.log('Decision output:', greenhouse);
 }
 
 // Run if executed directly
