@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party source copied from node_modules.
+    "components/ui/central-control/**",
   ]),
 ]);
 

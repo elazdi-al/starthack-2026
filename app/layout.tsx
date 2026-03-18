@@ -4,7 +4,7 @@ import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "Design System",
-  description: "A clean, minimal design system with shadcn/ui and DialKit",
+  description: "A clean, minimal design system with shadcn/ui and Central Control",
 };
 
 export default function RootLayout({
