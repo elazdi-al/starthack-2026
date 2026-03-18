@@ -1,21 +1,21 @@
 // Sensor readings (what sensors measure)
-export interface EnvironmentState {
-  timestamp: number;
-  temperature: number; // Celsius (inside greenhouse)
-  humidity: number; // percentage
-  co2Level: number; // ppm
-  soilMoisture: number; // percentage
-  lightLevel: number; // lux
-  plantGrowth: number; // 0-100%
-  externalTemp: number; // Mars outside temp
-  solarRadiation: number; // W/m²
+export abstract class EnvironmentState {
+  abstract timestamp: number;
+  abstract temperature: number; // Celsius (inside greenhouse)
+  abstract humidity: number; // percentage
+  abstract co2Level: number; // ppm
+  abstract soilMoisture: number; // percentage
+  abstract lightLevel: number; // lux
+  abstract plantGrowth: number; // 0-100%
+  abstract externalTemp: number; // Mars outside temp
+  abstract solarRadiation: number; // W/m²
 }
 
 // Machine outputs (what we control)
-export interface GreenhouseState {
-  waterPumpRate: number; // L/hour
-  lightingPower: number; // Watts
-  heatingPower: number; // Watts
-  co2InjectionRate: number; // ppm/hour
-  ventilationRate: number; // m³/hour
+export abstract class GreenhouseState {
+  abstract waterPumpRate: number; // L/hour
+  abstract lightingPower: number; // Watts
+  abstract heatingPower: number; // Watts
+  abstract co2InjectionRate: number; // ppm/hour
+  abstract ventilationRate: number; // m³/hour
 }

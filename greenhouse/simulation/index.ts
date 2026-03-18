@@ -1,1 +1,1 @@
-export { simulate } from './simulate';
+export type { SimulateFunction } from './simulate';

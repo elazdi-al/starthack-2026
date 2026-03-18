@@ -1,13 +1,7 @@
 import { EnvironmentState, GreenhouseState } from '../state/types';
 
-// Decision logic: determines new machine outputs based on sensor readings
-// TODO: Implement decision logic (AI, rules, optimization, etc.)
-
-export function decide(
+// Decision function type: determines new machine outputs based on sensor readings
+export type DecideFunction = (
   environment: EnvironmentState,
   currentGreenhouse: GreenhouseState
-): GreenhouseState {
-  // Placeholder: return current state unchanged
-  // Future: implement control logic here
-  return { ...currentGreenhouse };
-}
+) => GreenhouseState;
