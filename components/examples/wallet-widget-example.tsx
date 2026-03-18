@@ -1,6 +1,7 @@
 "use client";
 
 import { DotGridHorizontalIcon, WidgetBellIcon } from "@/components/icons";
+import { ColorSelector, WIDGET_ACCENTS } from "@/components/ui/color-selector";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 
@@ -8,9 +9,7 @@ import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import {
   WidgetShell,
-  WidgetAccentPicker,
   WidgetCopyAction,
-  WIDGET_ACCENTS,
   WIDGET_ANIMATED_STYLE,
   WIDGET_CONTENT_TRANSITION,
   WIDGET_EXIT_TRANSITION,
@@ -97,16 +96,12 @@ export function WalletWidgetExample({
       onOpenChange={handleDialogChange}
       panel={
         isPickingAccent ? (
-          <WidgetAccentPicker
-            selectedAccent={wallet.color}
-            onSelect={(color) => {
+          <ColorSelector
+            value={wallet.color}
+            onColorSelect={(color) => {
               setWallet((currentWallet) => ({ ...currentWallet, color }));
-              triggerHaptic("selection");
             }}
-            onDone={() => {
-              clearStep();
-              triggerHaptic("success");
-            }}
+            onDone={clearStep}
           />
         ) : null
       }

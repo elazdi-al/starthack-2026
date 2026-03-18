@@ -7,7 +7,6 @@ import {
   MotionConfig,
   motion,
   type HTMLMotionProps,
-  type Variants,
 } from "motion/react";
 import {
   forwardRef,
@@ -22,29 +21,6 @@ import {
 import { Checkmark1SmallIcon, ClipboardIcon } from "@/components/icons";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-
-export const WIDGET_ACCENTS = [
-  "#ee4562",
-  "#ec4899",
-  "#d946ef",
-  "#9553f9",
-  "#5647f0",
-  "#0680fa",
-  "#4dafff",
-  "#0ea5e9",
-  "#14bbc7",
-  "#10b981",
-  "#34c759",
-  "#84cc16",
-  "#eab308",
-  "#f59e0b",
-  "#f97316",
-  "#ef4444",
-  "#cdb35e",
-  "#c48c54",
-  "#023364",
-  "#1a1a1a",
-] as const;
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 
@@ -67,11 +43,6 @@ export const WIDGET_OVERLAY_TRANSITION = {
   ease: EASE_OUT,
 } as const;
 
-export const WIDGET_POPUP_TRANSITION = {
-  duration: 0.2,
-  ease: EASE_OUT,
-} as const;
-
 export const WIDGET_EXIT_TRANSITION = {
   duration: 0.14,
   ease: EASE_OUT,
@@ -86,33 +57,11 @@ export const WIDGET_ANIMATED_STYLE = {
   WebkitBackfaceVisibility: "hidden" as const,
 } as const;
 
-export const widgetPanelVariants = {
-  hidden: {
-    opacity: 0,
-    translateY: 14,
-    scale: 0.992,
-  },
-  visible: {
-    opacity: 1,
-    translateY: 0,
-    scale: 1,
-  },
-  exit: {
-    opacity: 0,
-    translateY: 14,
-    scale: 0.992,
-    transition: { duration: 0.16, ease: EASE_OUT },
-  },
-} as const satisfies Variants;
-
 export const widgetFrameClassName =
   "relative z-0 flex min-h-[384px] w-full items-center justify-center overflow-visible rounded-[12px] border border-[var(--dial-border)] bg-[var(--dial-surface)] shadow-[var(--dial-shadow)]";
 
 export const widgetPopupClassName =
   "fixed inset-0 z-[2147483647] m-auto flex flex-col-reverse items-center justify-center gap-6 p-4 pointer-events-none outline-none sm:p-6";
-
-export const widgetPanelClassName =
-  "pointer-events-auto flex w-full max-w-[400px] flex-col gap-4 rounded-[20px] border border-border/60 bg-card/72 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.18)] backdrop-blur-2xl dark:border-white/10 dark:bg-card/46";
 
 const widgetTextBaseClassName =
   "type-ui m-0 flex whitespace-nowrap p-0 leading-none";
@@ -160,14 +109,6 @@ interface WidgetSurfaceProps extends ComponentPropsWithoutRef<typeof motion.div>
   bottomLeft: ReactNode;
   topRight?: ReactNode;
   bottomRight?: ReactNode;
-}
-
-interface WidgetAccentPickerProps {
-  accents?: readonly string[];
-  selectedAccent: string;
-  doneLabel?: string;
-  onDone: () => void;
-  onSelect: (accent: string) => void;
 }
 
 interface WidgetCopyActionProps
@@ -479,59 +420,6 @@ const WidgetSurface = forwardRef<HTMLDivElement, WidgetSurfaceProps>(function Wi
     </motion.div>
   );
 });
-
-export function WidgetAccentPicker({
-  accents = WIDGET_ACCENTS,
-  selectedAccent,
-  doneLabel = "Save",
-  onDone,
-  onSelect,
-}: WidgetAccentPickerProps) {
-  return (
-    <motion.div
-      key="widget-accent-picker"
-      variants={widgetPanelVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      className={widgetPanelClassName}
-      style={WIDGET_ANIMATED_STYLE}
-      transition={WIDGET_POPUP_TRANSITION}
-    >
-      <fieldset
-        aria-label="Accent options"
-        className="m-0 grid min-w-0 grid-cols-5 gap-2 border-0 p-0"
-      >
-        {accents.map((accent) => (
-          <motion.button
-            key={accent}
-            type="button"
-            aria-label={`Select accent ${accent}`}
-            aria-pressed={selectedAccent === accent}
-            className="relative size-8 rounded-full"
-            style={{ background: accent }}
-            onClick={() => onSelect(accent)}
-            transition={WIDGET_CONTENT_TRANSITION}
-          >
-            {selectedAccent === accent && (
-              <span className="absolute inset-[4px] rounded-full ring-[3px] ring-white/95" />
-            )}
-          </motion.button>
-        ))}
-      </fieldset>
-
-      <motion.button
-        type="button"
-        onClick={onDone}
-        className="type-ui h-10 rounded-2xl text-white"
-        style={{ background: selectedAccent }}
-        transition={WIDGET_CONTENT_TRANSITION}
-      >
-        {doneLabel}
-      </motion.button>
-    </motion.div>
-  );
-}
 
 export function WidgetShell({
   accent,

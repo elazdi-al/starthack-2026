@@ -1,6 +1,7 @@
 "use client";
 
 import { DotGridHorizontalIcon, RoutePulseIcon } from "@/components/icons";
+import { ColorSelector, WIDGET_ACCENTS } from "@/components/ui/color-selector";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 
@@ -8,9 +9,7 @@ import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import {
   WidgetShell,
-  WidgetAccentPicker,
   WidgetCopyAction,
-  WIDGET_ACCENTS,
   WIDGET_ANIMATED_STYLE,
   WIDGET_CONTENT_TRANSITION,
   WIDGET_EXIT_TRANSITION,
@@ -99,16 +98,12 @@ export function RunningWidgetExample({
       onOpenChange={handleDialogChange}
       panel={
         isPickingAccent ? (
-          <WidgetAccentPicker
-            selectedAccent={run.color}
-            onSelect={(color) => {
+          <ColorSelector
+            value={run.color}
+            onColorSelect={(color) => {
               setRun((currentRun) => ({ ...currentRun, color }));
-              triggerHaptic("selection");
             }}
-            onDone={() => {
-              clearStep();
-              triggerHaptic("success");
-            }}
+            onDone={clearStep}
           />
         ) : null
       }
