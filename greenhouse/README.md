@@ -6,24 +6,20 @@ Type definitions for Mars greenhouse simulation and control.
 
 ```
 greenhouse/
-├── state/          # State type definitions
-│   └── types.ts           # EnvironmentState & GreenhouseState abstract classes
-├── simulation/     # Physics simulation types
-│   └── simulate.ts        # SimulateFunction type
+├── state/          # All state type definitions
+│   └── types.ts           # Environment, GreenhouseState, SimulationState, State
 └── decision/       # Control logic types
     └── index.ts           # DecideFunction type
 ```
 
 ## Types
 
-**EnvironmentState**: Abstract class for sensor readings (temperature, humidity, CO2, soil moisture, light, plant growth, external conditions)
+**Environment**: Sensor readings (temperature, humidity, CO2, soil moisture, light, plant growth, external conditions)
 
-**GreenhouseState**: Abstract class for machine outputs (water pump, lighting, heating, CO2 injection, ventilation)
+**GreenhouseState**: Machine outputs (water pump, lighting, heating, CO2 injection, ventilation)
 
-**SimulateFunction**: `(env, machines, deltaMinutes) => (time: 0-1) => nextEnv`
+**SimulationState**: Simulation state with `getEnvironment(time)` method to query environment at any time t
 
-**DecideFunction**: `(env, machines) => nextMachines`
+**State**: Complete system state containing current simulation and greenhouse machine outputs
 
-## Usage
-
-Implement concrete classes extending the abstract types, then implement the simulation and decision functions.
+**DecideFunction**: `(environment, machines) => nextMachines`

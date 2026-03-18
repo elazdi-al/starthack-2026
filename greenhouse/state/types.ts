@@ -1,21 +1,18 @@
-// Sensor readings (what sensors measure)
-export abstract class EnvironmentState {
-  abstract timestamp: number;
-  abstract temperature: number; // Celsius (inside greenhouse)
-  abstract humidity: number; // percentage
-  abstract co2Level: number; // ppm
-  abstract soilMoisture: number; // percentage
-  abstract lightLevel: number; // lux
-  abstract plantGrowth: number; // 0-100%
-  abstract externalTemp: number; // Mars outside temp
-  abstract solarRadiation: number; // W/m²
-}
+// Sensor readings - everything measured about the greenhouse
+export abstract class Environment {}
 
 // Machine outputs (what we control)
-export abstract class GreenhouseState {
-  abstract waterPumpRate: number; // L/hour
-  abstract lightingPower: number; // Watts
-  abstract heatingPower: number; // Watts
-  abstract co2InjectionRate: number; // ppm/hour
-  abstract ventilationRate: number; // m³/hour
+export abstract class GreenhouseState {}
+
+// Simulation - represents the current simulation state
+// A simulation is created from initial environment and greenhouse state
+// and can be queried at any time t (0 to infinity) to get the environment at that time
+export abstract class SimulationState {
+  abstract getEnvironment(time: number): Environment;
+}
+
+// Complete state - combines current simulation and greenhouse machine outputs
+export abstract class State {
+  abstract simulation: SimulationState;
+  abstract greenhouse: GreenhouseState;
 }
