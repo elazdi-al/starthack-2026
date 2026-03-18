@@ -1,44 +1,31 @@
 # Mars Greenhouse Simulation
 
-A simulation system for a Mars greenhouse that models environmental conditions and greenhouse control systems.
+A simple simulation system for a Mars greenhouse with clear separation between sensor readings, machine outputs, and simulation logic.
 
-## Structure
+## Architecture
 
-- **EnvironmentState**: External Mars conditions read by sensors (temperature, solar radiation, dust storms, etc.)
-- **GreenhouseState**: Internal controlled systems (water, lighting, heating, CO2, plant growth)
-- **MarsEnvironment**: Simulates changing Mars conditions over time
-- **Greenhouse**: Manages internal systems and plant growth
-- **MarsGreenhouseSimulator**: Main orchestrator that ties everything together
+- **EnvironmentState**: Sensor readings (temperature, humidity, CO2, soil moisture, light, plant growth, external conditions)
+- **GreenhouseState**: Machine outputs (water pump, lighting, heating, CO2 injection, ventilation)
+- **simulate()**: Pure function that takes current environment + machine outputs → returns next environment state
 
 ## Usage
 
 ```typescript
-import { MarsGreenhouseSimulator } from './simulation';
+import { simulate, createInitialEnvironment, createInitialGreenhouse } from './simulation';
 
-// Create simulator
-const simulator = new MarsGreenhouseSimulator({
-  updateIntervalMinutes: 5,
-});
+// Initialize
+let environment = createInitialEnvironment();
+let greenhouse = createInitialGreenhouse();
 
-// Get current state
-const state = simulator.getFullState();
+// Run simulation step (5 minutes)
+environment = simulate(environment, greenhouse, 5);
 
-// Manual update
-simulator.step();
+// Adjust machine outputs
+greenhouse.waterPumpRate = 20;
+greenhouse.heatingPower = 5000;
 
-// Control greenhouse
-simulator.setWaterSupply(2000);
-simulator.setLightingIntensity(90);
-simulator.setHeatingPower(6000);
-simulator.setCO2Level(1500);
-
-// Auto-update every X minutes
-simulator.start((state) => {
-  console.log('Updated:', state);
-});
-
-// Stop auto-updates
-simulator.stop();
+// Run another step
+environment = simulate(environment, greenhouse, 5);
 ```
 
 ## Running the Example

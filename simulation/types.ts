@@ -1,31 +1,23 @@
 // Core types for Mars greenhouse simulation
 
+// Sensor readings (what sensors measure)
 export interface EnvironmentState {
-  // External Mars conditions (read by sensors)
   timestamp: number;
-  externalTemperature: number; // Celsius
-  solarRadiation: number; // W/m²
-  atmosphericPressure: number; // Pa
-  dustStormIntensity: number; // 0-1 scale
-  marsTime: {
-    sol: number; // Mars day
-    hour: number; // 0-24
-  };
-}
-
-export interface GreenhouseState {
-  // Controlled internal conditions
-  waterSupply: number; // Liters
-  lightingIntensity: number; // 0-100%
-  heatingPower: number; // Watts
-  co2Level: number; // ppm
+  temperature: number; // Celsius (inside greenhouse)
   humidity: number; // percentage
+  co2Level: number; // ppm
   soilMoisture: number; // percentage
-  plantGrowthStage: number; // 0-100%
+  lightLevel: number; // lux
+  plantGrowth: number; // 0-100%
+  externalTemp: number; // Mars outside temp
+  solarRadiation: number; // W/m²
 }
 
-export interface SimulationConfig {
-  updateIntervalMinutes: number;
-  initialEnvironment: Partial<EnvironmentState>;
-  initialGreenhouse: Partial<GreenhouseState>;
+// Machine outputs (what we control)
+export interface GreenhouseState {
+  waterPumpRate: number; // L/hour
+  lightingPower: number; // Watts
+  heatingPower: number; // Watts
+  co2InjectionRate: number; // ppm/hour
+  ventilationRate: number; // m³/hour
 }

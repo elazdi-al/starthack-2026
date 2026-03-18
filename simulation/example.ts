@@ -1,57 +1,48 @@
-import { MarsGreenhouseSimulator } from './simulator';
+import { simulate } from './simulator';
+import { createInitialEnvironment } from './environment';
+import { createInitialGreenhouse } from './greenhouse';
+import { EnvironmentState, GreenhouseState } from './types';
 
 // Example usage of the Mars greenhouse simulation
 function runExample() {
-  // Create simulator with custom config
-  const simulator = new MarsGreenhouseSimulator({
-    updateIntervalMinutes: 5,
-    initialEnvironment: {
-      externalTemperature: -60,
-      dustStormIntensity: 0,
-    },
-    initialGreenhouse: {
-      waterSupply: 1500,
-      lightingIntensity: 85,
-    },
-  });
+  // Initialize states
+  let environment = createInitialEnvironment();
+  let greenhouse = createInitialGreenhouse();
 
-  // Log state on each update
-  const logState = (state: ReturnType<typeof simulator.getFullState>) => {
-    console.log('\n=== Mars Greenhouse Status ===');
-    console.log(`Sol ${state.environment.marsTime.sol}, Hour ${state.environment.marsTime.hour.toFixed(1)}`);
-    console.log('\nEnvironment:');
-    console.log(`  Temperature: ${state.environment.externalTemperature.toFixed(1)}°C`);
-    console.log(`  Solar Radiation: ${state.environment.solarRadiation.toFixed(0)} W/m²`);
-    console.log(`  Dust Storm: ${(state.environment.dustStormIntensity * 100).toFixed(0)}%`);
-    console.log('\nGreenhouse:');
-    console.log(`  Water Supply: ${state.greenhouse.waterSupply.toFixed(1)}L`);
-    console.log(`  Soil Moisture: ${state.greenhouse.soilMoisture.toFixed(1)}%`);
-    console.log(`  Plant Growth: ${state.greenhouse.plantGrowthStage.toFixed(1)}%`);
-    console.log(`  CO2 Level: ${state.greenhouse.co2Level.toFixed(0)} ppm`);
-  };
+  console.log('=== Initial State ===');
+  console.log('Environment (sensors):', environment);
+  console.log('Greenhouse (machines):', greenhouse);
 
-  // Get initial state
-  console.log('Initial state:');
-  logState(simulator.getFullState());
-
-  // Manual step example
-  console.log('\n--- Running 3 manual steps ---');
-  for (let i = 0; i < 3; i++) {
-    simulator.step();
-    logState(simulator.getFullState());
+  // Run simulation for 3 steps (5 minutes each)
+  console.log('\n=== Running 3 simulation steps (5 min each) ===');
+  for (let i = 1; i <= 3; i++) {
+    environment = simulate(environment, greenhouse, 5);
+    console.log(`\nStep ${i}:`);
+    console.log(`  Temp: ${environment.temperature.toFixed(1)}°C`);
+    console.log(`  Humidity: ${environment.humidity.toFixed(1)}%`);
+    console.log(`  Soil Moisture: ${environment.soilMoisture.toFixed(1)}%`);
+    console.log(`  CO2: ${environment.co2Level.toFixed(0)} ppm`);
+    console.log(`  Plant Growth: ${environment.plantGrowth.toFixed(1)}%`);
   }
 
-  // Adjust greenhouse controls
-  console.log('\n--- Adjusting controls ---');
-  simulator.setWaterSupply(2000);
-  simulator.setLightingIntensity(95);
-  simulator.setCO2Level(1500);
-  logState(simulator.getFullState());
+  // Adjust machine outputs
+  console.log('\n=== Adjusting greenhouse controls ===');
+  greenhouse.waterPumpRate = 20;
+  greenhouse.heatingPower = 5000;
+  greenhouse.co2InjectionRate = 100;
+  console.log('New greenhouse settings:', greenhouse);
 
-  // Start automatic updates (uncomment to run continuously)
-  // simulator.start(logState);
-  
-  // To stop: simulator.stop();
+  // Run more steps with new settings
+  console.log('\n=== Running 2 more steps with new settings ===');
+  for (let i = 1; i <= 2; i++) {
+    environment = simulate(environment, greenhouse, 5);
+    console.log(`\nStep ${i}:`);
+    console.log(`  Temp: ${environment.temperature.toFixed(1)}°C`);
+    console.log(`  Humidity: ${environment.humidity.toFixed(1)}%`);
+    console.log(`  Soil Moisture: ${environment.soilMoisture.toFixed(1)}%`);
+    console.log(`  CO2: ${environment.co2Level.toFixed(0)} ppm`);
+    console.log(`  Plant Growth: ${environment.plantGrowth.toFixed(1)}%`);
+  }
 }
 
 // Run if executed directly
