@@ -3,7 +3,6 @@ import type { ComponentType } from "react";
 import {
   ArrowCircleRightIcon,
   ArrowCircleUpIcon,
-  ArrowSquareOutIcon,
   ArrowSquareUpRightIcon,
   BellRingingIcon,
   BellSimpleIcon,
@@ -14,11 +13,13 @@ import {
   DotsThreeOutlineIcon,
   EyeIcon,
   EyeSlashIcon,
+  GearSixIcon,
   type IconWeight,
   MoonStarsIcon,
   type IconProps as PhosphorIconProps,
   PulseIcon,
   ReceiptIcon,
+  SidebarSimpleIcon,
   SquaresFourIcon,
   SunDimIcon,
   TrashSimpleIcon,
@@ -202,4 +203,14 @@ export const EyeOpenIcon = createIcon(EyeIcon, {
 export const EyeClosedIcon = createIcon(EyeSlashIcon, {
   size: 16,
   weight: "regular",
+});
+
+export const SettingsGearIcon = createIcon(GearSixIcon, {
+  size: 22,
+  weight: "fill",
+});
+
+export const SidebarPanelIcon = createIcon(SidebarSimpleIcon, {
+  size: 22,
+  weight: "fill",
 });
