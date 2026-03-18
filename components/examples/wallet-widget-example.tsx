@@ -1,5 +1,6 @@
 "use client";
 
+import { DotGridHorizontalIcon, WidgetBellIcon } from "@/components/icons";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 
@@ -27,57 +28,6 @@ interface WalletWidgetState {
   balance: number;
   color: string;
   name: string;
-}
-
-type IconProps = ComponentPropsWithoutRef<"svg"> & {
-  color?: string;
-  size?: number;
-};
-
-function Bell2Icon({ color = "currentColor", size = 24, ...props }: IconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      width={size}
-      height={size}
-      {...props}
-    >
-      <title>Bell 2</title>
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M12 2C8.10602 2 4.89608 5.05346 4.70162 8.94258L4.52221 12.5309C4.5153 12.6691 4.47977 12.8044 4.41788 12.9282L3.19098 15.382C3.06539 15.6332 3 15.9101 3 16.191C3 17.1901 3.80992 18 4.80902 18H7.10002C7.56329 20.2822 9.58104 22 12 22C14.419 22 16.4367 20.2822 16.9 18H19.191C20.1901 18 21 17.1901 21 16.191C21 15.9101 20.9346 15.6332 20.809 15.382L19.5821 12.9282C19.5202 12.8044 19.4847 12.6691 19.4778 12.5309L19.2984 8.94258C19.1039 5.05346 15.894 2 12 2ZM12 20C10.6938 20 9.58254 19.1652 9.17071 18H14.8293C14.4175 19.1652 13.3062 20 12 20Z"
-        fill={color}
-      />
-    </svg>
-  );
-}
-
-function DotGrid1X3HorizontalIcon({
-  color = "currentColor",
-  size = 24,
-  ...props
-}: IconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      width={size}
-      height={size}
-      {...props}
-    >
-      <title>Dot Grid 1 X 3 Horizontal</title>
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M2 12C2 10.8954 2.89543 10 4 10C5.10457 10 6 10.8954 6 12C6 13.1046 5.10457 14 4 14C2.89543 14 2 13.1046 2 12ZM10 12C10 10.8954 10.8954 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12ZM18 12C18 10.8954 18.8954 10 20 10C21.1046 10 22 10.8954 22 12C22 13.1046 21.1046 14 20 14C18.8954 14 18 13.1046 18 12Z"
-        fill={color}
-      />
-    </svg>
-  );
 }
 
 export function WalletWidgetExample({
@@ -162,7 +112,7 @@ export function WalletWidgetExample({
       }
       compactTopLeft={
         <div className="flex size-[30px] items-center justify-center">
-          <Bell2Icon color="rgba(255,255,255,0.95)" />
+          <WidgetBellIcon color="rgba(255,255,255,0.95)" />
         </div>
       }
       compactBottomLeft={
@@ -184,7 +134,7 @@ export function WalletWidgetExample({
           className="pointer-events-none"
           style={{ ...getWidgetIconButtonStyle(), ...WIDGET_ANIMATED_STYLE }}
         >
-          <DotGrid1X3HorizontalIcon color="rgba(255,255,255,0.95)" size={24} />
+          <DotGridHorizontalIcon color="rgba(255,255,255,0.95)" />
         </div>
       }
       compactBottomRight={
@@ -197,7 +147,7 @@ export function WalletWidgetExample({
       }
       expandedTopLeft={
         <div className="flex size-[30px] items-center justify-center">
-          <Bell2Icon color="rgba(255,255,255,0.95)" />
+          <WidgetBellIcon color="rgba(255,255,255,0.95)" />
         </div>
       }
       expandedBottomLeft={

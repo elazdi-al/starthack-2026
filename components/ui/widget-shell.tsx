@@ -19,8 +19,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { Checkmark1SmallIcon } from "@/icons/interface-general/checkmark-1-small";
-import { ClipboardIcon } from "@/icons/interface-general/clipboard";
+import { Checkmark1SmallIcon, ClipboardIcon } from "@/components/icons";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 

@@ -1,7 +1,7 @@
 "use client";
 
+import { Check, Copy } from "@phosphor-icons/react";
 import * as React from "react";
-import { Check, Copy } from "lucide-react";
 
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -77,15 +77,17 @@ function CopyButton({
       <span className="relative block h-4 w-4">
         <Copy
           className={cn(
-            "absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-200 ease-out",
+            "ui-icon ui-icon-ios ui-icon-muted absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-200 ease-out",
             copied ? "scale-75 opacity-0" : "scale-100 opacity-100"
           )}
+          weight="fill"
         />
         <Check
           className={cn(
-            "absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-200 ease-out",
+            "ui-icon ui-icon-ios ui-icon-strong absolute inset-0 h-4 w-4 transition-[opacity,transform] duration-200 ease-out",
             copied ? "scale-100 opacity-100" : "scale-75 opacity-0"
           )}
+          weight="bold"
         />
       </span>
     </button>

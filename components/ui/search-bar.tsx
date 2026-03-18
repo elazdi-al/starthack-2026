@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/utils";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
+
 import { triggerHaptic } from "@/lib/haptics";
+import { cn } from "@/lib/utils";
 
 function SearchBar({
   placeholder = "Ask about",
@@ -100,7 +101,7 @@ function SearchBar({
             )}
             aria-label="Send"
           >
-            <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
+            <ArrowRight className="ui-icon ui-icon-ios ui-icon-strong h-4 w-4" weight="bold" />
           </button>
         </div>
       </form>

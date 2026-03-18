@@ -1,5 +1,6 @@
 "use client";
 
+import { DotGridHorizontalIcon, RoutePulseIcon } from "@/components/icons";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 
@@ -28,63 +29,6 @@ interface RunningWidgetState {
   name: string;
   pace: string;
   streak: string;
-}
-
-type IconProps = ComponentPropsWithoutRef<"svg"> & {
-  color?: string;
-  size?: number;
-};
-
-function RoutePulseIcon({ color = "currentColor", size = 24, ...props }: IconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      width={size}
-      height={size}
-      {...props}
-    >
-      <title>Route Pulse</title>
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M5.75 4C3.67893 4 2 5.67893 2 7.75C2 9.82107 3.67893 11.5 5.75 11.5C7.24628 11.5 8.53801 10.6238 9.14009 9.35735H10.882L12.5767 12.3229C12.8444 12.7914 13.3428 13.0806 13.8823 13.0806H16.7786C17.0648 14.7628 18.5294 16.0452 20.2923 16.0452C22.2603 16.0452 23.8558 14.4497 23.8558 12.4817C23.8558 10.5137 22.2603 8.91821 20.2923 8.91821C18.7982 8.91821 17.5191 9.83703 16.9834 11.1408H14.3672L12.6725 8.17517C12.4048 7.70671 11.9064 7.41748 11.3669 7.41748H9.1041C8.95195 5.51526 7.35996 4 5.75 4ZM5.75 6C4.7835 6 4 6.7835 4 7.75C4 8.7165 4.7835 9.5 5.75 9.5C6.7165 9.5 7.5 8.7165 7.5 7.75C7.5 6.7835 6.7165 6 5.75 6ZM20.2923 10.9182C19.4111 10.9182 18.6969 11.6324 18.6969 12.5136C18.6969 13.3948 19.4111 14.109 20.2923 14.109C21.1735 14.109 21.8877 13.3948 21.8877 12.5136C21.8877 11.6324 21.1735 10.9182 20.2923 10.9182Z"
-        fill={color}
-      />
-      <path
-        d="M2.97363 17.8789C5.1893 16.4095 7.75866 15.625 10.3818 15.625H12.1894C14.6277 15.625 17.0082 16.3735 19.0088 17.7683"
-        stroke={color}
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function DotGrid1X3HorizontalIcon({
-  color = "currentColor",
-  size = 24,
-  ...props
-}: IconProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      width={size}
-      height={size}
-      {...props}
-    >
-      <title>Dot Grid 1 X 3 Horizontal</title>
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M2 12C2 10.8954 2.89543 10 4 10C5.10457 10 6 10.8954 6 12C6 13.1046 5.10457 14 4 14C2.89543 14 2 13.1046 2 12ZM10 12C10 10.8954 10.8954 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8954 14 10 13.1046 10 12ZM18 12C18 10.8954 18.8954 10 20 10C21.1046 10 22 10.8954 22 12C22 13.1046 21.1046 14 20 14C18.8954 14 18 13.1046 18 12Z"
-        fill={color}
-      />
-    </svg>
-  );
 }
 
 export function RunningWidgetExample({
@@ -192,7 +136,7 @@ export function RunningWidgetExample({
           className="pointer-events-none"
           style={{ ...getWidgetIconButtonStyle(), ...WIDGET_ANIMATED_STYLE }}
         >
-          <DotGrid1X3HorizontalIcon color="rgba(255,255,255,0.95)" size={24} />
+          <DotGridHorizontalIcon color="rgba(255,255,255,0.95)" />
         </div>
       }
       compactBottomRight={

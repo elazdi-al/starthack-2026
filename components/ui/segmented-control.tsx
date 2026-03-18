@@ -40,6 +40,14 @@ function SegmentedControl({
   );
   const currentValue = value ?? internalValue;
 
+  function renderOptionIcon(icon: React.ReactNode) {
+    return (
+      <span className="flex size-4 items-center justify-center [&>svg]:size-4 [&>svg]:shrink-0">
+        {icon}
+      </span>
+    );
+  }
+
   return (
     <TooltipProvider>
       <div
@@ -91,7 +99,7 @@ function SegmentedControl({
                     )}
                     <span
                       className={cn(
-                        "relative z-10 transition-colors duration-200",
+                        "relative z-10 flex items-center justify-center transition-colors duration-200",
                         isDisabled
                           ? "text-[var(--dial-text-tertiary)]"
                           : isActive
@@ -99,7 +107,7 @@ function SegmentedControl({
                             : "text-[var(--dial-text-label)]"
                       )}
                     >
-                      {option.icon ?? (
+                      {option.icon ? renderOptionIcon(option.icon) : (
                         <span className="type-caption flex h-4 items-center">
                           {option.label}
                         </span>

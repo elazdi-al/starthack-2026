@@ -1,7 +1,7 @@
 "use client"
 
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion"
-import { ChevronDown } from "lucide-react"
+import { CaretDown } from "@phosphor-icons/react"
 
 import { triggerHaptic } from "@/lib/haptics"
 import { cn } from "@/lib/utils"
@@ -59,7 +59,7 @@ function AccordionTrigger({
         {...props}
       >
         {children}
-        <ChevronDown className="size-5 shrink-0 text-[var(--dial-text-label)] transition-transform duration-200" />
+        <CaretDown className="ui-icon ui-icon-ios ui-icon-muted size-5 shrink-0 transition-transform duration-200" weight="bold" />
       </AccordionPrimitive.Trigger>
     </AccordionPrimitive.Header>
   )

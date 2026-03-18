@@ -242,14 +242,19 @@ function ToggleButton({
         }}
       >
         <IconWrapper
-          className="size-10 select-none text-white will-change-transform [&>svg]:size-10"
+          className="size-10 select-none text-white will-change-transform [&_.ui-icon]:filter-none [&_.ui-icon]:transform-none [&_svg]:size-10"
         >
-          <span ref={animatedIconRef} className="inline-flex [&>svg]:size-10">
+          <span ref={animatedIconRef} className="inline-flex [&_.ui-icon]:filter-none [&_.ui-icon]:transform-none [&_svg]:size-10">
             {overlayIcon}
           </span>
         </IconWrapper>
       </div>
-      <IconWrapper className={cn("size-10 select-none [&>svg]:size-10", colors.text)}>
+      <IconWrapper
+        className={cn(
+          "size-10 select-none [&_.ui-icon]:filter-none [&_.ui-icon]:transform-none [&_svg]:size-10",
+          colors.text
+        )}
+      >
         {baseIcon}
       </IconWrapper>
     </motion.button>
@@ -373,14 +378,19 @@ function ConfirmButton({
               initial={{ opacity: 0, scale: 0.5, filter: "blur(4px)" }}
               transition={buttonTransition}
             >
-              <IconWrapper className="size-10 select-none text-white [&>svg]:size-10">
+              <IconWrapper className="size-10 select-none text-white [&_.ui-icon]:filter-none [&_.ui-icon]:transform-none [&_svg]:size-10">
                 {activeIcon ?? icon}
               </IconWrapper>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-      <IconWrapper className={cn("size-10 select-none [&>svg]:size-10", colors.text)}>
+      <IconWrapper
+        className={cn(
+          "size-10 select-none [&_.ui-icon]:filter-none [&_.ui-icon]:transform-none [&_svg]:size-10",
+          colors.text
+        )}
+      >
         {icon}
       </IconWrapper>
     </motion.button>
@@ -461,11 +471,16 @@ function DeleteButton({
           transitionProperty: "clip-path",
         }}
       >
-        <IconWrapper className="size-10 select-none text-white [&>svg]:size-10">
+        <IconWrapper className="size-10 select-none text-white [&_.ui-icon]:filter-none [&_.ui-icon]:transform-none [&_svg]:size-10">
           {activeIcon ?? icon}
         </IconWrapper>
       </div>
-      <IconWrapper className={cn("size-10 select-none [&>svg]:size-10", colors.text)}>
+      <IconWrapper
+        className={cn(
+          "size-10 select-none [&_.ui-icon]:filter-none [&_.ui-icon]:transform-none [&_svg]:size-10",
+          colors.text
+        )}
+      >
         {icon}
       </IconWrapper>
     </motion.button>
