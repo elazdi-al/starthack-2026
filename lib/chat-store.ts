@@ -144,7 +144,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               updateMessage(assistantId, { toolCalls: [...toolCalls] });
 
               if (
-                parsed.toolName === "set-greenhouse-parameters" &&
+                parsed.toolName === "greenhouseParameterTool" &&
                 parsed.result?.success &&
                 Array.isArray(parsed.result.changes)
               ) {
