@@ -494,11 +494,9 @@ function MarsPreparedPad() {
 
 export function GreenhouseGrid({
   introStage = "open",
-  greenhouseVisible = false,
   showBackdrop = true,
 }: {
   introStage?: GreenhouseIntroStage;
-  greenhouseVisible?: boolean;
   showBackdrop?: boolean;
 }) {
   const grid = useGreenhouseStore((s) => s.grid);
@@ -508,23 +506,36 @@ export function GreenhouseGrid({
   const handleSelect = useCallback((tile: TileData) => setSelected(tile), []);
   const handleClose = useCallback(() => setSelected(null), []);
   const interactive = introStage === "open";
-  const cropInteractionsEnabled = interactive && !greenhouseVisible;
-  const overlayVisible = introStage === "sealed" || (interactive && greenhouseVisible);
-
-  useEffect(() => {
-    if (!greenhouseVisible || selected === null) {
-      return;
-    }
-
-    const frameId = window.requestAnimationFrame(() => {
-      setSelected(null);
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [greenhouseVisible, selected]);
 
   // ── Pan & Zoom ────────────────────────────────────────────────────────
   const [zoom, setZoom] = useState(1);
+
+  // ── Zoom-driven wall visibility with hysteresis ────────────────────────
+  // Walls hide at default zoom (1.0) and closer; show when zoomed out.
+  // Hysteresis prevents flickering at the boundary.
+  const ZOOM_HIDE_THRESHOLD = 1.0;  // zoom in past this → walls hide
+  const ZOOM_SHOW_THRESHOLD = 0.95; // zoom out past this → walls return
+  const [wallsVisible, setWallsVisible] = useState(false);
+
+  useEffect(() => {
+    if (zoom > ZOOM_HIDE_THRESHOLD && wallsVisible) {
+      setWallsVisible(false);
+    } else if (zoom < ZOOM_SHOW_THRESHOLD && !wallsVisible) {
+      setWallsVisible(true);
+    }
+  }, [zoom, wallsVisible]);
+
+  const cropInteractionsEnabled = interactive && !wallsVisible;
+  const overlayVisible = introStage === "sealed" || (interactive && wallsVisible);
+
+  useEffect(() => {
+    if (wallsVisible && selected !== null) {
+      const frameId = window.requestAnimationFrame(() => {
+        setSelected(null);
+      });
+      return () => window.cancelAnimationFrame(frameId);
+    }
+  }, [wallsVisible, selected]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
