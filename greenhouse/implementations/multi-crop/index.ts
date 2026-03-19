@@ -15,6 +15,7 @@ export {
   createInitialGreenhouseState,
   createInitialState,
   MISSION_START_LS,
+  INITIAL_FOOD_RESERVES_SOLS,
   TILE_CROP_LAYOUT,
   aggregateTileCrops,
 } from './initial';
@@ -27,4 +28,7 @@ export {
   applyTransformations,
   harvestCrop,
   replantCrop,
+  harvestTile,
+  plantTile,
+  clearTile,
 } from './transformation';

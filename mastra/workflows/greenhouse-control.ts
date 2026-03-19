@@ -20,14 +20,18 @@ const SituationReportSchema = z.object({
   cropsWithLowO2: z.array(z.string()),
   cropsWithHighEC: z.array(z.string()),
   boltingCrops: z.array(z.string()),
+  tilesAtHarvestReady: z.array(z.string()),
+  tilesWithHighDisease: z.array(z.string()),
+  tilesWithLowHealth: z.array(z.string()),
   urgencyLevel: z.enum(['low', 'medium', 'high', 'critical']),
 });
 
 const ActionSchema = z.object({
-  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant']),
+  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'harvest-tile', 'plant-tile', 'clear-tile']),
   param: z.string().optional(),
   value: z.number().optional(),
   crop: z.string().optional(),
+  tileId: z.string().optional(),
 });
 
 const ReasonOutputSchema = z.object({
@@ -84,6 +88,28 @@ const assessStep = createStep({
       .filter(([, c]) => c.isBolting)
       .map(([name]) => name);
 
+    // Per-tile analysis
+    const tileCrops = (snap.tileCrops ?? {}) as Record<string, {
+      tileId?: string;
+      cropType?: string;
+      stage?: string;
+      diseaseRisk?: number;
+      healthScore?: number;
+    }>;
+    const tileEntries = Object.entries(tileCrops);
+
+    const tilesAtHarvestReady = tileEntries
+      .filter(([, t]) => t.stage === 'harvest_ready')
+      .map(([tileId]) => tileId);
+
+    const tilesWithHighDisease = tileEntries
+      .filter(([, t]) => (t.diseaseRisk ?? 0) > 0.4)
+      .map(([tileId]) => tileId);
+
+    const tilesWithLowHealth = tileEntries
+      .filter(([, t]) => (t.healthScore ?? 1) < 0.5 && t.stage !== 'harvested')
+      .map(([tileId]) => tileId);
+
     const flags = {
       energyDeficit,
       co2SafetyAlert,
@@ -113,6 +139,9 @@ const assessStep = createStep({
       cropsWithLowO2,
       cropsWithHighEC,
       boltingCrops,
+      tilesAtHarvestReady,
+      tilesWithHighDisease,
+      tilesWithLowHealth,
       urgencyLevel,
     };
   },
@@ -138,7 +167,7 @@ const reasonStep = createStep({
       };
     }
 
-    const { snapshot, flags, cropsAtHarvestReady, cropsWithHighDisease, cropsWithLowO2, cropsWithHighEC, boltingCrops, urgencyLevel } = inputData;
+    const { snapshot, flags, cropsAtHarvestReady, cropsWithHighDisease, cropsWithLowO2, cropsWithHighEC, boltingCrops, tilesAtHarvestReady, tilesWithHighDisease, tilesWithLowHealth, urgencyLevel } = inputData;
 
     const prompt = `AUTONOMOUS CONTROL TICK — urgency: ${urgencyLevel.toUpperCase()}
 
@@ -155,10 +184,15 @@ Crops with low root O₂ (<60%): ${cropsWithLowO2.length > 0 ? cropsWithLowO2.jo
 Crops with high nutrient EC (>3.5): ${cropsWithHighEC.length > 0 ? cropsWithHighEC.join(', ') : 'none'}
 Bolting crops: ${boltingCrops.length > 0 ? boltingCrops.join(', ') : 'none'}
 
-Full sensor snapshot:
+Tile-level alerts:
+- Tiles at harvest_ready: ${tilesAtHarvestReady.length > 0 ? tilesAtHarvestReady.join(', ') : 'none'}
+- Tiles with high disease (>40%): ${tilesWithHighDisease.length > 0 ? tilesWithHighDisease.join(', ') : 'none'}
+- Tiles with low health (<50%): ${tilesWithLowHealth.length > 0 ? tilesWithLowHealth.join(', ') : 'none'}
+
+Full sensor snapshot (includes tileCrops for individual tile states and tileCounts for allocation summary):
 ${JSON.stringify(snapshot, null, 2)}
 
-Decide what actions to take this tick. Return your reasoning, a one-sentence summary for the operator, and the list of actions to apply (parameter changes, harvests, replants). Only include actions that are genuinely warranted by the current state. If nothing needs changing, return an empty actions array.`;
+Decide what actions to take this tick. You can use tile-level actions (plant-tile, harvest-tile, clear-tile) for granular control, or bulk actions (harvest, replant) for entire crop types. Return your reasoning, a one-sentence summary for the operator, and the list of actions to apply. Only include actions that are genuinely warranted by the current state. If nothing needs changing, return an empty actions array.`;
 
     const result = await agent.generate([{ role: 'user', content: prompt }], {
       structuredOutput: { schema: ReasonOutputSchema },
@@ -193,6 +227,9 @@ const actStep = createStep({
       if (a.type === 'harvest' || a.type === 'replant') return !!a.crop;
       if (a.type === 'greenhouse') return !!a.param && a.value !== undefined;
       if (a.type === 'crop') return !!a.crop && !!a.param && a.value !== undefined;
+      if (a.type === 'harvest-tile') return !!a.tileId;
+      if (a.type === 'plant-tile') return !!a.tileId && !!a.crop;
+      if (a.type === 'clear-tile') return !!a.tileId;
       return false;
     });
 

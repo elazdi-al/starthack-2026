@@ -18,10 +18,11 @@ import type { CropProfile } from '../../greenhouse/implementations/multi-crop/pr
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface SimAction {
-  type: 'greenhouse' | 'crop' | 'harvest' | 'replant';
+  type: 'greenhouse' | 'crop' | 'harvest' | 'replant' | 'harvest-tile' | 'plant-tile' | 'clear-tile';
   param?: string;
   value?: number;
   crop?: string;
+  tileId?: string;
 }
 
 export interface SimulationParams {
@@ -299,10 +300,21 @@ function runScenario(
   }
 
   // Handle immediate harvest/replant actions (applied to all individuals of the crop type)
+  // Also handles tile-level actions (harvest-tile, plant-tile, clear-tile)
   for (const action of proposedActions) {
     if (action.type === 'harvest' && action.crop) {
       for (const cs of cropStates) {
         if (cs.cropType === action.crop) cs.stage = 'harvested';
+      }
+    }
+    if (action.type === 'harvest-tile' && action.tileId) {
+      // In simulation, tile-level harvest maps to harvesting individuals of the target crop
+      // Since simulation uses representative individuals rather than actual tiles,
+      // harvest one individual matching the tile's crop type
+      const tileCrop = action.crop;
+      if (tileCrop) {
+        const target = cropStates.find(cs => cs.cropType === tileCrop && cs.stage !== 'harvested');
+        if (target) target.stage = 'harvested';
       }
     }
     if (action.type === 'replant' && action.crop) {
@@ -322,6 +334,41 @@ function runScenario(
             cs.genetics = generateGeneticIdentity(replantSeed, profile.geneticVariance);
           }
         }
+      }
+    }
+    if (action.type === 'plant-tile' && action.crop) {
+      // In simulation, planting a tile adds a new crop individual
+      const profile = CROP_PROFILES[action.crop as keyof typeof CROP_PROFILES];
+      if (profile) {
+        const repsPerTile = Math.min(profile.plantsPerTile, 6);
+        let plantSeed = (scenarioSeed * 0x85ebca6b) >>> 0;
+        if (action.tileId) {
+          for (let ci = 0; ci < action.tileId.length; ci++) {
+            plantSeed ^= action.tileId.charCodeAt(ci);
+            plantSeed = Math.imul(plantSeed, 16777619) >>> 0;
+          }
+        }
+        const genetics = generateGeneticIdentity(plantSeed, profile.geneticVariance);
+        cropStates.push({
+          cropType: action.crop,
+          instanceId: `${action.crop}#planted_${cropStates.length}`,
+          genetics,
+          stageProgress: 0,
+          healthScore: 1.0,
+          accumulatedStress: 0,
+          soilMoisture: profile.optimalMoisture ?? 65,
+          waterPumpRate: 8,
+          isBolting: false,
+          stage: 'seed',
+        });
+      }
+    }
+    if (action.type === 'clear-tile' && action.tileId) {
+      // In simulation, clearing a tile removes one individual of the crop type
+      const tileCrop = action.crop;
+      if (tileCrop) {
+        const idx = cropStates.findIndex(cs => cs.cropType === tileCrop && cs.stage !== 'harvested');
+        if (idx >= 0) cropStates.splice(idx, 1);
       }
     }
   }

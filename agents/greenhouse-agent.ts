@@ -13,10 +13,11 @@ const cropEnum = z.enum([
 
 export const transformationSchema = z.object({
   transformations: z.array(z.object({
-    type: z.enum(['greenhouse', 'crop']),
+    type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'plant-tile', 'harvest-tile', 'clear-tile']),
     param: z.string(),
     value: z.number(),
     crop: cropEnum.optional(),
+    tileId: z.string().optional().describe('Required for tile-level actions (plant-tile, harvest-tile, clear-tile)'),
     reasoning: z.string().describe('Brief explanation for this adjustment'),
   })),
   summary: z.string().describe('Overall strategy summary'),

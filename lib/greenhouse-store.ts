@@ -28,6 +28,9 @@ import {
   updateOverrides as updateOverridesTransform,
   harvestCrop as harvestCropTransform,
   replantCrop as replantCropTransform,
+  harvestTile as harvestTileTransform,
+  plantTile as plantTileTransform,
+  clearTile as clearTileTransform,
 } from "@/greenhouse/implementations/multi-crop/transformation";
 
 export type { CropType, GrowthStage, SeasonName, DustStormRisk, ManualOverrides };
@@ -35,10 +38,11 @@ export type { CropType, GrowthStage, SeasonName, DustStormRisk, ManualOverrides 
 // ─── Agent Decision Log ──────────────────────────────────────────────────────────
 
 export interface AgentAction {
-  type: "greenhouse" | "crop" | "harvest" | "replant";
+  type: "greenhouse" | "crop" | "harvest" | "replant" | "harvest-tile" | "plant-tile" | "clear-tile";
   param?: string;
   value?: number;
   crop?: string;
+  tileId?: string;
 }
 
 export interface AgentDecision {
@@ -128,6 +132,7 @@ export interface TileData {
   growth: number;
   water: number;
   status: Status;
+  stage?: GrowthStage;
   sensor?: boolean;
   crop?: CropType;
   tileId?: string;  // unique tile identifier for per-tile crop state (e.g. "lettuce_0_0")
@@ -157,77 +162,77 @@ function ct(crop: CropType, row: number, col: number, growth: number, water: num
 const INITIAL_GRID: TileData[][] = [
   // Row 0: Lettuce | path | Tomato | path | Potato
   [
-    ct("lettuce",0,0, 3,78), ct("lettuce",0,1, 4,82), ct("lettuce",0,2, 3,75),
+    ct("lettuce",0,0, 0,0), ct("lettuce",0,1, 0,0), ct("lettuce",0,2, 0,0),
     P,
-    ct("tomato",0,4, 4,92), ct("tomato",0,5, 3,88),
+    ct("tomato",0,4, 0,0), ct("tomato",0,5, 0,0),
     P,
-    ct("potato",0,7, 5,95), ct("potato",0,8, 4,90), ct("potato",0,9, 3,85),
+    ct("potato",0,7, 0,0), ct("potato",0,8, 0,0), ct("potato",0,9, 0,0),
     P,
-    ct("wheat",0,11, 2,72),
+    ct("wheat",0,11, 0,0),
   ],
   // Row 1
   [
-    ct("lettuce",1,0, 4,80), ct("lettuce",1,1, 5,85), ct("lettuce",1,2, 3,76),
+    ct("lettuce",1,0, 0,0), ct("lettuce",1,1, 0,0), ct("lettuce",1,2, 0,0),
     P,
-    ct("tomato",1,4, 5,95), ct("tomato",1,5, 4,90),
+    ct("tomato",1,4, 0,0), ct("tomato",1,5, 0,0),
     PS,
-    ct("potato",1,7, 3,80), ct("potato",1,8, 5,92), ct("potato",1,9, 4,88),
+    ct("potato",1,7, 0,0), ct("potato",1,8, 0,0), ct("potato",1,9, 0,0),
     P,
-    ct("wheat",1,11, 3,68),
+    ct("wheat",1,11, 0,0),
   ],
   // Row 2
   [
-    ct("lettuce",2,0, 2,70), ct("lettuce",2,1, 3,78), ct("lettuce",2,2, 4,82),
+    ct("lettuce",2,0, 0,0), ct("lettuce",2,1, 0,0), ct("lettuce",2,2, 0,0),
     P,
-    ct("tomato",2,4, 3,85), ct("tomato",2,5, 4,88),
+    ct("tomato",2,4, 0,0), ct("tomato",2,5, 0,0),
     P,
-    ct("potato",2,7, 4,85), ct("potato",2,8, 2,72), ct("potato",2,9, 5,70,"warn"),
+    ct("potato",2,7, 0,0), ct("potato",2,8, 0,0), ct("potato",2,9, 0,0),
     P,
-    ct("wheat",2,11, 4,75),
+    ct("wheat",2,11, 0,0),
   ],
   // Row 3: horizontal path
   [P, P, P, P, P, P, PS, P, P, P, P, P],
   // Row 4: Soybean | path | Spinach | path | Wheat
   [
-    ct("soybean",4,0, 5,88), ct("soybean",4,1, 3,80), ct("soybean",4,2, 4,82),
+    ct("soybean",4,0, 0,0), ct("soybean",4,1, 0,0), ct("soybean",4,2, 0,0),
     P,
-    ct("spinach",4,4, 2,65), ct("spinach",4,5, 1,82),
+    ct("spinach",4,4, 0,0), ct("spinach",4,5, 0,0),
     P,
-    ct("wheat",4,7, 3,72), ct("wheat",4,8, 2,68), ct("wheat",4,9, 4,78),
+    ct("wheat",4,7, 0,0), ct("wheat",4,8, 0,0), ct("wheat",4,9, 0,0),
     P,
-    ct("kale",4,11, 3,80),
+    ct("kale",4,11, 0,0),
   ],
   // Row 5
   [
-    ct("soybean",5,0, 4,75), ct("soybean",5,1, 5,70,"warn"), ct("soybean",5,2, 3,78),
+    ct("soybean",5,0, 0,0), ct("soybean",5,1, 0,0), ct("soybean",5,2, 0,0),
     P,
-    ct("spinach",5,4, 3,70), ct("spinach",5,5, 4,78),
+    ct("spinach",5,4, 0,0), ct("spinach",5,5, 0,0),
     P,
-    ct("wheat",5,7, 5,80), ct("wheat",5,8, 3,65), ct("wheat",5,9, 2,60),
+    ct("wheat",5,7, 0,0), ct("wheat",5,8, 0,0), ct("wheat",5,9, 0,0),
     PS,
-    ct("kale",5,11, 5,85),
+    ct("kale",5,11, 0,0),
   ],
   // Row 6: horizontal path
   [P, P, P, P, P, P, P, PS, P, P, P, P],
   // Row 7: Radish | path | Kale | path | extra Soybean
   [
-    ct("radish",7,0, 2,60), ct("radish",7,1, 3,72), ct("radish",7,2, 4,78),
+    ct("radish",7,0, 0,0), ct("radish",7,1, 0,0), ct("radish",7,2, 0,0),
     P,
-    ct("kale",7,4, 3,80), ct("kale",7,5, 5,85),
+    ct("kale",7,4, 0,0), ct("kale",7,5, 0,0),
     P,
-    ct("soybean",7,7, 1,88), ct("radish",7,8, 4,55,"warn"), ct("spinach",7,9, 3,78),
+    ct("soybean",7,7, 0,0), ct("radish",7,8, 0,0), ct("spinach",7,9, 0,0),
     P,
-    ct("tomato",7,11, 4,82),
+    ct("tomato",7,11, 0,0),
   ],
   // Row 8
   [
-    ct("radish",8,0, 3,65), ct("radish",8,1, 5,80), ct("radish",8,2, 2,58),
+    ct("radish",8,0, 0,0), ct("radish",8,1, 0,0), ct("radish",8,2, 0,0),
     P,
-    ct("kale",8,4, 4,90), ct("kale",8,5, 3,82),
+    ct("kale",8,4, 0,0), ct("kale",8,5, 0,0),
     P,
-    ct("soybean",8,7, 3,75), ct("radish",8,8, 1,62), ct("spinach",8,9, 5,90),
+    ct("soybean",8,7, 0,0), ct("radish",8,8, 0,0), ct("spinach",8,9, 0,0),
     P,
-    ct("tomato",8,11, 2,78),
+    ct("tomato",8,11, 0,0),
   ],
 ];
 
@@ -244,6 +249,27 @@ export interface CropSnapshot {
   leafArea: number;
   fruitCount: number;
   controls: { waterPumpRate: number; localHeatingPower: number; nutrientConcentration: number; aerationRate: number };
+  stage: GrowthStage;
+  stageProgress: number;
+  daysSincePlanting: number;
+  healthScore: number;
+  biomassKg: number;
+  estimatedYieldKg: number;
+  rootO2Level: number;
+  nutrientEC: number;
+  diseaseRisk: number;
+  isBolting: boolean;
+}
+
+/** Per-tile crop snapshot — agents can monitor individual entities. */
+export interface TileCropSnapshot {
+  tileId: string;
+  cropType: CropType;
+  soilMoisture: number;
+  soilTemperature: number;
+  plantGrowth: number;
+  leafArea: number;
+  fruitCount: number;
   stage: GrowthStage;
   stageProgress: number;
   daysSincePlanting: number;
@@ -282,6 +308,7 @@ export interface EnvironmentSnapshot {
   co2SafetyAlert: boolean;
   nutritionalOutput: import("@/greenhouse/implementations/multi-crop/types").NutritionalOutput;
   nutritionalCoverage: number;
+  foodReservesSols: number;
   resources: {
     waterConsumedL: number;
     energyUsedKWh: number;
@@ -295,6 +322,10 @@ export interface EnvironmentSnapshot {
     lightingPower: number;
   };
   crops: Partial<Record<CropType, CropSnapshot>>;
+  /** Per-tile crop states — agents can monitor and act on individual entities. */
+  tileCrops: Record<string, TileCropSnapshot>;
+  /** Summary: count of tiles per crop type (helps agents decide planting allocation). */
+  tileCounts: Partial<Record<CropType, { total: number; planted: number; harvested: number }>>;
 }
 
 // ─── Store Interface ────────────────────────────────────────────────────────────
@@ -345,6 +376,9 @@ export interface GreenhouseState {
   applyOverrides: (overrides: ManualOverrides) => void;
   doHarvest: (crop: CropType) => void;
   doReplant: (crop: CropType) => void;
+  doHarvestTile: (tileId: string) => void;
+  doPlantTile: (tileId: string, crop: CropType) => void;
+  doClearTile: (tileId: string) => void;
   setAutonomousEnabled: (enabled: boolean) => void;
   autonomousTick: () => Promise<void>;
 }
@@ -362,9 +396,13 @@ function syncGridFromEnv(grid: TileData[][], env: ConcreteEnvironment): TileData
       // Prefer per-tile state if available; fall back to aggregate per-type
       const tileCrop = tile.tileId ? env.tileCrops?.[tile.tileId] : undefined;
       const c: CropEnvironment = tileCrop ?? env.crops[tile.crop];
+      // Update crop type if tile has been reassigned to a different crop
+      const effectiveCrop = tileCrop ? tileCrop.cropType : tile.crop;
       return {
         ...tile,
+        crop: effectiveCrop,
         growth: STAGE_TO_GROWTH_INDEX[c.stage],
+        stage: c.stage,
         water: Math.round(c.soilMoisture),
         status: c.healthScore > 0.7 ? ("ok" as const) : c.healthScore > 0 ? ("warn" as const) : null,
       };
@@ -424,6 +462,7 @@ function buildSnapshot(
     co2SafetyAlert: env.co2SafetyAlert,
     nutritionalOutput: env.nutritionalOutput,
     nutritionalCoverage: Math.round(env.nutritionalCoverage * 1000) / 1000,
+    foodReservesSols: Math.round(env.foodReservesSols * 10) / 10,
     resources: {
       waterConsumedL: round1(env.waterConsumedL),
       energyUsedKWh: round1(env.energyUsedKWh),
@@ -437,7 +476,54 @@ function buildSnapshot(
       lightingPower: gh.lightingPower,
     },
     crops,
+    tileCrops: buildTileCropSnapshots(env),
+    tileCounts: buildTileCounts(env),
   };
+}
+
+/** Build per-tile snapshots from the simulation's tileCrops data. */
+function buildTileCropSnapshots(env: ConcreteEnvironment): Record<string, TileCropSnapshot> {
+  const result: Record<string, TileCropSnapshot> = {};
+  if (!env.tileCrops) return result;
+  for (const [tileId, tc] of Object.entries(env.tileCrops)) {
+    result[tileId] = {
+      tileId: tc.tileId,
+      cropType: tc.cropType,
+      soilMoisture: round1(tc.soilMoisture),
+      soilTemperature: round1(tc.soilTemperature),
+      plantGrowth: round1(tc.plantGrowth),
+      leafArea: Math.round(tc.leafArea * 100) / 100,
+      fruitCount: tc.fruitCount,
+      stage: tc.stage,
+      stageProgress: Math.round(tc.stageProgress * 100) / 100,
+      daysSincePlanting: round1(tc.daysSincePlanting),
+      healthScore: Math.round(tc.healthScore * 100) / 100,
+      biomassKg: round1(tc.biomassKg),
+      estimatedYieldKg: round1(tc.estimatedYieldKg),
+      rootO2Level: round1(tc.rootO2Level),
+      nutrientEC: Math.round(tc.nutrientEC * 100) / 100,
+      diseaseRisk: Math.round(tc.diseaseRisk * 100) / 100,
+      isBolting: tc.isBolting,
+    };
+  }
+  return result;
+}
+
+/** Build summary counts of tiles per crop type. */
+function buildTileCounts(env: ConcreteEnvironment): EnvironmentSnapshot['tileCounts'] {
+  const counts: EnvironmentSnapshot['tileCounts'] = {};
+  if (!env.tileCrops) return counts;
+  for (const tc of Object.values(env.tileCrops)) {
+    const ct = tc.cropType;
+    if (!counts[ct]) counts[ct] = { total: 0, planted: 0, harvested: 0 };
+    counts[ct]!.total++;
+    if (tc.stage === 'harvested' || tc.healthScore === 0) {
+      counts[ct]!.harvested++;
+    } else {
+      counts[ct]!.planted++;
+    }
+  }
+  return counts;
 }
 
 // ─── Store ──────────────────────────────────────────────────────────────────────
@@ -708,6 +794,93 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     });
   },
 
+  doHarvestTile: (tileId) => {
+    const { simState, elapsedMinutes, events, totalHarvestKg } = get();
+    const { state: newState, yieldKg } = harvestTileTransform(simState, tileId, elapsedMinutes);
+    const env = newState.simulation.getEnvironment(0);
+    const tileCrop = env.tileCrops[tileId];
+    const cropName = tileCrop?.cropType ?? 'unknown';
+
+    const newEvents: SimEvent[] = [...events, {
+      sol: env.missionSol, type: "harvest", severity: "info",
+      message: `Harvested tile ${tileId} (${cropName}): ${yieldKg.toFixed(1)} kg`,
+      crop: cropName as CropType, data: { yieldKg, tileId },
+    }];
+
+    set({
+      simState: newState,
+      elapsedMinutes: 0,
+      environment: env,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+      grid: syncGridFromEnv(get().grid, env),
+      events: newEvents,
+      totalHarvestKg: totalHarvestKg + yieldKg,
+    });
+  },
+
+  doPlantTile: (tileId, crop) => {
+    const { simState, elapsedMinutes, events } = get();
+    const newState = plantTileTransform(simState, tileId, crop, elapsedMinutes);
+    const env = newState.simulation.getEnvironment(0);
+
+    // Update the grid tile's crop type to reflect the new planting
+    const newGrid = get().grid.map((row) =>
+      row.map((tile) => {
+        if (tile.tileId === tileId) {
+          return { ...tile, crop };
+        }
+        return tile;
+      }),
+    );
+
+    const newEvents: SimEvent[] = [...events, {
+      sol: env.missionSol, type: "replant", severity: "info",
+      message: `Planted ${crop} on tile ${tileId}`,
+      crop, data: { tileId },
+    }];
+
+    set({
+      simState: newState,
+      elapsedMinutes: 0,
+      environment: env,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+      grid: syncGridFromEnv(newGrid, env),
+      events: newEvents,
+    });
+  },
+
+  doClearTile: (tileId) => {
+    const { simState, elapsedMinutes, events } = get();
+    const tileCropBefore = simState.simulation.getEnvironment(elapsedMinutes).tileCrops[tileId];
+    const cropName = tileCropBefore?.cropType ?? 'unknown';
+    const newState = clearTileTransform(simState, tileId, elapsedMinutes);
+    const env = newState.simulation.getEnvironment(0);
+
+    const newEvents: SimEvent[] = [...events, {
+      sol: env.missionSol, type: "harvest", severity: "info",
+      message: `Cleared tile ${tileId} (${cropName})`,
+      crop: cropName as CropType, data: { tileId },
+    }];
+
+    set({
+      simState: newState,
+      elapsedMinutes: 0,
+      environment: env,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+      grid: syncGridFromEnv(get().grid, env),
+      events: newEvents,
+    });
+  },
+
   setAutonomousEnabled: (enabled) => set({ autonomousEnabled: enabled }),
 
   autonomousTick: async () => {
@@ -732,10 +905,11 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
         summary?: string;
         reasoning?: string;
         actions?: Array<{
-          type: "greenhouse" | "crop" | "harvest" | "replant";
+          type: "greenhouse" | "crop" | "harvest" | "replant" | "harvest-tile" | "plant-tile" | "clear-tile";
           param?: string;
           value?: number;
           crop?: string;
+          tileId?: string;
         }>;
       };
 
@@ -767,12 +941,18 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
         events: agentEvents,
       });
 
-      // Apply harvests and replants first, then parameter changes
+      // Apply harvests, replants, and tile-level actions first, then parameter changes
       for (const action of data.actions) {
         if (action.type === "harvest" && action.crop) {
           get().doHarvest(action.crop as CropType);
         } else if (action.type === "replant" && action.crop) {
           get().doReplant(action.crop as CropType);
+        } else if (action.type === "harvest-tile" && action.tileId) {
+          get().doHarvestTile(action.tileId);
+        } else if (action.type === "plant-tile" && action.tileId && action.crop) {
+          get().doPlantTile(action.tileId, action.crop as CropType);
+        } else if (action.type === "clear-tile" && action.tileId) {
+          get().doClearTile(action.tileId);
         }
       }
 

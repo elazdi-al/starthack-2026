@@ -6,7 +6,7 @@ import type {
 } from './types';
 import { ALL_CROP_TYPES, GROWTH_STAGES, CREW_DAILY_TARGETS } from './types';
 import { CROP_PROFILES, type CropProfile } from './profiles';
-import { aggregateTileCrops } from './initial';
+import { aggregateTileCrops } from './crop-utils';
 
 export { CROP_PROFILES } from './profiles';
 
@@ -408,7 +408,20 @@ function simulate(
 
   // ─── Nutritional output ───
   const nutritionalOutput = calculateNutritionalOutput(crops);
-  const nutritionalCoverage = calculateNutritionalCoverage(nutritionalOutput);
+  const greenhouseCoverage = calculateNutritionalCoverage(nutritionalOutput);
+
+  // ─── Food reserves ───
+  // Pre-packaged food depletes at 1 sol per sol elapsed.
+  // Greenhouse harvests supplement reserves (each sol of greenhouse coverage saves reserves).
+  // foodReservesSols represents how many sols of full crew nutrition remain in storage.
+  const deltaSols = deltaHours / SOL_HOURS;
+  const reserveDepletion = deltaSols * Math.max(0, 1 - greenhouseCoverage); // greenhouse output offsets depletion
+  const foodReservesSols = Math.max(0, initialEnv.foodReservesSols - reserveDepletion);
+
+  // Effective nutritional coverage: if greenhouse covers X% and reserves exist, crew is fed
+  const nutritionalCoverage = foodReservesSols > 0
+    ? Math.min(1, greenhouseCoverage + (1 - greenhouseCoverage)) // reserves fill the gap → 1.0
+    : greenhouseCoverage; // reserves exhausted — crew depends entirely on greenhouse
 
   return {
     timestamp: simulationMs,
@@ -440,6 +453,7 @@ function simulate(
     co2SafetyAlert,
     nutritionalOutput,
     nutritionalCoverage,
+    foodReservesSols,
     crops,
     tileCrops,
   };

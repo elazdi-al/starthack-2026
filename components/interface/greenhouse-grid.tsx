@@ -1082,7 +1082,7 @@ const GridTile = memo(function GridTile({
     );
   }
 
-  const planted = data.growth > 0;
+  const planted = data.stage !== undefined ? data.stage !== 'harvested' : data.growth > 0;
   const cropInfo = data.crop ? CROP_DB[data.crop] : null;
 
   const tile = (
@@ -1167,6 +1167,7 @@ const GridTile = memo(function GridTile({
   prev.data.kind === next.data.kind &&
   prev.data.crop === next.data.crop &&
   prev.data.growth === next.data.growth &&
+  prev.data.stage === next.data.stage &&
   prev.data.water === next.data.water &&
   prev.data.status === next.data.status &&
   prev.data.sensor === next.data.sensor
@@ -1179,7 +1180,7 @@ const CropDialog = memo(function CropDialog({
   data: TileData | null;
   onClose: () => void;
 }) {
-  const open = data !== null && data.crop !== undefined && data.growth > 0;
+  const open = data !== null && data.crop !== undefined && (data.stage !== undefined ? data.stage !== 'harvested' : data.growth > 0);
   const info = data?.crop ? CROP_DB[data.crop] : null;
   const hoverMeta = data?.crop ? CROP_HOVER_META[data.crop] : null;
   const env = useGreenhouseStore((s) => s.environment);

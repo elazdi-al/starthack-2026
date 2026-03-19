@@ -1,9 +1,11 @@
 import type { StateTransformation } from '../../state/types';
 import type {
   ConcreteState, ConcreteGreenhouseState, CropControls, CropType, CropEnvironment, ManualOverrides,
+  TileCropEnvironment,
 } from './types';
 import { ALL_CROP_TYPES } from './types';
 import { CROP_PROFILES, createSimulation } from './simulation';
+import { aggregateTileCrops, hashTileId, generateGeneticFactors, buildCropAtProgress } from './crop-utils';
 
 function cloneGreenhouse(gh: ConcreteGreenhouseState): ConcreteGreenhouseState {
   const crops = {} as Record<CropType, CropControls>;
@@ -88,10 +90,11 @@ export function applyTransformations(
   initialState: ConcreteState,
   time: number,
   transformations: Array<{
-    type: 'greenhouse' | 'crop';
+    type: 'greenhouse' | 'crop' | 'harvest' | 'replant' | 'harvest-tile' | 'plant-tile' | 'clear-tile';
     param: string;
     value: number;
     crop?: CropType;
+    tileId?: string;
   }>,
 ): ConcreteState {
   let state = initialState;
@@ -110,6 +113,18 @@ export function applyTransformations(
         t.value,
         time,
       )(state) as ConcreteState;
+    } else if (t.type === 'harvest' && t.crop) {
+      const result = harvestCrop(state, t.crop, time);
+      state = result.state;
+    } else if (t.type === 'replant' && t.crop) {
+      state = replantCrop(state, t.crop, time);
+    } else if (t.type === 'harvest-tile' && t.tileId) {
+      const result = harvestTile(state, t.tileId, time);
+      state = result.state;
+    } else if (t.type === 'plant-tile' && t.tileId && t.crop) {
+      state = plantTile(state, t.tileId, t.crop, time);
+    } else if (t.type === 'clear-tile' && t.tileId) {
+      state = clearTile(state, t.tileId, time);
     }
   }
 
@@ -233,6 +248,140 @@ export function replantCrop(
     }
   }
 
+  const newEnv = { ...env, crops: newCrops, tileCrops: newTileCrops };
+  const simulation = createSimulation(newEnv, state.greenhouse);
+  return { simulation, greenhouse: state.greenhouse };
+}
+
+// ─── Tile-level operations ───────────────────────────────────────────────────
+
+/**
+ * Harvest a single tile and return updated state + yield information.
+ * Unlike harvestCrop() which harvests ALL tiles of a crop type, this
+ * only harvests one specific tile, allowing granular agent control.
+ */
+export function harvestTile(
+  state: ConcreteState,
+  tileId: string,
+  time: number,
+): { state: ConcreteState; yieldKg: number } {
+  const env = state.simulation.getEnvironment(time);
+  const tileCrop = env.tileCrops[tileId];
+  if (!tileCrop) return { state, yieldKg: 0 };
+
+  const yieldKg = tileCrop.estimatedYieldKg;
+
+  const newTileCrops = { ...env.tileCrops };
+  newTileCrops[tileId] = {
+    ...tileCrop,
+    stage: 'harvested' as const,
+    stageProgress: 0,
+    biomassKg: 0,
+    estimatedYieldKg: 0,
+    plantGrowth: 0,
+    leafArea: 0,
+    fruitCount: 0,
+  };
+
+  // Recompute aggregate from tiles
+  const newCrops = aggregateTileCrops(newTileCrops);
+  const newEnv = { ...env, crops: newCrops, tileCrops: newTileCrops };
+  const simulation = createSimulation(newEnv, state.greenhouse);
+  return { state: { simulation, greenhouse: state.greenhouse }, yieldKg };
+}
+
+/**
+ * Plant a specific crop on a specific tile.
+ * The tile can be empty (harvested) or have a different crop — the crop type
+ * is overwritten. This is the core mechanism for agents to decide the
+ * number of each crop type.
+ */
+export function plantTile(
+  state: ConcreteState,
+  tileId: string,
+  newCropType: CropType,
+  time: number,
+): ConcreteState {
+  const env = state.simulation.getEnvironment(time);
+  const existingTile = env.tileCrops[tileId];
+  if (!existingTile) return state;
+
+  // Generate genetics for the new crop using the tile position hash
+  const seed = hashTileId(tileId);
+  const genetics = generateGeneticFactors(seed, newCropType);
+  const baseEnv = buildCropAtProgress(newCropType, 0);
+
+  const newTileCrops = { ...env.tileCrops };
+  newTileCrops[tileId] = {
+    ...baseEnv,
+    tileId,
+    cropType: newCropType,
+    geneticSeed: seed,
+    geneticOptimalTempFactor: genetics.optimalTempFactor,
+    geneticOptimalMoistureFactor: genetics.optimalMoistureFactor,
+    geneticGrowthRateFactor: genetics.growthRateFactor,
+    geneticMaxYieldFactor: genetics.maxYieldFactor,
+    geneticBoltingThresholdFactor: genetics.boltingThresholdFactor,
+    geneticStressResilienceFactor: genetics.stressResilienceFactor,
+    geneticWaterEfficiencyFactor: genetics.waterEfficiencyFactor,
+    // Start as seed stage (planted)
+    stage: 'seed' as const,
+    stageProgress: 0,
+    daysSincePlanting: 0,
+    healthScore: 1,
+    stressAccumulator: 0,
+    biomassKg: 0,
+    estimatedYieldKg: 0,
+    plantGrowth: 0,
+    leafArea: 0,
+    fruitCount: 0,
+    rootO2Level: 90,
+    nutrientEC: 2.0,
+    diseaseRisk: 0,
+    isBolting: false,
+    boltingHoursAccumulated: 0,
+  };
+
+  // Recompute aggregate from tiles
+  const newCrops = aggregateTileCrops(newTileCrops);
+  const newEnv = { ...env, crops: newCrops, tileCrops: newTileCrops };
+  const simulation = createSimulation(newEnv, state.greenhouse);
+  return { simulation, greenhouse: state.greenhouse };
+}
+
+/**
+ * Clear a tile — set it to empty/harvested state without recording yield.
+ * Useful for removing a crop to make room for a different one.
+ */
+export function clearTile(
+  state: ConcreteState,
+  tileId: string,
+  time: number,
+): ConcreteState {
+  const env = state.simulation.getEnvironment(time);
+  const tileCrop = env.tileCrops[tileId];
+  if (!tileCrop) return state;
+
+  const newTileCrops = { ...env.tileCrops };
+  newTileCrops[tileId] = {
+    ...tileCrop,
+    stage: 'harvested' as const,
+    stageProgress: 0,
+    daysSincePlanting: 0,
+    healthScore: 0,
+    stressAccumulator: 0,
+    biomassKg: 0,
+    estimatedYieldKg: 0,
+    plantGrowth: 0,
+    leafArea: 0,
+    fruitCount: 0,
+    diseaseRisk: 0,
+    isBolting: false,
+    boltingHoursAccumulated: 0,
+  };
+
+  // Recompute aggregate from tiles
+  const newCrops = aggregateTileCrops(newTileCrops);
   const newEnv = { ...env, crops: newCrops, tileCrops: newTileCrops };
   const simulation = createSimulation(newEnv, state.greenhouse);
   return { simulation, greenhouse: state.greenhouse };

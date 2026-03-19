@@ -58,10 +58,11 @@ function applyPreferenceUpdates(
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const ActionSchema = z.object({
-  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant']),
+  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'harvest-tile', 'plant-tile', 'clear-tile']),
   param: z.string().optional(),
   value: z.number().optional(),
   crop: z.string().optional(),
+  tileId: z.string().optional(),
 });
 
 const DispatcherInputSchema = z.object({
@@ -709,6 +710,9 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       if (a.type === 'harvest' || a.type === 'replant') return !!a.crop;
       if (a.type === 'greenhouse') return !!a.param && a.value !== undefined;
       if (a.type === 'crop') return !!a.crop && !!a.param && a.value !== undefined;
+      if (a.type === 'harvest-tile') return !!a.tileId;
+      if (a.type === 'plant-tile') return !!a.tileId && !!a.crop;
+      if (a.type === 'clear-tile') return !!a.tileId;
       return false;
     });
 

@@ -127,6 +127,7 @@ export interface ConcreteEnvironment extends Environment {
   co2SafetyAlert: boolean;          // CO₂ > 1500 ppm — human health risk
   nutritionalOutput: NutritionalOutput;
   nutritionalCoverage: number;      // 0–1 vs 4-crew daily targets
+  foodReservesSols: number;         // pre-packaged food remaining in sols of full crew supply
 
   /** Aggregate per-type crop state (backward compat: agents, nutrition, progress panel). */
   crops: Record<CropType, CropEnvironment>;

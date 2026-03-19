@@ -18,25 +18,33 @@ const CROP_NAMES = [
 export const greenhouseParameterTool = createTool({
   id: 'set-greenhouse-parameters',
   description:
-    'Adjust greenhouse parameters, harvest crops, or replant crops. ' +
+    'Adjust greenhouse parameters, harvest crops, replant crops, or manage individual tiles. ' +
     'Changes propagate progressively through the thermal/atmospheric simulation. ' +
     'Global params (type "greenhouse"): globalHeatingPower (W, 0–10000), co2InjectionRate (ppm/h, 0–200), ' +
     'ventilationRate (m³/h, 0–500), lightingPower (W, 0–10000). ' +
     'Crop params (type "crop", requires crop): waterPumpRate (L/h, 0–30), localHeatingPower (W, 0–1000). ' +
-    'Harvest (type "harvest", requires crop): harvest a crop at harvest_ready or fruiting stage. ' +
-    'Replant (type "replant", requires crop): replant a harvested crop from seed. ' +
-    'Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale.',
+    'Harvest (type "harvest", requires crop): harvest ALL tiles of a crop type at once. ' +
+    'Replant (type "replant", requires crop): replant ALL harvested tiles of a crop type from seed. ' +
+    'Plant tile (type "plant-tile", requires tileId + crop): plant a specific crop on a specific tile. ' +
+    'Harvest tile (type "harvest-tile", requires tileId): harvest one specific tile only. ' +
+    'Clear tile (type "clear-tile", requires tileId): remove a crop from a tile without harvesting. ' +
+    'Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale. ' +
+    'Available tileIds follow the pattern "{cropType}_{row}_{col}" (e.g. "lettuce_0_0", "tomato_2_4").',
   inputSchema: z.object({
     changes: z
       .array(
         z.object({
-          type: z.enum(['greenhouse', 'crop', 'harvest', 'replant']),
+          type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'plant-tile', 'harvest-tile', 'clear-tile']),
           param: z.string().optional().describe('Parameter name (for greenhouse/crop types)'),
           value: z.number().optional().describe('New value (for greenhouse/crop types)'),
           crop: z
             .enum(CROP_NAMES)
             .optional()
-            .describe('Required for crop/harvest/replant changes'),
+            .describe('Required for crop/harvest/replant/plant-tile changes'),
+          tileId: z
+            .string()
+            .optional()
+            .describe('Required for plant-tile/harvest-tile/clear-tile — e.g. "lettuce_0_0"'),
         }),
       )
       .min(1)
@@ -79,6 +87,21 @@ export const greenhouseParameterTool = createTool({
       } else if (change.type === 'replant') {
         if (!change.crop) {
           return { success: false, error: 'Crop name is required for replant' };
+        }
+      } else if (change.type === 'plant-tile') {
+        if (!change.tileId) {
+          return { success: false, error: 'tileId is required for plant-tile' };
+        }
+        if (!change.crop) {
+          return { success: false, error: 'crop is required for plant-tile (which crop to plant on the tile)' };
+        }
+      } else if (change.type === 'harvest-tile') {
+        if (!change.tileId) {
+          return { success: false, error: 'tileId is required for harvest-tile' };
+        }
+      } else if (change.type === 'clear-tile') {
+        if (!change.tileId) {
+          return { success: false, error: 'tileId is required for clear-tile' };
         }
       }
       validated.push(change);
