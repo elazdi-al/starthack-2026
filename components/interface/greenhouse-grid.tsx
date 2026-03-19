@@ -580,7 +580,7 @@ export function GreenhouseGrid({
               <Corner position="top-right" />
               <Corner position="bottom-left" />
               <Corner position="bottom-right" />
-              <GreenhouseOverlay introStage={introStage} />
+              <GreenhouseOverlay introStage={introStage === "open" ? (zoom < 0.7 ? "sealed" : "opening") : introStage} />
 
               <div
                 className="grid"
@@ -661,7 +661,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
 
   const poly = (...points: [number, number][]) => points.map(([px, py]) => `${px},${py}`).join(" ");
   const rafterFractions = [0.18, 0.38, 0.58, 0.78];
-  const showShell = introStage !== "open";
+  const closed = introStage === "sealed";
   const floorGradientId = "greenhouse-floor-fill";
   const frontGradientId = "greenhouse-glass-front";
   const sideGradientId = "greenhouse-glass-side";
@@ -703,33 +703,11 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
         </filter>
       </defs>
 
-      {showShell && (
-        <>
-          {introStage === "sealed" && (
-            <g>
-              <polygon
-                points={poly(
-                  [baseTL[0] + shadowOffsetX, baseTL[1] + shadowOffsetY],
-                  [baseTR[0] + shadowOffsetX, baseTR[1] + shadowOffsetY],
-                  [baseBR[0] + shadowOffsetX, baseBR[1] + shadowOffsetY],
-                  [baseBL[0] + shadowOffsetX, baseBL[1] + shadowOffsetY],
-                )}
-                style={{ fill: "var(--greenhouse-shadow)" }}
-                filter="url(#greenhouse-shadow)"
-              />
-              <polygon
-                points={poly(baseTL, baseTR, baseBR, baseBL)}
-                fill={`url(#${floorGradientId})`}
-                style={{ stroke: "var(--greenhouse-line-soft)" }}
-                strokeWidth="0.95"
-              />
-            </g>
-          )}
-
+      <>
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              closed
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: 0, y: -3600, rotate: 0 }
             }
@@ -747,7 +725,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              closed
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: -3600, y: 0, rotate: 0 }
             }
@@ -774,7 +752,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              closed
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: rise * 32, y: -rise * 32, rotate: 0 }
             }
@@ -795,18 +773,14 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
             />
             <polygon
               points={poly(eaveTL, eaveBL, ridgeL)}
-              style={{
-                fill: "var(--greenhouse-glass-side-end)",
-                stroke: "var(--greenhouse-line-soft)",
-              }}
+              fill={`url(#${sideGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="0.85"
             />
             <polygon
               points={poly(eaveTR, eaveBR, ridgeR)}
-              style={{
-                fill: "var(--greenhouse-glass-side-end)",
-                stroke: "var(--greenhouse-line-soft)",
-              }}
+              fill={`url(#${sideGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="0.8"
             />
             <line
@@ -891,7 +865,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              closed
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: 3600, y: 0, rotate: 0 }
             }
@@ -918,7 +892,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              closed
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: 0, y: 3600, rotate: 0 }
             }
@@ -961,7 +935,6 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
             />
           </motion.g>
         </>
-      )}
     </svg>
   );
 }
