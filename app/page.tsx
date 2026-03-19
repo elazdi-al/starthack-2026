@@ -47,7 +47,7 @@ export default function Home() {
           <TemperatureWidget />
         </div>
 
-        <div className="absolute right-6 top-6 flex items-center gap-3">
+        <div className={`absolute right-6 top-6 flex items-center gap-3 ${controlOpen ? "z-50" : ""}`}>
           <SpeedSelector
             open={speedOpen}
             onOpenChange={handleSpeedOpenChange}
@@ -65,7 +65,7 @@ export default function Home() {
         </div>
       </main>
 
-      <div className="fixed right-6 top-6 z-60">
+      <div className={`fixed right-6 top-6 ${controlOpen ? "z-40" : "z-60"}`}>
         <SidebarToggle
           pressed={sidebarOpen}
           onPressedChange={setSidebarOpen}

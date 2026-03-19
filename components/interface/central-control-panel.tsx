@@ -25,6 +25,13 @@ export function CentralControlPanel({
 }: CentralControlPanelProps) {
   const [panels, setPanels] = React.useState<PanelConfig[]>([]);
   const [mounted, setMounted] = React.useState(false);
+  const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
+  const dragRef = React.useRef<{
+    startX: number; startY: number;
+    offsetX: number; offsetY: number;
+    baseLeft: number; baseTop: number;
+    baseWidth: number; baseHeight: number;
+  } | null>(null);
 
   React.useEffect(() => {
     setMounted(true);
@@ -37,13 +44,63 @@ export function CentralControlPanel({
     return unsubscribe;
   }, []);
 
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const morphRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const { startX, startY, offsetX, offsetY, baseLeft, baseTop, baseWidth, baseHeight } = dragRef.current;
+      let newX = offsetX + (e.clientX - startX);
+      let newY = offsetY + (e.clientY - startY);
+
+      newX = Math.max(-baseLeft, Math.min(window.innerWidth - baseLeft - baseWidth, newX));
+      newY = Math.max(-baseTop, Math.min(window.innerHeight - baseTop - baseHeight, newY));
+
+      setDragOffset({ x: newX, y: newY });
+    };
+    const onMouseUp = () => { dragRef.current = null; };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    const el = morphRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      offsetX: dragOffset.x,
+      offsetY: dragOffset.y,
+      baseLeft: rect.left - dragOffset.x,
+      baseTop: rect.top - dragOffset.y,
+      baseWidth: rect.width,
+      baseHeight: rect.height,
+    };
+    e.preventDefault();
+  };
+
+  React.useEffect(() => {
+    if (!open) setDragOffset({ x: 0, y: 0 });
+  }, [open]);
+
   const showPanel = open && mounted && panels.length > 0;
 
   return (
-    <div className="relative inline-flex flex-col items-end">
+    <div
+      ref={wrapperRef}
+      className="relative inline-flex flex-col items-end"
+      style={showPanel ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined}
+    >
       <div className="size-10 shrink-0" />
 
       <motion.div
+        ref={morphRef}
         className={cn("absolute right-0 top-0", showPanel && "z-9999")}
         initial={false}
         animate={{
@@ -72,7 +129,11 @@ export function CentralControlPanel({
 
         <div
           className="relative flex justify-end"
-          style={{ padding: showPanel ? "5px 6px 0" : "0px" }}
+          style={{
+            padding: showPanel ? "5px 6px 0" : "0px",
+            cursor: showPanel ? "grab" : undefined,
+          }}
+          onMouseDown={showPanel ? handleDragStart : undefined}
         >
           <Button
             aria-label={open ? "Hide controls" : "Show controls"}
@@ -87,6 +148,7 @@ export function CentralControlPanel({
             )}
             onContextMenu={(e) => e.currentTarget.blur()}
             onClick={() => onOpenChange(!open)}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <ControlPanelIcon
               className="size-6"
