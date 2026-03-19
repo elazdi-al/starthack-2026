@@ -15,4 +15,8 @@ export {
   createInitialState,
 } from './initial';
 
-export { simpleDecide } from './decision';
+export { 
+  simpleTransformation,
+  updateGreenhouseParam,
+  updateCropParam,
+} from './transformation';

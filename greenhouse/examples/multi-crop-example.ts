@@ -1,5 +1,5 @@
-import { createInitialState } from './initial';
-import { ConcreteEnvironment } from './types';
+import { createInitialState } from '../implementations/multi-crop/initial';
+import { ConcreteEnvironment } from '../implementations/multi-crop/types';
 
 // Example usage of the multi-crop greenhouse simulation
 function runExample() {

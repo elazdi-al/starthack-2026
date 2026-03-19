@@ -16,3 +16,6 @@ export abstract class State {
   abstract simulation: SimulationState;
   abstract greenhouse: GreenhouseState;
 }
+
+// State transformation - takes a state and returns a new state
+export type StateTransformation = (state: State) => State;
