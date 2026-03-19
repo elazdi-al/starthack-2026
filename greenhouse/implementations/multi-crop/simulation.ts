@@ -2,9 +2,9 @@ import type { SimulationState } from '../../state/types';
 import type {
   ConcreteEnvironment, ConcreteGreenhouseState,
   CropEnvironment, CropControls, CropType, GrowthStage,
-  SeasonName, DustStormRisk,
+  SeasonName, DustStormRisk, NutritionalOutput,
 } from './types';
-import { ALL_CROP_TYPES, GROWTH_STAGES } from './types';
+import { ALL_CROP_TYPES, GROWTH_STAGES, CREW_DAILY_TARGETS } from './types';
 import { CROP_PROFILES, type CropProfile } from './profiles';
 
 export { CROP_PROFILES } from './profiles';
@@ -41,6 +41,16 @@ const MOISTURE_PUMP_COEFF  = 0.45;
 const MOISTURE_EVAP_RATE   = 0.055;
 
 const O2_PRODUCTION_FACTOR = 0.00008;
+
+// ─── Energy & Water Constants ────────────────────────────────────────────────────
+const WATER_RECYCLING_DECAY_PER_SOL = 0.00015;   // natural filter degradation/sol
+const WATER_RECYCLING_STORM_PENALTY  = 0.0004;   // extra decay per sol during dust storm
+const EC_EVAP_RATE_BASE              = 0.0008;   // mS/cm per hour natural concentration drift
+const DISEASE_HUMIDITY_THRESHOLD     = 80;        // % above which disease risk builds
+const DISEASE_BUILD_RATE             = 0.003;     // risk units per hour at max humidity
+const DISEASE_CLEAR_RATE             = 0.001;     // risk units cleared per hour when humidity low
+const ROOT_O2_TAU                    = 3.0;       // hours time-constant for root O₂ change
+const GRAVITY_GROWTH_PENALTY         = 0.05;      // 5 % growth reduction from 0.38g effects
 
 // ─── Dust Storm Types ────────────────────────────────────────────────────────────
 
@@ -205,6 +215,39 @@ function getDustStormFactor(
   return factor;
 }
 
+// ─── Nutritional Output ──────────────────────────────────────────────────────────
+
+function calculateNutritionalOutput(crops: Record<CropType, CropEnvironment>): NutritionalOutput {
+  let caloriesPerDay = 0, proteinGPerDay = 0, vitaminC_mgPerDay = 0;
+  let vitaminA_mcgPerDay = 0, iron_mgPerDay = 0, calcium_mgPerDay = 0, fiber_gPerDay = 0;
+
+  for (const ct of ALL_CROP_TYPES) {
+    const profile = CROP_PROFILES[ct];
+    const crop = crops[ct];
+    // Daily contribution: estimated yield available / growth cycle sols (daily harvest rate)
+    const dailyYieldKg = crop.estimatedYieldKg / Math.max(1, profile.growthCycleSols);
+    caloriesPerDay     += dailyYieldKg * profile.caloriesPerKg;
+    proteinGPerDay     += dailyYieldKg * profile.proteinPerKg;
+    vitaminC_mgPerDay  += dailyYieldKg * profile.vitaminC_mgPerKg;
+    vitaminA_mcgPerDay += dailyYieldKg * profile.vitaminA_mcgPerKg;
+    iron_mgPerDay      += dailyYieldKg * profile.iron_mgPerKg;
+    calcium_mgPerDay   += dailyYieldKg * profile.calcium_mgPerKg;
+    fiber_gPerDay      += dailyYieldKg * profile.fiber_gPerKg;
+  }
+
+  return { caloriesPerDay, proteinGPerDay, vitaminC_mgPerDay, vitaminA_mcgPerDay, iron_mgPerDay, calcium_mgPerDay, fiber_gPerDay };
+}
+
+function calculateNutritionalCoverage(output: NutritionalOutput): number {
+  const calCov     = Math.min(1, output.caloriesPerDay    / CREW_DAILY_TARGETS.calories);
+  const protCov    = Math.min(1, output.proteinGPerDay    / CREW_DAILY_TARGETS.proteinG);
+  const vitCCov    = Math.min(1, output.vitaminC_mgPerDay / CREW_DAILY_TARGETS.vitaminC_mg);
+  const vitACov    = Math.min(1, output.vitaminA_mcgPerDay/ CREW_DAILY_TARGETS.vitaminA_mcg);
+  const ironCov    = Math.min(1, output.iron_mgPerDay     / CREW_DAILY_TARGETS.iron_mg);
+  // Weighted: calories 35%, protein 30%, micronutrients 35%
+  return calCov * 0.35 + protCov * 0.30 + (vitCCov + vitACov + ironCov) / 3 * 0.35;
+}
+
 // ─── Main Simulation ────────────────────────────────────────────────────────────
 
 function simulate(
@@ -232,29 +275,21 @@ function simulate(
   // ─── Daily cycle + dust ───
   const ov = greenhouse.overrides;
 
-  // Time-of-day: manual lock overrides the computed sol fraction
   const effectiveSolFraction = ov.timeOfDayLocked ? ov.timeOfDayFraction : solFraction;
-
-  // Shift by 0.25 so the peak (sin=1) falls at solFraction=0.5 (noon),
-  // dawn at 0.25, dusk at 0.75, and darkness either side.
   const solarFactor = Math.max(0, Math.sin((effectiveSolFraction - 0.25) * 2 * Math.PI));
 
-  // Dust storm: manual override bypasses the seasonal calendar
   const dustStormFactor = ov.dustStormEnabled
     ? Math.max(0, 1 - ov.dustStormSeverity)
     : getDustStormFactor(currentLs, missionSol, missionStartLs, dustStorms);
 
-  // Atmospheric pressure: manual override bypasses seasonal CO₂ cycle
   const effectiveAtmosphericPressure = ov.atmosphericPressureEnabled
     ? ov.atmosphericPressure
     : atmosphericPressure;
 
-  // External temperature: manual override bypasses physics
   const externalTemp = ov.externalTempEnabled
     ? ov.externalTemp
     : MARS_MEAN_TEMP + seasonalTempOffset + 30 * solarFactor + deterministicNoise(simulationMs, 3);
 
-  // Solar radiation: manual override bypasses physics (raw value, ignores dust/day-night)
   const solarRadiation = ov.solarRadiationEnabled
     ? ov.solarRadiation
     : Math.max(0,
@@ -262,9 +297,34 @@ function simulate(
         + deterministicNoise(simulationMs + 1000, 30),
       );
 
-  // ─── Air temperature ───
+  // ─── Energy Budget ───
+  const solarGenerationKW = greenhouse.maxSolarGenerationKW * solarFactor * dustStormFactor;
+  const cropLocalHeatKW   = ALL_CROP_TYPES.reduce((s, ct) => s + greenhouse.crops[ct].localHeatingPower, 0) / 1000;
+  const powerDemandKW     = (greenhouse.globalHeatingPower + greenhouse.lightingPower) / 1000 + cropLocalHeatKW;
+  const netPowerKW        = solarGenerationKW - powerDemandKW;
+  let   batteryStorageKWh = clamp(0, greenhouse.batteryCapacityKWh,
+    initialEnv.batteryStorageKWh + netPowerKW * deltaHours,
+  );
+  const energyDeficit     = batteryStorageKWh <= 0 && netPowerKW < 0;
+  // Effective lighting/heating when in deficit: scale down by available energy ratio
+  const energyAvailRatio  = energyDeficit
+    ? clamp(0.2, 1, solarGenerationKW / Math.max(0.1, powerDemandKW))
+    : 1;
+
+  // ─── Water Recycling Efficiency ───
+  const deltaPerSol        = deltaHours / SOL_HOURS;
+  const stormPenalty       = dustStormFactor < 0.8 ? WATER_RECYCLING_STORM_PENALTY : 0;
+  const waterRecyclingEfficiency = clamp(0.30, 0.99,
+    initialEnv.waterRecyclingEfficiency - (WATER_RECYCLING_DECAY_PER_SOL + stormPenalty) * deltaPerSol,
+  );
+  // Irrigation effectiveness: scales with recycling — below 85% the water supply shrinks
+  const irrigationEffectiveness = waterRecyclingEfficiency / 0.95;
+
+  // ─── Air temperature (modified by energy availability) ───
+  const effectiveHeating = greenhouse.globalHeatingPower * energyAvailRatio;
+  const effectiveLighting = greenhouse.lightingPower * energyAvailRatio;
   const T_eq = THERMAL_BASE
-    + greenhouse.globalHeatingPower / K_HEAT_DIVISOR
+    + effectiveHeating / K_HEAT_DIVISOR
     + solarRadiation * K_SOLAR
     - greenhouse.ventilationRate * K_VENT_TEMP;
   const airTemp = exponentialApproach(initialEnv.airTemperature, T_eq, deltaHours, T_TAU);
@@ -280,20 +340,20 @@ function simulate(
     exponentialApproach(initialEnv.humidity, H_eq, deltaHours, H_TAU),
   );
 
-  // ─── CO₂ — modulated slightly by atmospheric pressure ───
-  // Higher pressure = slightly higher CO₂ partial pressure for same ppm
+  // ─── CO₂ ───
   const pressureModifier = effectiveAtmosphericPressure / MARS_MEAN_PRESSURE;
   const C_eq = Math.max(CO2_BASE,
     CO2_BASE
     + greenhouse.co2InjectionRate * K_CO2_INJECT * pressureModifier
-    - greenhouse.lightingPower * K_CO2_PHOTO
+    - effectiveLighting * K_CO2_PHOTO
     - greenhouse.ventilationRate * K_CO2_VENT,
   );
   const co2Level = Math.max(CO2_BASE,
     exponentialApproach(initialEnv.co2Level, C_eq, deltaHours, C_TAU),
   );
+  const co2SafetyAlert = co2Level > 1500;
 
-  const lightLevel = greenhouse.lightingPower * 2 + solarRadiation * 5;
+  const lightLevel = effectiveLighting * 2 + solarRadiation * 5;
 
   // ─── Per-crop simulation ───
   const crops = {} as Record<CropType, CropEnvironment>;
@@ -302,7 +362,7 @@ function simulate(
     crops[ct] = simulateCrop(
       initialEnv.crops[ct], greenhouse.crops[ct],
       airTemp, humidity, co2Level, lightLevel, deltaHours,
-      CROP_PROFILES[ct],
+      CROP_PROFILES[ct], irrigationEffectiveness,
     );
     totalLeafArea += crops[ct].leafArea;
   }
@@ -314,14 +374,14 @@ function simulate(
 
   // ─── Resource tracking ───
   const waterRate = ALL_CROP_TYPES.reduce((s, ct) => s + greenhouse.crops[ct].waterPumpRate, 0);
-  const waterConsumedL = initialEnv.waterConsumedL + waterRate * deltaHours;
+  const waterConsumedL = initialEnv.waterConsumedL + waterRate * irrigationEffectiveness * deltaHours;
 
-  const energyKW = (
-    greenhouse.globalHeatingPower
-    + greenhouse.lightingPower
-    + ALL_CROP_TYPES.reduce((s, ct) => s + greenhouse.crops[ct].localHeatingPower, 0)
-  ) / 1000;
+  const energyKW = powerDemandKW;
   const energyUsedKWh = initialEnv.energyUsedKWh + energyKW * deltaHours;
+
+  // ─── Nutritional output ───
+  const nutritionalOutput = calculateNutritionalOutput(crops);
+  const nutritionalCoverage = calculateNutritionalCoverage(nutritionalOutput);
 
   return {
     timestamp: simulationMs,
@@ -346,6 +406,13 @@ function simulate(
     waterConsumedL,
     energyUsedKWh,
     o2ProducedKg,
+    waterRecyclingEfficiency,
+    solarGenerationKW,
+    batteryStorageKWh,
+    energyDeficit,
+    co2SafetyAlert,
+    nutritionalOutput,
+    nutritionalCoverage,
     crops,
   };
 }
@@ -371,6 +438,7 @@ function simulateCrop(
   lightLevel: number,
   deltaHours: number,
   profile: CropProfile,
+  irrigationEffectiveness: number,
 ): CropEnvironment {
   if (initial.stage === 'harvested') return { ...initial };
 
@@ -378,8 +446,8 @@ function simulateCrop(
   const soilT_eq = airTemp + controls.localHeatingPower / K_LOCAL_HEAT_DIVISOR;
   const soilTemp = exponentialApproach(initial.soilTemperature, soilT_eq, deltaHours, SOIL_T_TAU);
 
-  // Soil moisture
-  const moistureGain = controls.waterPumpRate * MOISTURE_PUMP_COEFF;
+  // Soil moisture (scaled by irrigation effectiveness from water recycling)
+  const moistureGain = controls.waterPumpRate * MOISTURE_PUMP_COEFF * irrigationEffectiveness;
   const effectiveEvapRate = MOISTURE_EVAP_RATE
     + Math.max(0, airTemp - 15) * 0.001
     + Math.max(0, 100 - humidity) * 0.0003;
@@ -388,11 +456,44 @@ function simulateCrop(
     exponentialApproach(initial.soilMoisture, m_eq, deltaHours, 1 / effectiveEvapRate / 60),
   );
 
-  // Growth rate (smooth Gaussian response)
-  const growthRate = calculateGrowthRate(soilTemp, soilMoisture, airTemp, humidity, co2Level, lightLevel, profile);
+  // ─── Root O₂ (hypoxia model) ───
+  const overwaterFraction = Math.max(0, soilMoisture - 80) / 20; // 0 at 80%, 1 at 100%
+  const aerationBenefit   = controls.aerationRate / 100;
+  const rootO2Target      = clamp(10, 100, 95 - overwaterFraction * 65 + aerationBenefit * 25);
+  const rootO2Level       = clamp(5, 100,
+    exponentialApproach(initial.rootO2Level, rootO2Target, deltaHours, ROOT_O2_TAU),
+  );
 
-  // Stress
-  const stressRate = calculateStressRate(soilTemp, soilMoisture, airTemp, profile);
+  // ─── Nutrient EC (electrical conductivity) ───
+  // Evaporation concentrates nutrients; control target pulls toward set EC
+  const ecEvapConcentration = EC_EVAP_RATE_BASE * Math.max(1, airTemp / 20) * deltaHours;
+  const ecTarget = controls.nutrientConcentration;
+  const nutrientEC = clamp(0.3, 6.5,
+    exponentialApproach(initial.nutrientEC, ecTarget, deltaHours, 6.0) + ecEvapConcentration,
+  );
+
+  // ─── Disease risk (humidity-driven pathogen accumulation) ───
+  const humidityExcess   = Math.max(0, humidity - DISEASE_HUMIDITY_THRESHOLD) / (100 - DISEASE_HUMIDITY_THRESHOLD);
+  const diseaseBuildup   = humidityExcess * DISEASE_BUILD_RATE * profile.diseaseSusceptibility * deltaHours;
+  const diseaseClearance = Math.max(0, (DISEASE_HUMIDITY_THRESHOLD - humidity) / DISEASE_HUMIDITY_THRESHOLD)
+    * DISEASE_CLEAR_RATE * deltaHours;
+  const diseaseRisk      = clamp(0, 1, initial.diseaseRisk + diseaseBuildup - diseaseClearance);
+
+  // ─── Bolting ───
+  const aboveThreshold           = airTemp > profile.boltingTempThreshold;
+  const boltingHoursAccumulated  = clamp(0, profile.boltingHoursToTrigger * 2,
+    initial.boltingHoursAccumulated + (aboveThreshold ? deltaHours : -deltaHours * 0.3),
+  );
+  const isBolting = boltingHoursAccumulated >= profile.boltingHoursToTrigger;
+
+  // ─── Growth rate (smooth Gaussian response + new modifiers) ───
+  const growthRate = calculateGrowthRate(
+    soilTemp, soilMoisture, airTemp, humidity, co2Level, lightLevel,
+    nutrientEC, rootO2Level, diseaseRisk, isBolting, profile,
+  );
+
+  // ─── Stress ───
+  const stressRate = calculateStressRate(soilTemp, soilMoisture, airTemp, nutrientEC, rootO2Level, diseaseRisk, profile);
   const stressAccumulator = Math.max(0, initial.stressAccumulator + stressRate * deltaHours);
   const healthScore = clamp(0, 1, 1 - stressAccumulator / 100);
 
@@ -404,24 +505,29 @@ function simulateCrop(
       healthScore: 0, stressAccumulator,
       biomassKg: 0, estimatedYieldKg: 0,
       plantGrowth: 0, leafArea: 0, fruitCount: 0,
+      rootO2Level, nutrientEC, diseaseRisk, isBolting, boltingHoursAccumulated,
     };
   }
 
-  // Stage progression
-  const effectiveHours = growthRate * healthScore * deltaHours;
+  // Stage progression — bolting forces rapid advance at heavily reduced yield
+  const boltingSpeedMult   = isBolting ? 3.0 : 1.0;
+  const effectiveHours     = growthRate * healthScore * (1 - GRAVITY_GROWTH_PENALTY) * boltingSpeedMult * deltaHours;
   const { stage, stageProgress } = advanceGrowthStage(
     initial.stage, initial.stageProgress, effectiveHours, profile,
   );
 
   const daysSincePlanting = initial.daysSincePlanting + deltaHours / SOL_HOURS;
-  const totalProgress = getTotalProgress(stage, stageProgress, profile);
-  const maxBiomass = profile.maxYieldKgPerPlant * profile.plantsPerTile;
-  const biomassKg = maxBiomass * totalProgress * healthScore;
-  const estimatedYieldKg = biomassKg * profile.harvestIndex;
+  const totalProgress     = getTotalProgress(stage, stageProgress, profile);
+  const maxBiomass        = profile.maxYieldKgPerPlant * profile.plantsPerTile;
+  // Bolting reduces harvestable yield significantly; disease also cuts yield
+  const boltingYieldPenalty  = isBolting ? 0.25 : 1.0;
+  const diseaseYieldPenalty  = 1 - diseaseRisk * 0.6;
+  const biomassKg            = maxBiomass * totalProgress * healthScore * diseaseYieldPenalty;
+  const estimatedYieldKg     = biomassKg * profile.harvestIndex * boltingYieldPenalty;
 
   const plantGrowth = totalProgress * 100;
-  const leafArea = totalProgress * profile.plantsPerTile * 0.02;
-  const fruitCount = (stage === 'fruiting' || stage === 'harvest_ready')
+  const leafArea    = totalProgress * profile.plantsPerTile * 0.02;
+  const fruitCount  = (stage === 'fruiting' || stage === 'harvest_ready')
     ? Math.floor(profile.plantsPerTile * stageProgress * 0.8)
     : 0;
 
@@ -431,6 +537,7 @@ function simulateCrop(
     healthScore, stressAccumulator,
     biomassKg, estimatedYieldKg,
     plantGrowth, leafArea, fruitCount,
+    rootO2Level, nutrientEC, diseaseRisk, isBolting, boltingHoursAccumulated,
   };
 }
 
@@ -443,16 +550,44 @@ function calculateGrowthRate(
   humidity: number,
   co2Level: number,
   lightLevel: number,
+  nutrientEC: number,
+  rootO2Level: number,
+  diseaseRisk: number,
+  isBolting: boolean,
   profile: CropProfile,
 ): number {
   const tempR     = gaussian(soilTemp, profile.optimalTemp, profile.tempSigma);
   const moistureR = gaussian(soilMoisture, profile.optimalMoisture, profile.moistureSigma);
   const airTempR  = gaussian(airTemp, (profile.optimalTemp + 21) / 2, 6);
   const co2R      = co2Level < 400 ? 0.3 : Math.min(1.2, 0.5 + 0.7 * (co2Level / 1000));
-  const lightR    = lightLevel < 1000 ? 0.2 : Math.min(1.3, 0.4 + 0.9 * (lightLevel / 10000));
+
+  // Photoinhibition: light above saturation point damages chlorophyll
+  const rawLightR = lightLevel < 1000 ? 0.2 : Math.min(1.3, 0.4 + 0.9 * (lightLevel / 10000));
+  const photoinhibition = lightLevel > profile.lightSaturationPoint
+    ? 1 - Math.min(0.6, (lightLevel - profile.lightSaturationPoint) / profile.lightSaturationPoint * 0.5)
+    : 1;
+  const lightR = rawLightR * photoinhibition;
+
   const humidityR = gaussian(humidity, 70, 20);
 
-  return tempR * moistureR * airTempR * co2R * lightR * humidityR;
+  // Nutrient EC: optimal 1.5–2.5, stress outside range (sensitivity-weighted)
+  const ecDev      = nutrientEC < 1.5 ? (1.5 - nutrientEC) / 1.0
+                   : nutrientEC > 2.5 ? (nutrientEC - 2.5) / 1.5
+                   : 0;
+  const nutrientR  = Math.max(0.1, 1 - ecDev * profile.nutrientSensitivity * 0.7);
+
+  // Root O₂: below 70% starts impairing uptake (sensitivity-weighted)
+  const rootO2R    = rootO2Level > 70 ? 1.0
+                   : Math.max(0.1, 0.1 + (rootO2Level / 70) * 0.9 * profile.rootO2Sensitivity
+                       + (1 - profile.rootO2Sensitivity) * 0.9);
+
+  // Disease: reduces photosynthetic capacity
+  const diseaseR   = 1 - diseaseRisk * 0.5;
+
+  // Bolting crops grow faster (toward seed production) but produce poor yield — handled in caller
+  const boltingR   = isBolting ? 1.5 : 1.0;
+
+  return tempR * moistureR * airTempR * co2R * lightR * humidityR * nutrientR * rootO2R * diseaseR * boltingR;
 }
 
 // ─── Stress Model ───────────────────────────────────────────────────────────────
@@ -461,6 +596,9 @@ function calculateStressRate(
   soilTemp: number,
   soilMoisture: number,
   airTemp: number,
+  nutrientEC: number,
+  rootO2Level: number,
+  diseaseRisk: number,
   profile: CropProfile,
 ): number {
   let stress = 0;
@@ -473,6 +611,17 @@ function calculateStressRate(
 
   if (airTemp < 5)  stress += (5 - airTemp) * 0.3;
   if (airTemp > 35) stress += (airTemp - 35) * 0.3;
+
+  // Salinity stress (high EC)
+  if (nutrientEC > 3.0) stress += (nutrientEC - 3.0) * profile.nutrientSensitivity * 0.4;
+  // Nutrient deficiency stress (low EC)
+  if (nutrientEC < 1.0) stress += (1.0 - nutrientEC) * profile.nutrientSensitivity * 0.25;
+
+  // Root hypoxia stress
+  if (rootO2Level < 50) stress += (50 - rootO2Level) / 50 * profile.rootO2Sensitivity * 0.3;
+
+  // Disease stress
+  stress += diseaseRisk * 0.2;
 
   if (stress < 0.1) stress = -0.5;
 

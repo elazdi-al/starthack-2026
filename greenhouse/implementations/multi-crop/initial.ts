@@ -7,14 +7,14 @@ import { CROP_PROFILES } from './profiles';
 import { createSimulation, SOL_HOURS } from './simulation';
 
 const DEFAULT_CROP_CONTROLS: Record<CropType, CropControls> = {
-  lettuce:  { waterPumpRate: 8,  localHeatingPower: 300 },
-  tomato:   { waterPumpRate: 12, localHeatingPower: 500 },
-  potato:   { waterPumpRate: 10, localHeatingPower: 200 },
-  soybean:  { waterPumpRate: 8,  localHeatingPower: 400 },
-  spinach:  { waterPumpRate: 7,  localHeatingPower: 200 },
-  wheat:    { waterPumpRate: 9,  localHeatingPower: 300 },
-  radish:   { waterPumpRate: 6,  localHeatingPower: 250 },
-  kale:     { waterPumpRate: 8,  localHeatingPower: 250 },
+  lettuce:  { waterPumpRate: 8,  localHeatingPower: 300, nutrientConcentration: 1.8, aerationRate: 70 },
+  tomato:   { waterPumpRate: 12, localHeatingPower: 500, nutrientConcentration: 2.2, aerationRate: 65 },
+  potato:   { waterPumpRate: 10, localHeatingPower: 200, nutrientConcentration: 2.0, aerationRate: 60 },
+  soybean:  { waterPumpRate: 8,  localHeatingPower: 400, nutrientConcentration: 1.9, aerationRate: 65 },
+  spinach:  { waterPumpRate: 7,  localHeatingPower: 200, nutrientConcentration: 1.7, aerationRate: 70 },
+  wheat:    { waterPumpRate: 9,  localHeatingPower: 300, nutrientConcentration: 2.0, aerationRate: 60 },
+  radish:   { waterPumpRate: 6,  localHeatingPower: 250, nutrientConcentration: 1.6, aerationRate: 65 },
+  kale:     { waterPumpRate: 8,  localHeatingPower: 250, nutrientConcentration: 1.8, aerationRate: 70 },
 };
 
 /**
@@ -73,6 +73,11 @@ function buildCropAtProgress(ct: CropType, fraction: number): CropEnvironment {
     fruitCount: (stage === 'fruiting' || stage === 'harvest_ready')
       ? Math.floor(profile.plantsPerTile * stageProgress * 0.8)
       : 0,
+    rootO2Level: 90,
+    nutrientEC: 2.0,
+    diseaseRisk: 0,
+    isBolting: false,
+    boltingHoursAccumulated: 0,
   };
 }
 
@@ -114,6 +119,21 @@ export function createInitialEnvironment(): ConcreteEnvironment {
     waterConsumedL: 0,
     energyUsedKWh: 0,
     o2ProducedKg: 0,
+    waterRecyclingEfficiency: 0.95,
+    solarGenerationKW: 0,
+    batteryStorageKWh: 150,
+    energyDeficit: false,
+    co2SafetyAlert: false,
+    nutritionalOutput: {
+      caloriesPerDay: 0,
+      proteinGPerDay: 0,
+      vitaminC_mgPerDay: 0,
+      vitaminA_mcgPerDay: 0,
+      iron_mgPerDay: 0,
+      calcium_mgPerDay: 0,
+      fiber_gPerDay: 0,
+    },
+    nutritionalCoverage: 0,
     crops,
   };
 }
@@ -129,6 +149,8 @@ export function createInitialGreenhouseState(): ConcreteGreenhouseState {
     globalHeatingPower: 3000,
     co2InjectionRate: 50,
     ventilationRate: 100,
+    maxSolarGenerationKW: 50,
+    batteryCapacityKWh: 200,
     crops,
     overrides: {
       externalTempEnabled:        false,

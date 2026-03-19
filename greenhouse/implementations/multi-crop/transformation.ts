@@ -10,7 +10,13 @@ function cloneGreenhouse(gh: ConcreteGreenhouseState): ConcreteGreenhouseState {
   for (const ct of ALL_CROP_TYPES) {
     crops[ct] = { ...gh.crops[ct] };
   }
-  return { ...gh, crops, overrides: { ...gh.overrides } };
+  return {
+    ...gh,
+    crops,
+    overrides: { ...gh.overrides },
+    maxSolarGenerationKW: gh.maxSolarGenerationKW,
+    batteryCapacityKWh: gh.batteryCapacityKWh,
+  };
 }
 
 export const updateGreenhouseParam = <K extends keyof ConcreteGreenhouseState>(
@@ -175,6 +181,11 @@ export function replantCrop(
     plantGrowth: 0,
     leafArea: 0,
     fruitCount: 0,
+    rootO2Level: 90,
+    nutrientEC: 2.0,
+    diseaseRisk: 0,
+    isBolting: false,
+    boltingHoursAccumulated: 0,
   };
 
   const newEnv = { ...env, crops: newCrops };

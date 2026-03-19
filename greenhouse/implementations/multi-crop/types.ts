@@ -55,11 +55,20 @@ export interface CropEnvironment {
   plantGrowth: number;
   leafArea: number;
   fruitCount: number;
+
+  // Extended realism
+  rootO2Level: number;             // 0–100 %, healthy above 70
+  nutrientEC: number;              // mS/cm, optimal 1.5–2.5
+  diseaseRisk: number;             // 0–1 cumulative pathogen load
+  isBolting: boolean;              // premature flowering triggered
+  boltingHoursAccumulated: number; // hours spent above bolting threshold
 }
 
 export interface CropControls {
   waterPumpRate: number;
   localHeatingPower: number;
+  nutrientConcentration: number;   // target EC mS/cm (0.5–5.0)
+  aerationRate: number;            // root-zone aeration 0–100 %
 }
 
 export interface ConcreteEnvironment extends Environment {
@@ -90,6 +99,15 @@ export interface ConcreteEnvironment extends Environment {
   energyUsedKWh: number;
   o2ProducedKg: number;
 
+  // Extended realism
+  waterRecyclingEfficiency: number; // 0–1 (starts 0.95, degrades over sols)
+  solarGenerationKW: number;        // current solar power output
+  batteryStorageKWh: number;        // remaining battery charge
+  energyDeficit: boolean;           // battery empty and demand > supply
+  co2SafetyAlert: boolean;          // CO₂ > 1500 ppm — human health risk
+  nutritionalOutput: NutritionalOutput;
+  nutritionalCoverage: number;      // 0–1 vs 4-crew daily targets
+
   crops: Record<CropType, CropEnvironment>;
 }
 
@@ -100,6 +118,9 @@ export interface ConcreteGreenhouseState extends GreenhouseState {
   ventilationRate: number;
   crops: Record<CropType, CropControls>;
   overrides: ManualOverrides;
+  // Extended realism
+  maxSolarGenerationKW: number;  // installed solar capacity (default 50 kW)
+  batteryCapacityKWh: number;    // battery bank capacity (default 200 kWh)
 }
 
 export interface ConcreteState extends State {

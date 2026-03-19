@@ -177,13 +177,17 @@ export interface CropSnapshot {
   plantGrowth: number;
   leafArea: number;
   fruitCount: number;
-  controls: { waterPumpRate: number; localHeatingPower: number };
+  controls: { waterPumpRate: number; localHeatingPower: number; nutrientConcentration: number; aerationRate: number };
   stage: GrowthStage;
   stageProgress: number;
   daysSincePlanting: number;
   healthScore: number;
   biomassKg: number;
   estimatedYieldKg: number;
+  rootO2Level: number;
+  nutrientEC: number;
+  diseaseRisk: number;
+  isBolting: boolean;
 }
 
 export interface EnvironmentSnapshot {
@@ -203,6 +207,15 @@ export interface EnvironmentSnapshot {
   solarRadiation: number;
   dustStormFactor: number;
   dustStormActive: boolean;
+  // Extended realism
+  waterRecyclingEfficiency: number;
+  solarGenerationKW: number;
+  batteryStorageKWh: number;
+  batteryCapacityKWh: number;
+  energyDeficit: boolean;
+  co2SafetyAlert: boolean;
+  nutritionalOutput: import("@/greenhouse/implementations/multi-crop/types").NutritionalOutput;
+  nutritionalCoverage: number;
   resources: {
     waterConsumedL: number;
     energyUsedKWh: number;
@@ -301,6 +314,10 @@ function buildSnapshot(
       healthScore: Math.round(ce.healthScore * 100) / 100,
       biomassKg: round1(ce.biomassKg),
       estimatedYieldKg: round1(ce.estimatedYieldKg),
+      rootO2Level: round1(ce.rootO2Level),
+      nutrientEC: Math.round(ce.nutrientEC * 100) / 100,
+      diseaseRisk: Math.round(ce.diseaseRisk * 100) / 100,
+      isBolting: ce.isBolting,
     };
   }
 
@@ -321,6 +338,14 @@ function buildSnapshot(
     solarRadiation: Math.round(env.solarRadiation),
     dustStormFactor: Math.round(env.dustStormFactor * 100) / 100,
     dustStormActive: env.dustStormFactor < 0.9,
+    waterRecyclingEfficiency: Math.round(env.waterRecyclingEfficiency * 1000) / 1000,
+    solarGenerationKW: round1(env.solarGenerationKW),
+    batteryStorageKWh: round1(env.batteryStorageKWh),
+    batteryCapacityKWh: gh.batteryCapacityKWh,
+    energyDeficit: env.energyDeficit,
+    co2SafetyAlert: env.co2SafetyAlert,
+    nutritionalOutput: env.nutritionalOutput,
+    nutritionalCoverage: Math.round(env.nutritionalCoverage * 1000) / 1000,
     resources: {
       waterConsumedL: round1(env.waterConsumedL),
       energyUsedKWh: round1(env.energyUsedKWh),
@@ -434,6 +459,24 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       newEvents.push({
         sol: env.missionSol, type: "dust_storm_end", severity: "info",
         message: "Dust storm has cleared — solar output returning to normal",
+      });
+    }
+    if (env.energyDeficit && !get().environment.energyDeficit) {
+      newEvents.push({
+        sol: env.missionSol, type: "resource_warning", severity: "critical",
+        message: "Energy deficit — battery depleted, non-critical systems throttled",
+      });
+    }
+    if (env.co2SafetyAlert && !get().environment.co2SafetyAlert) {
+      newEvents.push({
+        sol: env.missionSol, type: "resource_warning", severity: "critical",
+        message: `CO₂ safety threshold exceeded: ${Math.round(env.co2Level)} ppm — crew health at risk`,
+      });
+    }
+    if (env.waterRecyclingEfficiency < 0.75 && get().environment.waterRecyclingEfficiency >= 0.75) {
+      newEvents.push({
+        sol: env.missionSol, type: "resource_warning", severity: "warning",
+        message: `Water recycling efficiency dropped to ${Math.round(env.waterRecyclingEfficiency * 100)}% — irrigation compromised`,
       });
     }
 

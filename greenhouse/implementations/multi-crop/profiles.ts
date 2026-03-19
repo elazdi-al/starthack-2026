@@ -23,6 +23,14 @@ export interface CropProfile {
 
   waterLPerHourBase: number;
   optimalLightHours: number;
+
+  // Extended realism parameters
+  boltingTempThreshold: number;   // °C — airTemp above this risks bolting
+  boltingHoursToTrigger: number;  // continuous hours above threshold to trigger
+  nutrientSensitivity: number;    // 0–1 multiplier for EC-deviation stress
+  rootO2Sensitivity: number;      // 0–1 multiplier for hypoxia stress
+  diseaseSusceptibility: number;  // 0–1 baseline accumulation rate factor
+  lightSaturationPoint: number;   // lux — above this photoinhibition begins
 }
 
 const STAGES_DEFAULT: Record<GrowthStage, number> = {
@@ -44,6 +52,9 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     caloriesPerKg: 150, proteinPerKg: 14, vitaminC_mgPerKg: 24,
     vitaminA_mcgPerKg: 7405, iron_mgPerKg: 8.6, calcium_mgPerKg: 360, fiber_gPerKg: 13,
     waterLPerHourBase: 0.035, optimalLightHours: 17,
+    boltingTempThreshold: 25, boltingHoursToTrigger: 12,
+    nutrientSensitivity: 0.9, rootO2Sensitivity: 0.85, diseaseSusceptibility: 0.7,
+    lightSaturationPoint: 40000,
   },
   tomato: {
     optimalTemp: 24, optimalMoisture: 70, tempSigma: 5, moistureSigma: 15,
@@ -53,6 +64,9 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     caloriesPerKg: 180, proteinPerKg: 9, vitaminC_mgPerKg: 140,
     vitaminA_mcgPerKg: 833, iron_mgPerKg: 2.7, calcium_mgPerKg: 110, fiber_gPerKg: 12,
     waterLPerHourBase: 0.065, optimalLightHours: 16,
+    boltingTempThreshold: 32, boltingHoursToTrigger: 24,
+    nutrientSensitivity: 0.75, rootO2Sensitivity: 0.7, diseaseSusceptibility: 0.6,
+    lightSaturationPoint: 60000,
   },
   potato: {
     optimalTemp: 18, optimalMoisture: 65, tempSigma: 4, moistureSigma: 12,
@@ -62,6 +76,9 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     caloriesPerKg: 770, proteinPerKg: 20, vitaminC_mgPerKg: 197,
     vitaminA_mcgPerKg: 2, iron_mgPerKg: 8.1, calcium_mgPerKg: 120, fiber_gPerKg: 22,
     waterLPerHourBase: 0.050, optimalLightHours: 14,
+    boltingTempThreshold: 27, boltingHoursToTrigger: 18,
+    nutrientSensitivity: 0.8, rootO2Sensitivity: 0.75, diseaseSusceptibility: 0.5,
+    lightSaturationPoint: 50000,
   },
   soybean: {
     optimalTemp: 25, optimalMoisture: 65, tempSigma: 5, moistureSigma: 15,
@@ -71,6 +88,9 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     caloriesPerKg: 1730, proteinPerKg: 166, vitaminC_mgPerKg: 60,
     vitaminA_mcgPerKg: 9, iron_mgPerKg: 155, calcium_mgPerKg: 2770, fiber_gPerKg: 92,
     waterLPerHourBase: 0.042, optimalLightHours: 15,
+    boltingTempThreshold: 34, boltingHoursToTrigger: 30,
+    nutrientSensitivity: 0.7, rootO2Sensitivity: 0.65, diseaseSusceptibility: 0.45,
+    lightSaturationPoint: 55000,
   },
   spinach: {
     optimalTemp: 18, optimalMoisture: 65, tempSigma: 4, moistureSigma: 12,
@@ -80,6 +100,9 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     caloriesPerKg: 230, proteinPerKg: 29, vitaminC_mgPerKg: 281,
     vitaminA_mcgPerKg: 9377, iron_mgPerKg: 27.1, calcium_mgPerKg: 990, fiber_gPerKg: 22,
     waterLPerHourBase: 0.030, optimalLightHours: 15,
+    boltingTempThreshold: 24, boltingHoursToTrigger: 10,
+    nutrientSensitivity: 0.85, rootO2Sensitivity: 0.8, diseaseSusceptibility: 0.65,
+    lightSaturationPoint: 38000,
   },
   wheat: {
     optimalTemp: 21, optimalMoisture: 60, tempSigma: 5, moistureSigma: 15,
@@ -89,6 +112,9 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     caloriesPerKg: 3400, proteinPerKg: 132, vitaminC_mgPerKg: 0,
     vitaminA_mcgPerKg: 9, iron_mgPerKg: 35, calcium_mgPerKg: 290, fiber_gPerKg: 127,
     waterLPerHourBase: 0.045, optimalLightHours: 17,
+    boltingTempThreshold: 30, boltingHoursToTrigger: 20,
+    nutrientSensitivity: 0.6, rootO2Sensitivity: 0.55, diseaseSusceptibility: 0.4,
+    lightSaturationPoint: 65000,
   },
   radish: {
     optimalTemp: 19, optimalMoisture: 60, tempSigma: 4, moistureSigma: 12,
@@ -98,6 +124,9 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     caloriesPerKg: 160, proteinPerKg: 7, vitaminC_mgPerKg: 148,
     vitaminA_mcgPerKg: 7, iron_mgPerKg: 3.4, calcium_mgPerKg: 250, fiber_gPerKg: 16,
     waterLPerHourBase: 0.025, optimalLightHours: 13,
+    boltingTempThreshold: 26, boltingHoursToTrigger: 8,
+    nutrientSensitivity: 0.7, rootO2Sensitivity: 0.7, diseaseSusceptibility: 0.5,
+    lightSaturationPoint: 45000,
   },
   kale: {
     optimalTemp: 19, optimalMoisture: 65, tempSigma: 5, moistureSigma: 15,
@@ -107,5 +136,8 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     caloriesPerKg: 490, proteinPerKg: 43, vitaminC_mgPerKg: 1200,
     vitaminA_mcgPerKg: 9990, iron_mgPerKg: 15, calcium_mgPerKg: 1500, fiber_gPerKg: 20,
     waterLPerHourBase: 0.038, optimalLightHours: 15,
+    boltingTempThreshold: 26, boltingHoursToTrigger: 14,
+    nutrientSensitivity: 0.75, rootO2Sensitivity: 0.75, diseaseSusceptibility: 0.55,
+    lightSaturationPoint: 42000,
   },
 };
