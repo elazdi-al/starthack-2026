@@ -222,7 +222,7 @@ function DecisionCard({ decision, defaultOpen }: { decision: AgentDecision; defa
                 Actions taken
               </p>
               <div className="flex flex-col gap-1">
-                {decision.actions.map((action, i) => (
+                {groupActions(decision.actions).map((action, i) => (
                   <ActionRow key={i} action={action} />
                 ))}
               </div>
@@ -427,9 +427,32 @@ const ACTION_COLORS: Record<string, string> = {
   crop:       "text-emerald-500 bg-emerald-500/10 border-emerald-500/25",
   harvest:    "text-amber-500 bg-amber-500/10 border-amber-500/25",
   replant:    "text-violet-500 bg-violet-500/10 border-violet-500/25",
+  "plant-tile": "text-violet-500 bg-violet-500/10 border-violet-500/25",
 };
 
-function ActionRow({ action }: { action: AgentAction }) {
+type DisplayAction = AgentAction & { count?: number };
+
+/** Group plant-tile actions by crop so we show "Plant tomato ×5" instead of 5 rows */
+function groupActions(actions: AgentAction[]): DisplayAction[] {
+  const result: DisplayAction[] = [];
+  const plantCounts = new Map<string, number>();
+
+  for (const a of actions) {
+    if (a.type === "plant-tile" && a.crop) {
+      plantCounts.set(a.crop, (plantCounts.get(a.crop) ?? 0) + 1);
+    } else {
+      result.push(a);
+    }
+  }
+
+  for (const [crop, count] of plantCounts) {
+    result.push({ type: "plant-tile", crop, count });
+  }
+
+  return result;
+}
+
+function ActionRow({ action }: { action: DisplayAction }) {
   const color = ACTION_COLORS[action.type] ?? "text-neutral-500 bg-neutral-500/10 border-neutral-500/25";
   const icon = action.param
     ? ACTION_ICON[action.param] ?? null
@@ -440,6 +463,8 @@ function ActionRow({ action }: { action: AgentAction }) {
     label = `Harvest ${action.crop}`;
   } else if (action.type === "replant") {
     label = `Replant ${action.crop}`;
+  } else if (action.type === "plant-tile") {
+    label = `Plant ${action.crop}${action.count && action.count > 1 ? ` ×${action.count}` : ""}`;
   } else if (action.type === "greenhouse" && action.param) {
     const paramLabel = PARAM_LABELS[action.param] ?? action.param;
     label = `${paramLabel} → ${formatValue(action.param, action.value)}`;
