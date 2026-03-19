@@ -15,9 +15,10 @@ const CROP_LABELS: Record<CropType, string> = {
 };
 
 export const PANEL = {
-  ext:   "sim-ext",
-  gh:    "sim-gh",
-  crops: "sim-crops",
+  ext:       "sim-ext",
+  gh:        "sim-gh",
+  crops:     "sim-crops",
+  resources: "sim-resources",
 } as const;
 
 const GH_PARAMS = [
@@ -43,6 +44,12 @@ const EXT_PARAMS: ExtParamDef[] = [
   { key: "timeOfDay",      enabledKey: "timeOfDayLocked",           valueKey: "timeOfDayFraction" },
 ];
 
+const RES_PARAMS: ExtParamDef[] = [
+  { key: "waterRecycling", enabledKey: "waterRecyclingEnabled",  valueKey: "waterRecyclingEfficiency" },
+  { key: "batteryStorage", enabledKey: "batteryStorageEnabled",  valueKey: "batteryStorageKWh" },
+  { key: "foodReserves",   enabledKey: "foodReservesEnabled",    valueKey: "foodReservesSols" },
+];
+
 let pushingFromSim = false;
 
 function r1(n: number) { return Math.round(n * 10) / 10; }
@@ -52,6 +59,9 @@ function ri(n: number) { return Math.round(n); }
 export function CentralControlExample() {
   const externalTemp = useGreenhouseStore((s) => s.environment.externalTemp);
   const solarRadiation = useGreenhouseStore((s) => s.environment.solarRadiation);
+  const waterRecyclingEff = useGreenhouseStore((s) => s.environment.waterRecyclingEfficiency);
+  const batteryKWh = useGreenhouseStore((s) => s.environment.batteryStorageKWh);
+  const foodReserves = useGreenhouseStore((s) => s.environment.foodReservesSols);
   const simState = useGreenhouseStore((s) => s.simState);
   const applyParameterChanges = useGreenhouseStore((s) => s.applyParameterChanges);
   const applyOverrides = useGreenhouseStore((s) => s.applyOverrides);
@@ -59,6 +69,7 @@ export function CentralControlExample() {
   const selectedCropRef = React.useRef<CropType>("lettuce");
   const setFocusedCrop = useGreenhouseStore((s) => s.setFocusedCrop);
   const prevExtRef = React.useRef<Record<string, number>>({});
+  const prevResRef = React.useRef<Record<string, number>>({});
 
   // ── Register all three panels on mount ──────────────────────────────────
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount with initial snapshot
@@ -110,10 +121,25 @@ export function CentralControlExample() {
       aerationRate:          [c.aerationRate, 0, 100, 1],
     });
 
+    // ─ Resource Parameters ─
+    const resInitial: Record<string, number> = {
+      waterRecycling: r2(initEnv.waterRecyclingEfficiency),
+      batteryStorage: ri(initEnv.batteryStorageKWh),
+      foodReserves:   ri(initEnv.foodReservesSols),
+    };
+    prevResRef.current = { ...resInitial };
+
+    DialStore.registerPanel(PANEL.resources, "Resources", {
+      waterRecycling: [resInitial.waterRecycling, 0.30, 0.99, 0.01],
+      batteryStorage: [resInitial.batteryStorage, 0, 1000, 1],
+      foodReserves:   [resInitial.foodReserves, 0, 450, 1],
+    });
+
     return () => {
       DialStore.unregisterPanel(PANEL.ext);
       DialStore.unregisterPanel(PANEL.gh);
       DialStore.unregisterPanel(PANEL.crops);
+      DialStore.unregisterPanel(PANEL.resources);
       setFocusedCrop(null);
     };
   }, []);
@@ -161,6 +187,53 @@ export function CentralControlExample() {
       // Update prev tracking
       for (const { key } of EXT_PARAMS) {
         prevExtRef.current[key] = v[key] as number;
+      }
+
+      if (changed) applyOverrides(next);
+    });
+  }, [applyOverrides]);
+
+  // ── Push live resource values to Resource sliders ──────────────────────
+  React.useEffect(() => {
+    pushingFromSim = true;
+    const v = DialStore.getValues(PANEL.resources);
+    const o = useGreenhouseStore.getState().simState.greenhouse.overrides;
+
+    const push = (key: string, val: number) => {
+      if (v[key] !== val) DialStore.updateValue(PANEL.resources, key, val);
+      prevResRef.current[key] = val;
+    };
+
+    if (!o.waterRecyclingEnabled) push("waterRecycling", r2(waterRecyclingEff));
+    if (!o.batteryStorageEnabled) push("batteryStorage", ri(batteryKWh));
+    if (!o.foodReservesEnabled)   push("foodReserves", ri(foodReserves));
+
+    pushingFromSim = false;
+  }, [waterRecyclingEff, batteryKWh, foodReserves]);
+
+  // ── Resource params → overrides (auto-enable on user change) ───────────
+  React.useEffect(() => {
+    return DialStore.subscribe(PANEL.resources, () => {
+      if (pushingFromSim) return;
+      const v = DialStore.getValues(PANEL.resources);
+      const prev = prevResRef.current;
+      const currentOverrides = useGreenhouseStore.getState().simState.greenhouse.overrides;
+      const next: ManualOverrides = { ...currentOverrides };
+      let changed = false;
+
+      for (const { key, enabledKey, valueKey } of RES_PARAMS) {
+        const newVal = v[key] as number;
+        if (newVal !== undefined && newVal !== prev[key]) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (next as any)[enabledKey] = true;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (next as any)[valueKey] = newVal;
+          changed = true;
+        }
+      }
+
+      for (const { key } of RES_PARAMS) {
+        prevResRef.current[key] = v[key] as number;
       }
 
       if (changed) applyOverrides(next);

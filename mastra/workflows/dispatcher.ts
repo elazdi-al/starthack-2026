@@ -440,7 +440,7 @@ Otherwise, permit the override and log it.`;
                   wellbeingJustification,
                   crewResponse: `Override denied: ${parsed.vetoReason ?? 'Safety threshold exceeded.'}`,
                   reasoning: parsed.vetoReason ?? 'Override vetoed for safety',
-                  summary: `Override vetoed — risk score ${riskScore.toFixed(2)} > 0.85`,
+                  summary: `Override vetoed — risk ${riskScore.toFixed(2)}`,
                   decisionId: decisionEntry.id,
                 };
               }
@@ -472,7 +472,7 @@ Otherwise, permit the override and log it.`;
                 wellbeingJustification,
                 crewResponse: crewResponse || 'Override approved.',
                 reasoning: `Crew override permitted`,
-                summary: `Override approved — risk score ${riskScore.toFixed(2)}`,
+                summary: `Override approved — risk ${riskScore.toFixed(2)}`,
                 decisionId: decisionEntry.id,
               };
             }
@@ -603,6 +603,7 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
     let simulationP10: number | undefined;
     let simulationP90: number | undefined;
     let arbiterReasoning = '';
+    let arbiterSummary = '';
 
     if (survivalVeto || survivalRiskScore > 0.85) {
       conflictType = 'hard_veto';
@@ -681,6 +682,7 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
             const parsed = JSON.parse(jsonMatch[0]);
             conflictType = (parsed.conflictType as ConflictType) ?? 'none';
             arbiterReasoning = parsed.reasoning ?? aText.slice(0, 400);
+            arbiterSummary = typeof parsed.summary === 'string' ? parsed.summary.slice(0, 100) : '';
             if (parsed.crewMessage) crewResponseText = parsed.crewMessage;
 
             // Resolve actions based on Arbiter decision
@@ -784,13 +786,10 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       simulationP10,
       simulationP90,
       reasoning: arbiterReasoning,
-      summary: conflictType === 'hard_veto'
-        ? `Safety veto (risk ${survivalRiskScore.toFixed(2)}) — survival plan enacted`
-        : conflictType === 'soft_conflict'
-        ? `Conflict resolved — ${winningAgent} plan selected`
-        : isEmergencySev2
-        ? `Severity-2 emergency — ${resolvedActions.length} action(s) enacted`
-        : `${resolvedActions.length} action(s) enacted — agents agreed`,
+      summary: arbiterSummary
+        || (conflictType === 'hard_veto'
+          ? `Safety veto — risk ${survivalRiskScore.toFixed(2)}`
+          : `${resolvedActions.length} action(s) enacted`),
       decisionId: decisionEntry.id,
     };
   },

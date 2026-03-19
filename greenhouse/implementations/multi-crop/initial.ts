@@ -295,6 +295,12 @@ export function createInitialGreenhouseState(): ConcreteGreenhouseState {
       atmosphericPressure:        600,
       timeOfDayLocked:            false,
       timeOfDayFraction:          0.5,
+      waterRecyclingEnabled:      false,
+      waterRecyclingEfficiency:   0.95,
+      batteryStorageEnabled:      false,
+      batteryStorageKWh:          200,
+      foodReservesEnabled:        false,
+      foodReservesSols:           450,
     },
   };
 }

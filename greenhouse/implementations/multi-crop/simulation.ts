@@ -323,9 +323,11 @@ function simulate(
   const cropLocalHeatKW   = ALL_CROP_TYPES.reduce((s, ct) => s + greenhouse.crops[ct].localHeatingPower, 0) / 1000;
   const powerDemandKW     = (greenhouse.globalHeatingPower + greenhouse.lightingPower) / 1000 + cropLocalHeatKW;
   const netPowerKW        = solarGenerationKW - powerDemandKW;
-  let   batteryStorageKWh = clamp(0, greenhouse.batteryCapacityKWh,
-    initialEnv.batteryStorageKWh + netPowerKW * deltaHours,
-  );
+  let   batteryStorageKWh = ov.batteryStorageEnabled
+    ? ov.batteryStorageKWh
+    : clamp(0, greenhouse.batteryCapacityKWh,
+        initialEnv.batteryStorageKWh + netPowerKW * deltaHours,
+      );
   const energyDeficit     = batteryStorageKWh <= 0 && netPowerKW < 0;
   // Effective lighting/heating when in deficit: scale down by available energy ratio
   const energyAvailRatio  = energyDeficit
@@ -335,9 +337,11 @@ function simulate(
   // ─── Water Recycling Efficiency ───
   const deltaPerSol        = deltaHours / SOL_HOURS;
   const stormPenalty       = dustStormFactor < 0.8 ? WATER_RECYCLING_STORM_PENALTY : 0;
-  const waterRecyclingEfficiency = clamp(0.30, 0.99,
-    initialEnv.waterRecyclingEfficiency - (WATER_RECYCLING_DECAY_PER_SOL + stormPenalty) * deltaPerSol,
-  );
+  const waterRecyclingEfficiency = ov.waterRecyclingEnabled
+    ? ov.waterRecyclingEfficiency
+    : clamp(0.30, 0.99,
+        initialEnv.waterRecyclingEfficiency - (WATER_RECYCLING_DECAY_PER_SOL + stormPenalty) * deltaPerSol,
+      );
   // Irrigation effectiveness: scales with recycling — below 85% the water supply shrinks
   const irrigationEffectiveness = waterRecyclingEfficiency / 0.95;
 
@@ -436,7 +440,9 @@ function simulate(
   // foodReservesSols represents how many sols of full crew nutrition remain in storage.
   const deltaSols = deltaHours / SOL_HOURS;
   const reserveDepletion = deltaSols * Math.max(0, 1 - greenhouseCoverage); // greenhouse output offsets depletion
-  const foodReservesSols = Math.max(0, initialEnv.foodReservesSols - reserveDepletion);
+  const foodReservesSols = ov.foodReservesEnabled
+    ? ov.foodReservesSols
+    : Math.max(0, initialEnv.foodReservesSols - reserveDepletion);
 
   // Effective nutritional coverage: greenhouse output + reserves fill the gap.
   // Reserves contribute proportionally — above 30 sols they fully cover the gap,

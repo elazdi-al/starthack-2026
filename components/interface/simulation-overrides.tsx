@@ -58,6 +58,13 @@ export function SimulationOverrides() {
       atmosphericPressure:        values["Atmosphere"].pressure,
       timeOfDayLocked:            values["Time of Day"].locked,
       timeOfDayFraction:          values["Time of Day"].fraction,
+      // Preserve current resource overrides (managed by CentralControlExample)
+      waterRecyclingEnabled:      simState.greenhouse.overrides.waterRecyclingEnabled,
+      waterRecyclingEfficiency:   simState.greenhouse.overrides.waterRecyclingEfficiency,
+      batteryStorageEnabled:      simState.greenhouse.overrides.batteryStorageEnabled,
+      batteryStorageKWh:          simState.greenhouse.overrides.batteryStorageKWh,
+      foodReservesEnabled:        simState.greenhouse.overrides.foodReservesEnabled,
+      foodReservesSols:           simState.greenhouse.overrides.foodReservesSols,
     };
     applyOverrides(overrides);
   // eslint-disable-next-line react-hooks/exhaustive-deps

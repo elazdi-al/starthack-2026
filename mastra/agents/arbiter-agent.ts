@@ -50,6 +50,7 @@ RESPONSE FORMAT — respond with a single JSON object only, no markdown:
 {
   "conflictType": "agreement" | "soft_conflict" | "hard_veto",
   "decision": "survival" | "wellbeing" | "hybrid",
+  "summary": "<8–12 word headline describing what this decision does, e.g. 'Boosted heating and harvested wheat ahead of dust storm'>",
   "actions": [
     { "type": "greenhouse|crop|harvest|replant|plant-tile|harvest-tile|clear-tile", "param": "<string>", "value": <number>, "crop": "<string>", "tileId": "<string>" }
   ],
