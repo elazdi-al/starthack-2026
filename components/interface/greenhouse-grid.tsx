@@ -10,126 +10,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  useGreenhouseStore,
+  CROP_DB,
+  type TileData,
+} from "@/lib/greenhouse-store";
 
 const TILE = 120;
 const GAP = 3;
 const COLS = 8;
 const ROWS = 5;
-
-type TileKind = "crop" | "path";
-type Status = "ok" | "warn" | null;
-type CropType =
-  | "lettuce"
-  | "tomato"
-  | "potato"
-  | "soybean"
-  | "spinach"
-  | "wheat"
-  | "radish"
-  | "kale";
-
-interface CropInfo {
-  name: string;
-  scientificName: string;
-  growthCycleDays: number;
-  optimalTemp: [number, number];
-  lightHours: string;
-  waterPerDay: string;
-  caloriesPer100g: number;
-  proteinPer100g: number;
-  keyNutrients: string[];
-}
-
-const CROP_DB: Record<CropType, CropInfo> = {
-  lettuce: {
-    name: "Lettuce",
-    scientificName: "Lactuca sativa",
-    growthCycleDays: 45,
-    optimalTemp: [18, 24],
-    lightHours: "16–18 h/day",
-    waterPerDay: "0.8 L/m²",
-    caloriesPer100g: 15,
-    proteinPer100g: 1.4,
-    keyNutrients: ["Vitamin A", "Vitamin K", "Folate"],
-  },
-  tomato: {
-    name: "Tomato",
-    scientificName: "Solanum lycopersicum",
-    growthCycleDays: 80,
-    optimalTemp: [20, 28],
-    lightHours: "14–18 h/day",
-    waterPerDay: "1.5 L/m²",
-    caloriesPer100g: 18,
-    proteinPer100g: 0.9,
-    keyNutrients: ["Vitamin C", "Lycopene", "Potassium"],
-  },
-  potato: {
-    name: "Potato",
-    scientificName: "Solanum tuberosum",
-    growthCycleDays: 90,
-    optimalTemp: [15, 22],
-    lightHours: "12–16 h/day",
-    waterPerDay: "1.2 L/m²",
-    caloriesPer100g: 77,
-    proteinPer100g: 2.0,
-    keyNutrients: ["Vitamin C", "Potassium", "Vitamin B6"],
-  },
-  soybean: {
-    name: "Soybean",
-    scientificName: "Glycine max",
-    growthCycleDays: 100,
-    optimalTemp: [20, 30],
-    lightHours: "14–16 h/day",
-    waterPerDay: "1.0 L/m²",
-    caloriesPer100g: 173,
-    proteinPer100g: 16.6,
-    keyNutrients: ["Protein", "Iron", "Calcium"],
-  },
-  spinach: {
-    name: "Spinach",
-    scientificName: "Spinacia oleracea",
-    growthCycleDays: 40,
-    optimalTemp: [15, 22],
-    lightHours: "14–16 h/day",
-    waterPerDay: "0.7 L/m²",
-    caloriesPer100g: 23,
-    proteinPer100g: 2.9,
-    keyNutrients: ["Iron", "Vitamin A", "Vitamin C"],
-  },
-  wheat: {
-    name: "Wheat",
-    scientificName: "Triticum aestivum",
-    growthCycleDays: 120,
-    optimalTemp: [18, 24],
-    lightHours: "16–18 h/day",
-    waterPerDay: "1.1 L/m²",
-    caloriesPer100g: 340,
-    proteinPer100g: 13.2,
-    keyNutrients: ["Fiber", "Manganese", "Selenium"],
-  },
-  radish: {
-    name: "Radish",
-    scientificName: "Raphanus sativus",
-    growthCycleDays: 30,
-    optimalTemp: [16, 22],
-    lightHours: "12–14 h/day",
-    waterPerDay: "0.6 L/m²",
-    caloriesPer100g: 16,
-    proteinPer100g: 0.7,
-    keyNutrients: ["Vitamin C", "Folate", "Potassium"],
-  },
-  kale: {
-    name: "Kale",
-    scientificName: "Brassica oleracea var. sabellica",
-    growthCycleDays: 55,
-    optimalTemp: [15, 24],
-    lightHours: "14–16 h/day",
-    waterPerDay: "0.9 L/m²",
-    caloriesPer100g: 49,
-    proteinPer100g: 4.3,
-    keyNutrients: ["Vitamin K", "Vitamin C", "Calcium"],
-  },
-};
 
 const GROWTH_LABEL: Record<number, string> = {
   0: "Not Planted",
@@ -139,68 +29,6 @@ const GROWTH_LABEL: Record<number, string> = {
   4: "Fruiting",
   5: "Harvest Ready",
 };
-
-interface TileData {
-  kind: TileKind;
-  growth: number;
-  water: number;
-  status: Status;
-  sensor?: boolean;
-  crop?: CropType;
-}
-
-const grid: TileData[][] = [
-  [
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "lettuce" },
-    { kind: "crop", growth: 4, water: 92, status: "ok", crop: "tomato" },
-    { kind: "crop", growth: 2, water: 65, status: "ok", crop: "spinach" },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "path", growth: 0, water: 0, status: null, sensor: true },
-    { kind: "crop", growth: 5, water: 88, status: "ok", crop: "soybean" },
-    { kind: "crop", growth: 3, water: 72, status: "ok", crop: "wheat" },
-    { kind: "crop", growth: 4, water: 95, status: "ok", crop: "kale" },
-  ],
-  [
-    { kind: "crop", growth: 5, water: 95, status: "ok", crop: "potato" },
-    { kind: "crop", growth: 3, water: 80, status: "ok", crop: "lettuce" },
-    { kind: "crop", growth: 0, water: 0, status: null, crop: "radish" },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 2, water: 60, status: "ok", crop: "radish" },
-    { kind: "crop", growth: 5, water: 90, status: "ok", crop: "tomato" },
-    { kind: "crop", growth: 1, water: 82, status: "ok", crop: "spinach" },
-  ],
-  [
-    { kind: "crop", growth: 2, water: 55, status: "ok", crop: "wheat" },
-    { kind: "crop", growth: 5, water: 70, status: "warn", crop: "soybean" },
-    { kind: "crop", growth: 1, water: 90, status: "ok", crop: "kale" },
-    { kind: "path", growth: 0, water: 0, status: null, sensor: true },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 4, water: 75, status: "ok", crop: "lettuce" },
-    { kind: "crop", growth: 0, water: 0, status: null, crop: "potato" },
-    { kind: "crop", growth: 5, water: 70, status: "warn", crop: "potato" },
-  ],
-  [
-    { kind: "crop", growth: 4, water: 82, status: "ok", crop: "tomato" },
-    { kind: "crop", growth: 1, water: 65, status: "ok", crop: "spinach" },
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "potato" },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 3, water: 80, status: "ok", crop: "wheat" },
-    { kind: "crop", growth: 4, water: 55, status: "warn", crop: "radish" },
-    { kind: "crop", growth: 1, water: 88, status: "ok", crop: "soybean" },
-  ],
-  [
-    { kind: "crop", growth: 3, water: 90, status: "ok", crop: "kale" },
-    { kind: "crop", growth: 5, water: 85, status: "ok", crop: "kale" },
-    { kind: "crop", growth: 4, water: 72, status: "ok", crop: "tomato" },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "path", growth: 0, water: 0, status: null, sensor: true },
-    { kind: "crop", growth: 1, water: 92, status: "ok", crop: "spinach" },
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "soybean" },
-    { kind: "crop", growth: 2, water: 65, status: "ok", crop: "wheat" },
-  ],
-];
 
 const DOT_SIZE: Record<number, string> = {
   1: "w-[3px] h-[3px]",
@@ -219,18 +47,11 @@ const DOT_OPACITY: Record<number, string> = {
 };
 
 export function GreenhouseGrid() {
+  const grid = useGreenhouseStore((s) => s.grid);
   const [selected, setSelected] = useState<TileData | null>(null);
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-      <div className="flex items-center gap-2 mb-6">
-        <span className="text-[13px] font-medium tracking-wide text-black/40">
-          Greenhouse Module
-        </span>
-        <span className="text-sm text-black/15">·</span>
-        <span className="font-mono text-xs text-black/25">Sol 1 / 450</span>
-      </div>
-
       <TooltipProvider delay={200} closeDelay={0}>
         <div
           className="pointer-events-auto"
@@ -266,18 +87,6 @@ export function GreenhouseGrid() {
           </div>
         </div>
       </TooltipProvider>
-
-      <div className="flex items-center gap-4 mt-8">
-        <EnvReading label="Temp" value="22°C" />
-        <EnvDivider />
-        <EnvReading label="Humidity" value="65%" />
-        <EnvDivider />
-        <EnvReading label="CO₂" value="800 ppm" />
-        <EnvDivider />
-        <EnvReading label="Light" value="420 µmol" />
-        <EnvDivider />
-        <EnvReading label="H₂O Reserve" value="94%" />
-      </div>
 
       <CropDialog data={selected} onClose={() => setSelected(null)} />
     </div>

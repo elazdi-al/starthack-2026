@@ -6,54 +6,6 @@ import type { CSSProperties } from "react";
 import { CentralControlExample } from "@/components/examples/central-control-example";
 import { GreenhouseGrid } from "@/components/interface/greenhouse-grid";
 import { CentralControlPanel } from "@/components/interface/central-control-panel";
-import { ColorSelectorExample } from "@/components/examples/color-selector-example";
-import { HoldToDeleteExample } from "@/components/examples/hold-to-delete-example";
-import { ExplodingInputExample } from "@/components/examples/exploding-input-example";
-import { RunningWidgetExample } from "@/components/examples/running-widget-example";
-import { SwitchExample } from "@/components/examples/switch-example";
-import { TypographySpecimen } from "@/components/examples/typography-specimen";
-import { WalletWidgetExample } from "@/components/examples/wallet-widget-example";
-import {
-  ArrowRightCircleIcon,
-  ArrowUpCircleIcon,
-  BalancesIcon,
-  BillingIcon,
-  ComponentsGlyphIcon,
-  CourseArrowIcon,
-  CustomersIcon,
-  DeleteActionActiveIcon,
-  DeleteActionIcon,
-  NotificationBellIcon,
-  NotificationBellMutedIcon,
-  PaymentsIcon,
-} from "@/components/icons";
-import { SiteHeader } from "@/components/layout/site-header";
-import { CodeBlock } from "@/components/ui/code-block";
-import { FilterBar } from "@/components/ui/filter-bar";
-import { HighlightTabs } from "@/components/ui/highlight-tabs";
-import { IconActionButton } from "@/components/ui/icon-action-button";
-import { Input } from "@/components/ui/input";
-import { SearchBar } from "@/components/ui/search-bar";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
-import {
-  AlignBottomSimple,
-  AlignCenterVerticalSimple,
-  AlignTopSimple,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  CaretRight,
-  DotsThree,
-  Layout,
-  Minus,
-  Sparkle,
-  Swatches,
-  TextAa,
-} from "@phosphor-icons/react";
 
 import { ClockWidget } from "@/components/interface/clock-widget";
 import { SettingsButton } from "@/components/interface/settings-button";
@@ -61,6 +13,7 @@ import { TemperatureWidget } from "@/components/interface/temperature-widget";
 import { SidebarToggle } from "@/components/interface/sidebar-toggle";
 import { SpeedSelector } from "@/components/interface/speed-selector";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+
 
 const lightModeVars = {
   "--background": "#ffffff",
@@ -91,7 +44,6 @@ const lightModeVars = {
 } as CSSProperties;
 
 export default function Home() {
-  const [speed, setSpeed] = React.useState("x1");
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [controlOpen, setControlOpen] = React.useState(false);
   const [speedOpen, setSpeedOpen] = React.useState(false);
@@ -127,8 +79,6 @@ export default function Home() {
 
         <div className="absolute right-6 top-6 flex items-center gap-3">
           <SpeedSelector
-            value={speed}
-            onValueChange={setSpeed}
             open={speedOpen}
             onOpenChange={handleSpeedOpenChange}
             portalContainer={portalContainer}

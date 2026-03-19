@@ -10,13 +10,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useGreenhouseStore, type SpeedKey } from "@/lib/greenhouse-store";
 
-const SPEED_OPTIONS = ["x1", "x2", "x5", "x10"] as const;
+const SPEED_OPTIONS: SpeedKey[] = ["x1", "x2", "x5", "x10"];
 
 interface SpeedSelectorProps {
-  value?: string;
-  defaultValue?: string;
-  onValueChange?: (value: string) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   portalContainer?: HTMLElement | null;
@@ -24,24 +22,21 @@ interface SpeedSelectorProps {
 }
 
 export function SpeedSelector({
-  value,
-  defaultValue = "x1",
-  onValueChange,
   open: controlledOpen,
   onOpenChange,
   portalContainer,
   className,
 }: SpeedSelectorProps) {
+  const speed = useGreenhouseStore((s) => s.speed);
+  const setSpeed = useGreenhouseStore((s) => s.setSpeed);
+
   const [internalOpen, setInternalOpen] = React.useState(false);
   const open = controlledOpen ?? internalOpen;
   const setOpen = (next: boolean) => {
     if (controlledOpen === undefined) setInternalOpen(next);
     onOpenChange?.(next);
   };
-  const [internalValue, setInternalValue] = React.useState(defaultValue);
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
-
-  const currentValue = value ?? internalValue;
 
   return (
     <div className={cn("relative inline-flex", className)}>
@@ -63,7 +58,7 @@ export function SpeedSelector({
             event.currentTarget.blur();
           }}
         >
-          {currentValue}
+          {speed}
         </DropdownMenuTrigger>
 
         <DropdownMenuContent
@@ -73,20 +68,16 @@ export function SpeedSelector({
           container={portalContainer}
         >
           <DropdownMenuRadioGroup
-            value={currentValue}
+            value={speed}
             onValueChange={(nextValue) => {
-              if (value === undefined) {
-                setInternalValue(nextValue);
-              }
-
-              onValueChange?.(nextValue);
+              setSpeed(nextValue as SpeedKey);
               setOpen(false);
               triggerRef.current?.blur();
             }}
           >
-            {SPEED_OPTIONS.map((speed) => (
-              <DropdownMenuRadioItem key={speed} value={speed}>
-                {speed}
+            {SPEED_OPTIONS.map((s) => (
+              <DropdownMenuRadioItem key={s} value={s}>
+                {s}
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>

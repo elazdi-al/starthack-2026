@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { ArrowUp } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -21,11 +20,12 @@ export function ChatInput({
   placeholder = "Message…",
 }: ChatInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const canSend = value.trim().length > 0 && !disabled;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (value.trim()) onSubmit();
+      if (canSend) onSubmit();
     }
   };
 
@@ -37,7 +37,14 @@ export function ChatInput({
   }, [value]);
 
   return (
-    <div className="relative flex items-end gap-2 rounded-full border border-input bg-transparent px-3.5 py-2 transition-[border-color,box-shadow] focus-within:border-[var(--input-hover)]">
+    <div
+      className={cn(
+        "relative flex items-end rounded-[20px] pl-3.5 pr-[5px]",
+        "bg-[var(--dial-surface)] border border-[var(--dial-border)]",
+        "transition-[border-color,box-shadow] duration-200",
+        "focus-within:border-[var(--dial-border-hover)]",
+      )}
+    >
       <textarea
         ref={textareaRef}
         value={value}
@@ -46,20 +53,32 @@ export function ChatInput({
         disabled={disabled}
         placeholder={placeholder}
         rows={1}
+        style={{ margin: 0, padding: 0 }}
         className={cn(
-          "flex-1 resize-none bg-transparent text-[13px] font-medium leading-relaxed text-[var(--dial-text-primary)] placeholder:text-[var(--dial-text-tertiary)] outline-none",
-          "scrollbar-none"
+          "my-[9px] flex-1 resize-none bg-transparent",
+          "text-[15px] leading-[20px] font-normal",
+          "text-[var(--dial-text-primary)] placeholder:text-[var(--dial-text-tertiary)]",
+          "outline-none scrollbar-none",
         )}
       />
-      <Button
-        variant="default"
-        size="icon-xs"
-        onClick={onSubmit}
-        disabled={disabled || !value.trim()}
-        aria-label="Send message"
-      >
-        <ArrowUp size={14} weight="bold" />
-      </Button>
+      <div className="flex shrink-0 items-center pb-[5px] pl-2">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!canSend}
+          aria-label="Send message"
+          className={cn(
+            "flex size-[28px] items-center justify-center rounded-full",
+            "transition-[background-color,opacity,transform] duration-150",
+            "active:scale-[0.85]",
+            canSend
+              ? "bg-[#007AFF] text-white"
+              : "bg-transparent text-[var(--dial-text-tertiary)] opacity-0 pointer-events-none",
+          )}
+        >
+          <ArrowUp size={16} weight="bold" />
+        </button>
+      </div>
     </div>
   );
 }
