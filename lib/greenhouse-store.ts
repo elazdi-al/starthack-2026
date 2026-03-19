@@ -541,6 +541,12 @@ function buildTileCounts(env: ConcreteEnvironment): EnvironmentSnapshot['tileCou
 
 // ─── Store ──────────────────────────────────────────────────────────────────────
 
+// Module-level lock for autonomousTick to prevent TOCTOU race conditions.
+// Zustand's get()/set() are not transactional, so two rapid calls could both
+// see tickInFlight === false. This lock is checked synchronously before any
+// async work begins.
+let _autonomousTickLock = false;
+
 function buildInitialSimulation() {
   const env = createInitialEnvironment();
   const greenhouse = createInitialGreenhouseState();
@@ -905,9 +911,11 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   setAutonomousEnabled: (enabled) => set({ autonomousEnabled: enabled }),
 
   autonomousTick: async () => {
-    const { tickInFlight, elapsedMinutes, environment, simState, totalHarvestKg, events } = get();
-    if (tickInFlight) return;
+    // Use module-level lock to prevent TOCTOU race between check and set
+    if (_autonomousTickLock) return;
+    _autonomousTickLock = true;
 
+    const { elapsedMinutes, environment, simState, totalHarvestKg } = get();
     set({ tickInFlight: true, lastTickSimMinutes: elapsedMinutes });
 
     try {
@@ -1021,6 +1029,7 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       console.error('[autonomousTick] error:', err);
     } finally {
       set({ tickInFlight: false, lastTickSimMinutes: get().elapsedMinutes });
+      _autonomousTickLock = false;
     }
   },
 }));

@@ -97,7 +97,7 @@ function LiveParamCard({
 
 /* ── Crew data ─────────────────────────────────────────────────── */
 
-type HealthStatus = "nominal" | "caution" | "critical";
+import { CREW_PROFILES, type HealthStatus, type NeedLevel } from "@/lib/crew-data";
 
 interface CrewMember {
   name: string;
@@ -112,12 +112,23 @@ interface CrewMember {
   stress: number;
 }
 
-const CREW: CrewMember[] = [
-  { name: "Wei",   role: "Botanist",   color: "#30D158", health: "nominal", morale: 88, hydration: 92, nutrition: 88, sleep: 7.2, o2Sat: 98, stress: 90 },
-  { name: "Amara", role: "Engineer",   color: "#0A84FF", health: "nominal", morale: 81, hydration: 85, nutrition: 79, sleep: 6.8, o2Sat: 97, stress: 60 },
-  { name: "Lena",  role: "Medic",      color: "#BF5AF2", health: "caution", morale: 74, hydration: 76, nutrition: 82, sleep: 5.9, o2Sat: 97, stress: 60 },
-  { name: "Kenji", role: "Specialist", color: "#FF9F0A", health: "nominal", morale: 91, hydration: 90, nutrition: 91, sleep: 7.5, o2Sat: 99, stress: 90 },
-];
+const STRESS_MAP: Record<NeedLevel, number> = { good: 90, moderate: 60, low: 30 };
+const COLOR_MAP: Record<string, string> = {
+  wei: "#30D158", amara: "#0A84FF", lena: "#BF5AF2", kenji: "#FF9F0A",
+};
+
+const CREW: CrewMember[] = CREW_PROFILES.map((p) => ({
+  name: p.name,
+  role: p.role,
+  color: COLOR_MAP[p.id] ?? "#888",
+  health: p.health,
+  morale: p.morale,
+  hydration: p.hydration,
+  nutrition: p.nutrition,
+  sleep: p.sleep,
+  o2Sat: p.o2Sat,
+  stress: STRESS_MAP[p.stress],
+}));
 
 const HEALTH_METRICS: RadarMetric[] = [
   { key: "morale",    label: "Morale" },

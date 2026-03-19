@@ -206,8 +206,28 @@ function getDustStormFactor(
   for (const storm of storms) {
     if (storm.yearIndex !== yearIndex) continue;
     const endLs = storm.startLs + storm.durationLs;
-    if (yearLs >= storm.startLs && yearLs < endLs) {
-      const t = (yearLs - storm.startLs) / storm.durationLs;
+
+    // Check if yearLs falls within the storm window, handling Ls wrap at 360°
+    let inStorm = false;
+    let t = 0; // normalised position within storm (0 at start, 1 at end)
+    if (endLs <= 360) {
+      // No wrap — simple range check
+      if (yearLs >= storm.startLs && yearLs < endLs) {
+        inStorm = true;
+        t = (yearLs - storm.startLs) / storm.durationLs;
+      }
+    } else {
+      // Storm wraps past 360° (e.g. starts at Ls 330, ends at Ls 30 next cycle)
+      if (yearLs >= storm.startLs) {
+        inStorm = true;
+        t = (yearLs - storm.startLs) / storm.durationLs;
+      } else if (yearLs < endLs - 360) {
+        inStorm = true;
+        t = (yearLs + 360 - storm.startLs) / storm.durationLs;
+      }
+    }
+
+    if (inStorm) {
       const ramp = t < 0.2 ? t / 0.2 : t > 0.8 ? (1 - t) / 0.2 : 1;
       const stormFactor = storm.severity + (1 - storm.severity) * (1 - ramp);
       factor = Math.min(factor, stormFactor);
@@ -418,10 +438,16 @@ function simulate(
   const reserveDepletion = deltaSols * Math.max(0, 1 - greenhouseCoverage); // greenhouse output offsets depletion
   const foodReservesSols = Math.max(0, initialEnv.foodReservesSols - reserveDepletion);
 
-  // Effective nutritional coverage: if greenhouse covers X% and reserves exist, crew is fed
-  const nutritionalCoverage = foodReservesSols > 0
-    ? Math.min(1, greenhouseCoverage + (1 - greenhouseCoverage)) // reserves fill the gap → 1.0
-    : greenhouseCoverage; // reserves exhausted — crew depends entirely on greenhouse
+  // Effective nutritional coverage: greenhouse output + reserves fill the gap.
+  // Reserves contribute proportionally — above 30 sols they fully cover the gap,
+  // below that they scale linearly so coverage degrades gradually as reserves dwindle.
+  const RESERVE_FULL_COVER_SOLS = 30; // reserves fully supplement greenhouse above this threshold
+  const reserveFraction = foodReservesSols > 0
+    ? Math.min(1, foodReservesSols / RESERVE_FULL_COVER_SOLS)
+    : 0;
+  const nutritionalCoverage = Math.min(1,
+    greenhouseCoverage + (1 - greenhouseCoverage) * reserveFraction,
+  );
 
   return {
     timestamp: simulationMs,

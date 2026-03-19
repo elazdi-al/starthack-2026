@@ -149,12 +149,22 @@ export function buildCropAtProgress(ct: CropType, fraction: number): CropEnviron
  * Used to keep backward-compatible `crops: Record<CropType, CropEnvironment>`.
  */
 export function aggregateTileCrops(tileCrops: Record<string, TileCropEnvironment>): Record<CropType, CropEnvironment> {
-  const sums: Record<string, { total: CropEnvironment; count: number }> = {};
+  const sums: Record<string, {
+    total: CropEnvironment;
+    count: number;
+    stageCounts: Record<string, number>;
+    anyBolting: boolean;
+  }> = {};
 
   for (const tile of Object.values(tileCrops)) {
     const ct = tile.cropType;
     if (!sums[ct]) {
-      sums[ct] = { total: { ...tile }, count: 1 };
+      sums[ct] = {
+        total: { ...tile },
+        count: 1,
+        stageCounts: { [tile.stage]: 1 },
+        anyBolting: tile.isBolting,
+      };
     } else {
       const t = sums[ct].total;
       t.soilMoisture += tile.soilMoisture;
@@ -173,6 +183,8 @@ export function aggregateTileCrops(tileCrops: Record<string, TileCropEnvironment
       t.stageProgress += tile.stageProgress;
       t.boltingHoursAccumulated += tile.boltingHoursAccumulated;
       sums[ct].count++;
+      sums[ct].stageCounts[tile.stage] = (sums[ct].stageCounts[tile.stage] ?? 0) + 1;
+      if (tile.isBolting) sums[ct].anyBolting = true;
     }
   }
 
@@ -183,26 +195,39 @@ export function aggregateTileCrops(tileCrops: Record<string, TileCropEnvironment
       result[ct] = buildCropAtProgress(ct, 0);
       continue;
     }
-    const { total: t, count: n } = sums[ct];
+    const { total: t, count: n, stageCounts, anyBolting } = sums[ct];
+
+    // Determine the most common stage across tiles of this type
+    let mostCommonStage: GrowthStage = 'seed';
+    let maxStageCount = 0;
+    for (const [s, cnt] of Object.entries(stageCounts)) {
+      if (cnt > maxStageCount) {
+        maxStageCount = cnt;
+        mostCommonStage = s as GrowthStage;
+      }
+    }
+
     result[ct] = {
+      // Averaged values (per-tile metrics)
       soilMoisture: t.soilMoisture / n,
       soilTemperature: t.soilTemperature / n,
-      // Use the most advanced tile's stage for the aggregate
-      stage: t.stage,
       stageProgress: t.stageProgress / n,
       daysSincePlanting: t.daysSincePlanting / n,
       healthScore: t.healthScore / n,
       stressAccumulator: t.stressAccumulator / n,
-      biomassKg: t.biomassKg / n,
-      estimatedYieldKg: t.estimatedYieldKg / n,
       plantGrowth: t.plantGrowth / n,
-      leafArea: t.leafArea / n,
-      fruitCount: Math.round(t.fruitCount / n),
       rootO2Level: t.rootO2Level / n,
       nutrientEC: t.nutrientEC / n,
       diseaseRisk: t.diseaseRisk / n,
-      isBolting: t.isBolting,
       boltingHoursAccumulated: t.boltingHoursAccumulated / n,
+      // Summed values (totals across all tiles of this type)
+      biomassKg: t.biomassKg,
+      estimatedYieldKg: t.estimatedYieldKg,
+      leafArea: t.leafArea,
+      fruitCount: t.fruitCount,
+      // Correctly aggregated discrete values
+      stage: mostCommonStage,
+      isBolting: anyBolting,
     };
   }
   return result;

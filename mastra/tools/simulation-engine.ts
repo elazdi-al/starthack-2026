@@ -150,6 +150,8 @@ interface EnvState {
   solarFluxBase: number;
   heatingPower: number;
   lightingPower: number;
+  ventilationRate: number;
+  co2InjectionRate: number;
   waterRecyclingEfficiency: number;
 }
 
@@ -229,6 +231,8 @@ function runScenario(
     solarFluxBase: (snap.seasonalSolarFlux as number) ?? 500,
     heatingPower: ((snap.greenhouseControls as Record<string, number>)?.globalHeatingPower as number) ?? 3000,
     lightingPower: ((snap.greenhouseControls as Record<string, number>)?.lightingPower as number) ?? 5000,
+    ventilationRate: ((snap.greenhouseControls as Record<string, number>)?.ventilationRate as number) ?? 100,
+    co2InjectionRate: ((snap.greenhouseControls as Record<string, number>)?.co2InjectionRate as number) ?? 50,
     waterRecyclingEfficiency: (snap.waterRecyclingEfficiency as number) ?? 0.9,
   };
 
@@ -237,6 +241,8 @@ function runScenario(
     if (action.type === 'greenhouse') {
       if (action.param === 'globalHeatingPower' && action.value !== undefined) env.heatingPower = action.value;
       if (action.param === 'lightingPower' && action.value !== undefined) env.lightingPower = action.value;
+      if (action.param === 'ventilationRate' && action.value !== undefined) env.ventilationRate = action.value;
+      if (action.param === 'co2InjectionRate' && action.value !== undefined) env.co2InjectionRate = action.value;
     }
   }
 
@@ -391,6 +397,25 @@ function runScenario(
     const totalLoadKW = (env.heatingPower + env.lightingPower) / 1000;
     const energyBalanceKWh = (solarGenKW - totalLoadKW) * 24;
     env.batteryKWh = Math.max(0, Math.min(env.batteryCapacity, env.batteryKWh + energyBalanceKWh));
+
+    // CO₂ dynamics: injection raises level, ventilation and photosynthesis reduce it.
+    // Simplified per-sol model matching the constants from the main simulation engine.
+    const co2Injection = env.co2InjectionRate * 10;                   // K_CO2_INJECT = 10
+    const co2Photosynthesis = env.lightingPower * 0.015;              // K_CO2_PHOTO = 0.015
+    const co2Ventilation = env.ventilationRate * 0.08;                // K_CO2_VENT = 0.08
+    const co2Equilibrium = Math.max(400, 400 + co2Injection - co2Photosynthesis - co2Ventilation);
+    // Exponential approach per sol (tau ≈ 0.8h, over ~24h this nearly converges)
+    env.co2Level = co2Equilibrium + (env.co2Level - co2Equilibrium) * Math.exp(-24 / 0.8);
+
+    // Temperature effect of ventilation: vents cool the greenhouse
+    // Matches K_VENT_TEMP = 0.015 from main simulation
+    const tempEquilibrium = 8 + env.heatingPower / 250 - env.ventilationRate * 0.015;
+    env.airTemperature = tempEquilibrium + (env.airTemperature - tempEquilibrium) * Math.exp(-24 / 2.0);
+
+    // Humidity effect of ventilation: vents reduce humidity
+    // Matches K_VENT_HUMIDITY = 0.035 from main simulation
+    const humidityTarget = Math.max(0, Math.min(100, 65 - env.ventilationRate * 0.035));
+    env.humidity = humidityTarget + (env.humidity - humidityTarget) * Math.exp(-24 / 1.0);
 
     // When energy deficit: reduce effective lighting (crop stress)
     const effectiveLightFactor = env.batteryKWh < env.batteryCapacity * 0.1 && energyBalanceKWh < 0

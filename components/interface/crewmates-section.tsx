@@ -21,129 +21,26 @@ import type { RingData } from "@/components/charts/ring-context";
 
 /* ─────────────────────────── Types ─────────────────────────── */
 
-type HealthStatus = "nominal" | "caution" | "critical";
-type NeedLevel = "good" | "moderate" | "low";
+import { CREW_PROFILES, type CrewmateProfile, type HealthStatus, type NeedLevel } from "@/lib/crew-data";
 
-interface Crewmate {
-  id: string;
-  name: string;
-  role: string;
+interface Crewmate extends CrewmateProfile {
   initials: string;
   color: string;
-  health: HealthStatus;
-  condition: string;
-  heartRate: number;
-  bloodPressure: string;
-  bodyTemp: number;
-  o2Sat: number;
-  sleep: number;
-  stress: NeedLevel;
-  morale: number;
-  hydration: number;
-  nutrition: number;
-  calories: number;
-  evaHours: number;
-  taskLoad: NeedLevel;
-  currentTask: string;
-  specialty: string;
 }
 
 /* ─────────────────────────── Data ──────────────────────────── */
 
-const CREW: Crewmate[] = [
-  {
-    id: "wei",
-    name: "Wei",
-    role: "Botanist",
-    initials: "W",
-    color: "#30d158",
-    health: "nominal",
-    condition: "Rested",
-    heartRate: 68,
-    bloodPressure: "118/76",
-    bodyTemp: 36.6,
-    o2Sat: 98,
-    sleep: 7.2,
-    stress: "good",
-    morale: 88,
-    hydration: 92,
-    nutrition: 88,
-    calories: 2180,
-    evaHours: 142,
-    taskLoad: "moderate",
-    currentTask: "Monitoring tomato flowering cycle",
-    specialty: "Closed-loop agriculture",
-  },
-  {
-    id: "amara",
-    name: "Amara",
-    role: "Engineer",
-    initials: "A",
-    color: "#0a84ff",
-    health: "nominal",
-    condition: "Alert",
-    heartRate: 72,
-    bloodPressure: "122/78",
-    bodyTemp: 36.7,
-    o2Sat: 97,
-    sleep: 6.8,
-    stress: "moderate",
-    morale: 81,
-    hydration: 85,
-    nutrition: 79,
-    calories: 2340,
-    evaHours: 218,
-    taskLoad: "moderate",
-    currentTask: "Solar panel diagnostics post-storm",
-    specialty: "Life support & power systems",
-  },
-  {
-    id: "lena",
-    name: "Lena",
-    role: "Medic",
-    initials: "L",
-    color: "#bf5af2",
-    health: "caution",
-    condition: "Fatigued",
-    heartRate: 74,
-    bloodPressure: "115/72",
-    bodyTemp: 36.9,
-    o2Sat: 97,
-    sleep: 5.9,
-    stress: "moderate",
-    morale: 74,
-    hydration: 76,
-    nutrition: 82,
-    calories: 1980,
-    evaHours: 96,
-    taskLoad: "moderate",
-    currentTask: "Crew sleep pattern analysis",
-    specialty: "Crew health & nutrition",
-  },
-  {
-    id: "kenji",
-    name: "Kenji",
-    role: "Specialist",
-    initials: "K",
-    color: "#ff9f0a",
-    health: "nominal",
-    condition: "Sharp",
-    heartRate: 65,
-    bloodPressure: "116/74",
-    bodyTemp: 36.5,
-    o2Sat: 99,
-    sleep: 7.5,
-    stress: "good",
-    morale: 91,
-    hydration: 90,
-    nutrition: 91,
-    calories: 2420,
-    evaHours: 186,
-    taskLoad: "good",
-    currentTask: "EVA prep for water extraction site",
-    specialty: "Geology & EVA ops",
-  },
-];
+const CREW_UI_EXTRAS: Record<string, { initials: string; color: string }> = {
+  wei:   { initials: "W", color: "#30d158" },
+  amara: { initials: "A", color: "#0a84ff" },
+  lena:  { initials: "L", color: "#bf5af2" },
+  kenji: { initials: "K", color: "#ff9f0a" },
+};
+
+const CREW: Crewmate[] = CREW_PROFILES.map((p) => ({
+  ...p,
+  ...CREW_UI_EXTRAS[p.id],
+}));
 
 /* ────────────────────── Apple-like ring colors ─────────────── */
 

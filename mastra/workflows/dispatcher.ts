@@ -32,6 +32,7 @@ import {
   type WinningAgent,
 } from '../../lib/secretary-store';
 import { ingestSecretaryReports } from '../tools/secretary-vector-tool';
+import { crewProfilesForAgent } from '../../lib/crew-data';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -126,7 +127,13 @@ const classifyStep = createStep({
     // ── Emergency severity classification (spec §6.1) ──────────────────────
     // Classification is deterministic — no LLM inference at this stage.
 
-    const dustOpacity = (snap.dustOpacity as number) ?? (snap.dustStormFactor as number) ? (1 - (snap.dustStormFactor as number)) * 5 : 0;
+    const dustOpacity = (() => {
+      const rawOpacity = snap.dustOpacity as number | undefined;
+      if (rawOpacity != null) return rawOpacity;
+      const stormFactor = snap.dustStormFactor as number | undefined;
+      if (stormFactor != null) return (1 - stormFactor) * 5;
+      return 0;
+    })();
     const solarPct = (() => {
       const gen = (snap.solarGenerationKW as number) ?? 0;
       const cap = 5; // nominal ~5 kW at full solar
@@ -153,28 +160,34 @@ const classifyStep = createStep({
 
     if (isSev1) {
       // Build hardcoded playbook actions (spec §3.1 Emergency playbook)
-      const playbookActions: z.infer<typeof ActionSchema>[] = [];
+      // Use a map keyed by param to deduplicate conflicting actions.
+      // Order: dust → solar → battery → CO₂ (most life-threatening last wins).
+      const actionMap = new Map<string, z.infer<typeof ActionSchema>>();
       const reasons: string[] = [];
 
       if (dustOpacity > 3.0) {
-        playbookActions.push({ type: 'greenhouse', param: 'ventilationRate', value: 20 });
+        actionMap.set('ventilationRate', { type: 'greenhouse', param: 'ventilationRate', value: 20 });
         reasons.push('Extreme dust storm (tau > 3.0): sealed vents, filter intakes activated');
       }
       if (solarCritical) {
-        playbookActions.push({ type: 'greenhouse', param: 'lightingPower', value: 2000 });
-        playbookActions.push({ type: 'greenhouse', param: 'globalHeatingPower', value: 1500 });
+        actionMap.set('lightingPower', { type: 'greenhouse', param: 'lightingPower', value: 2000 });
+        actionMap.set('globalHeatingPower', { type: 'greenhouse', param: 'globalHeatingPower', value: 1500 });
         reasons.push('Solar power < 15% with battery critically low: shedding non-essential loads, switching to battery reserves');
       }
-      if (co2Level > 5000) {
-        playbookActions.push({ type: 'greenhouse', param: 'ventilationRate', value: 400 });
-        playbookActions.push({ type: 'greenhouse', param: 'co2InjectionRate', value: 0 });
-        reasons.push('CO₂ breach > 5000 ppm: maximising ventilation, CO₂ injection halted');
-      }
       if (batteryPct < 0.1) {
-        playbookActions.push({ type: 'greenhouse', param: 'lightingPower', value: 1000 });
-        playbookActions.push({ type: 'greenhouse', param: 'globalHeatingPower', value: 1000 });
+        actionMap.set('lightingPower', { type: 'greenhouse', param: 'lightingPower', value: 1000 });
+        actionMap.set('globalHeatingPower', { type: 'greenhouse', param: 'globalHeatingPower', value: 1000 });
         reasons.push('Battery critically low (<10%): emergency power reduction');
       }
+      if (co2Level > 5000) {
+        // CO₂ > 5000 ppm is immediately life-threatening — ventilation takes priority
+        // over dust sealing since crew asphyxiation is more urgent than dust exposure.
+        actionMap.set('ventilationRate', { type: 'greenhouse', param: 'ventilationRate', value: 400 });
+        actionMap.set('co2InjectionRate', { type: 'greenhouse', param: 'co2InjectionRate', value: 0 });
+        reasons.push('CO₂ breach > 5000 ppm: maximising ventilation, CO₂ injection halted');
+      }
+
+      const playbookActions = [...actionMap.values()];
 
       return {
         triggerType: 'emergency' as const,
@@ -193,9 +206,19 @@ const classifyStep = createStep({
       waterRecycling < 0.25 ||
       nutritionalCoverage < 0.5;
 
+    if (isSev2) {
+      return {
+        triggerType: 'emergency' as const,
+        emergencySeverity: 2 as const,
+        snapshot,
+        missionSol,
+      };
+    }
+
+    // Emergency trigger fired but conditions don't meet severity-1 or severity-2
+    // thresholds — downgrade to routine so agents handle it normally.
     return {
-      triggerType: 'emergency' as const,
-      emergencySeverity: 2 as const,
+      triggerType: 'routine' as const,
       snapshot,
       missionSol,
     };
@@ -220,7 +243,10 @@ const dispatchStep = createStep({
     const crewProfile = secretaryStore.getCrewPreferenceProfile();
 
     const snapshotJson = JSON.stringify(snapshot, null, 2);
+    const crewStatusBlock = crewProfilesForAgent();
     const contextBlock = `
+${crewStatusBlock}
+
 Secretary context (recent decisions and crew state):
 ${secretaryContext || 'No prior decisions logged.'}
 

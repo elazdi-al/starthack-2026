@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
 
-const SYNC_INTERVAL_MS = 5000;
+const SYNC_INTERVAL_MS = 30000;
 
 /**
  * Headless component that periodically pushes the current greenhouse

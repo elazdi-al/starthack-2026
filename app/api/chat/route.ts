@@ -14,6 +14,7 @@
 
 import { mastra } from '@/mastra';
 import { secretaryStore } from '@/lib/secretary-store';
+import { crewProfilesForAgent } from '@/lib/crew-data';
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
   const crewProfile = secretaryStore.getCrewPreferenceProfile();
 
   const systemContext = [
+    crewProfilesForAgent(),
     greenhouseState
       ? `Current greenhouse sensor readings (live):\n${JSON.stringify(greenhouseState, null, 2)}`
       : null,
