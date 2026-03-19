@@ -223,12 +223,15 @@ export function createInitialEnvironment(): ConcreteEnvironment {
 
   const now = Date.now();
 
+  // Start the mission at noon (solFraction = 0.5) on Sol 0
+  const initialElapsedHours = SOL_HOURS * 0.5;
+
   return {
     timestamp: now,
     missionStartMs: now,
-    missionElapsedHours: 0,
+    missionElapsedHours: initialElapsedHours,
     missionSol: 0,
-    solFraction: 0,
+    solFraction: 0.5,
     missionStartLs: MISSION_START_LS,
     currentLs: MISSION_START_LS,
     seasonName: 'northern_spring',

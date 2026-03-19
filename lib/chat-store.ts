@@ -151,11 +151,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 const store = useGreenhouseStore.getState();
                 const paramChanges: Array<{ type: "greenhouse" | "crop"; param: string; value: number; crop?: string }> = [];
 
-                for (const c of parsed.result.changes as Array<{ type: string; param?: string; value?: number; crop?: string }>) {
+                for (const c of parsed.result.changes as Array<{ type: string; param?: string; value?: number; crop?: string; tileId?: string }>) {
                   if (c.type === "harvest" && c.crop) {
                     store.doHarvest(c.crop as Parameters<typeof store.doHarvest>[0]);
                   } else if (c.type === "replant" && c.crop) {
                     store.doReplant(c.crop as Parameters<typeof store.doReplant>[0]);
+                  } else if (c.type === "plant-tile" && c.tileId && c.crop) {
+                    store.doPlantTile(c.tileId, c.crop as Parameters<typeof store.doPlantTile>[1]);
+                  } else if (c.type === "harvest-tile" && c.tileId) {
+                    store.doHarvestTile(c.tileId);
+                  } else if (c.type === "clear-tile" && c.tileId) {
+                    store.doClearTile(c.tileId);
                   } else if ((c.type === "greenhouse" || c.type === "crop") && c.param && c.value !== undefined) {
                     paramChanges.push(c as typeof paramChanges[number]);
                   }

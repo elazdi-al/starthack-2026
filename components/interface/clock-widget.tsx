@@ -14,7 +14,7 @@ const SKIP_OPTIONS = [
 ] as const;
 
 export function ClockWidget() {
-  const time = useGreenhouseStore((s) => s.simulationTime);
+  const solFraction = useGreenhouseStore((s) => s.environment.solFraction);
   const tick = useGreenhouseStore((s) => s.tick);
   const skipTime = useGreenhouseStore((s) => s.skipTime);
   const missionSol = useGreenhouseStore((s) => s.missionSol);
@@ -26,17 +26,21 @@ export function ClockWidget() {
     return () => clearInterval(id);
   }, [tick]);
 
+  // Derive Mars time-of-day from solFraction (0 = midnight, 0.5 = noon)
+  const totalMarsMinutes = solFraction * 24 * 60;
+  const marsHour = Math.floor(totalMarsMinutes / 60);
+  const marsMinute = Math.floor(totalMarsMinutes % 60);
+
   let timeDisplay: string;
 
   if (timeFormat === "12h") {
-    const h = time.getHours();
-    const period = h >= 12 ? "PM" : "AM";
-    const h12 = h % 12 || 12;
-    const mm = String(time.getMinutes()).padStart(2, "0");
+    const period = marsHour >= 12 ? "PM" : "AM";
+    const h12 = marsHour % 12 || 12;
+    const mm = String(marsMinute).padStart(2, "0");
     timeDisplay = isHydrated ? `${h12}:${mm} ${period}` : "--:-- --";
   } else {
-    const hh = String(time.getHours()).padStart(2, "0");
-    const mm = String(time.getMinutes()).padStart(2, "0");
+    const hh = String(marsHour).padStart(2, "0");
+    const mm = String(marsMinute).padStart(2, "0");
     timeDisplay = isHydrated ? `${hh}:${mm}` : "--:--";
   }
 
