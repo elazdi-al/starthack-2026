@@ -537,9 +537,9 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       events: newEvents,
     });
 
-    // Fire autonomous agent tick every 15 simulation minutes
+    // Fire autonomous agent tick every 2 simulation hours (120 minutes)
     const { lastTickSimMinutes, tickInFlight, autonomousEnabled } = get();
-    if (autonomousEnabled && !tickInFlight && nextMinutes - lastTickSimMinutes >= 15) {
+    if (autonomousEnabled && !tickInFlight && nextMinutes - lastTickSimMinutes >= 120) {
       get().autonomousTick();
     }
   },

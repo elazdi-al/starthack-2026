@@ -1,22 +1,63 @@
+/**
+ * Chat endpoint — crew interaction handler
+ *
+ * All crew messages arrive here first. The Wellbeing agent classifies the intent
+ * (question / request / override) before any further routing occurs (spec §6.3).
+ *
+ * - Questions: answered directly by Wellbeing agent with sensor snapshot context.
+ * - Requests + overrides: dispatched through the full dispatcher pipeline.
+ *
+ * Streaming is used for all Wellbeing-agent responses so the crew sees fast feedback.
+ * The dispatcher pipeline runs asynchronously for request/override types while the
+ * Wellbeing agent streams an acknowledgement.
+ */
+
 import { mastra } from '@/mastra';
+import { secretaryStore } from '@/lib/secretary-store';
 
 export async function POST(req: Request) {
-  const { messages, threadId, resourceId, greenhouseState } = await req.json();
+  const body = await req.json();
+  const { messages, threadId, resourceId, greenhouseState, missionSol } = body as {
+    messages: unknown[];
+    threadId?: string;
+    resourceId?: string;
+    greenhouseState?: Record<string, unknown>;
+    missionSol?: number;
+  };
 
-  const agent = mastra.getAgent('greenhouseAgent');
+  const wellbeingAgent = mastra.getAgent('wellbeingAgent');
 
-  const contextMessage = greenhouseState
-    ? {
-        role: 'system' as const,
-        content: `Current greenhouse sensor readings (live):\n${JSON.stringify(greenhouseState, null, 2)}`,
-      }
-    : null;
+  // Inject live sensor snapshot + secretary context into the conversation
+  const secretaryContext = secretaryStore.getAgentContext(3);
+  const crewProfile = secretaryStore.getCrewPreferenceProfile();
 
-  const augmentedMessages = contextMessage
-    ? [contextMessage, ...messages]
-    : messages;
+  const systemContext = [
+    greenhouseState
+      ? `Current greenhouse sensor readings (live):\n${JSON.stringify(greenhouseState, null, 2)}`
+      : null,
+    secretaryContext ? `Recent mission decisions:\n${secretaryContext}` : null,
+    Object.keys(crewProfile.preferences).length > 0
+      ? `Crew food preferences: ${JSON.stringify(crewProfile.preferences)}`
+      : null,
+    missionSol !== undefined ? `Current mission sol: ${missionSol}` : null,
+  ].filter(Boolean).join('\n\n');
 
-  const result = await agent.stream(augmentedMessages, {
+  const contextMessage = {
+    role: 'system' as const,
+    content: systemContext,
+  };
+
+  const augmentedMessages = [contextMessage, ...messages];
+
+  // Log the crew message to secretary
+  const lastUserMessage = [...messages].reverse().find((m) => (m as Record<string, string>).role === 'user') as Record<string, string> | undefined;
+  if (lastUserMessage && missionSol !== undefined) {
+    secretaryStore.addCrewRequest(lastUserMessage.content, missionSol);
+  }
+
+  // Stream response from Wellbeing agent
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await wellbeingAgent.stream(augmentedMessages as any, {
     maxSteps: 10,
     memory: {
       thread: threadId ?? 'default-thread',
