@@ -34,7 +34,7 @@ Crops and their optimal soil conditions:
 - lettuce:  temp 21°C, moisture 70%
 - tomato:   temp 24°C, moisture 70%
 - potato:   temp 18°C, moisture 65%
-- soybean:  temp 25°C, moisture 65%
+- soybean:  temp 22°C, moisture 65%
 - spinach:  temp 18°C, moisture 65%
 - wheat:    temp 21°C, moisture 60%
 - radish:   temp 19°C, moisture 60%

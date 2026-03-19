@@ -19,14 +19,16 @@ import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { AgentDecisionPanel } from "@/components/interface/agent-decision-panel";
 import { SimulationOverrides } from "@/components/interface/simulation-overrides";
 import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
-import { SquaresFour, Leaf, Gavel, Robot } from "@phosphor-icons/react";
+import { ReportsView } from "@/components/interface/reports-view";
+import { SquaresFour, Leaf, Gavel, Robot, FileText } from "@phosphor-icons/react";
 
 type IntroStage = "sealed" | "opening" | "open";
-type MainView = "greenhouse" | "dashboard";
+type MainView = "greenhouse" | "dashboard" | "reports";
 
 const VIEW_ORDER: Record<MainView, number> = {
   greenhouse: 0,
   dashboard: 1,
+  reports: 2,
 };
 
 const VIEWPORT_TRANSITION = {
@@ -73,7 +75,6 @@ export default function Home() {
   const [activeView, setActiveView]   = React.useState<MainView>("greenhouse");
   const [viewDirection, setViewDirection] = React.useState(1);
   const [introStage, setIntroStage] = React.useState<IntroStage>("sealed");
-  const [greenhouseVisible, setGreenhouseVisible] = React.useState(false);
   const setFocusedCrop = useGreenhouseStore((s) => s.setFocusedCrop);
 
   React.useEffect(() => {
@@ -114,6 +115,7 @@ export default function Home() {
     () => [
       { value: "greenhouse", label: "Greenhouse", icon: <Leaf size={16} weight="fill" /> },
       { value: "dashboard",  label: "Dashboard",  icon: <SquaresFour size={16} weight="fill" /> },
+      { value: "reports",    label: "Reports",     icon: <FileText size={16} weight="fill" /> },
       { value: "rules",      label: "Rules",      icon: <Gavel size={16} weight="fill" /> },
     ],
     []
@@ -122,7 +124,7 @@ export default function Home() {
   const handleTabChange = React.useCallback((tab: string) => {
     setActiveTab(tab);
 
-    if (tab !== "greenhouse" && tab !== "dashboard") {
+    if (tab !== "greenhouse" && tab !== "dashboard" && tab !== "reports") {
       return;
     }
 
@@ -170,8 +172,22 @@ export default function Home() {
               >
                 <GreenhouseView
                   introStage={introStage}
-                  greenhouseVisible={greenhouseVisible}
                 />
+              </motion.section>
+            )}
+
+            {activeView === "reports" && (
+              <motion.section
+                key="reports"
+                custom={viewDirection}
+                initial={shouldReduceMotion ? false : "enter"}
+                animate="center"
+                exit={shouldReduceMotion ? { opacity: 0 } : "exit"}
+                variants={GREENHOUSE_PANEL_VARIANTS}
+                transition={shouldReduceMotion ? { duration: 0 } : GREENHOUSE_PANEL_TRANSITION}
+                className="absolute inset-0 z-10 will-change-transform"
+              >
+                <ReportsView />
               </motion.section>
             )}
           </AnimatePresence>
@@ -226,12 +242,6 @@ export default function Home() {
                 className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2"
               >
                 <SettingsButton />
-                {activeView === "greenhouse" && (
-                  <GreenhouseToggleButton
-                    active={greenhouseVisible}
-                    onClick={() => setGreenhouseVisible((value) => !value)}
-                  />
-                )}
                 <HighlightTabs
                   items={navTabs}
                   value={activeTab}
@@ -277,16 +287,13 @@ export default function Home() {
 
 function GreenhouseView({
   introStage,
-  greenhouseVisible,
 }: {
   introStage: IntroStage;
-  greenhouseVisible: boolean;
 }) {
   return (
     <div className="absolute inset-0">
       <GreenhouseGrid
         introStage={introStage}
-        greenhouseVisible={greenhouseVisible}
         showBackdrop={false}
       />
       <motion.div
@@ -296,53 +303,6 @@ function GreenhouseView({
         className="pointer-events-none absolute inset-0 bg-background"
       />
     </div>
-  );
-}
-
-function GreenhouseToggleButton({
-  active,
-  onClick,
-}: {
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={active ? "Hide greenhouse" : "Restore greenhouse"}
-      aria-label={active ? "Hide greenhouse" : "Restore greenhouse"}
-      aria-pressed={active}
-      className={[
-        "relative flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-transparent transition-[background-color,color,box-shadow] duration-200",
-        active
-          ? "bg-[var(--highlight-tabs-active)] text-[var(--highlight-tabs-active-foreground)]"
-          : "bg-[var(--highlight-tabs-bg)] text-[var(--highlight-tabs-text)] hover:text-[var(--dial-text-primary)]",
-      ].join(" ")}
-    >
-      <GreenhouseIcon active={active} />
-    </button>
-  );
-}
-
-function GreenhouseIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className="size-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4.25 16.25V9.6L10 4.75L15.75 9.6V16.25" />
-      <path d="M6.65 16.25V10.9H13.35V16.25" opacity={active ? 1 : 0.76} />
-      <path d="M10 10.9V16.25" opacity={active ? 1 : 0.76} />
-      <path d="M6.65 13.55H13.35" opacity={active ? 1 : 0.76} />
-      {!active && <path d="M5.15 5.4L14.85 15.1" opacity="0.72" />}
-    </svg>
   );
 }
 

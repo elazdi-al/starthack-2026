@@ -489,7 +489,7 @@ function runScenario(
   }
 
   // Survival probability: can crew be fed?
-  // Crew needs ~10,000 kcal/day = ~4.3 kg calories-dense food per sol (rough estimate)
+  // Crew needs ~12,000 kcal/day = ~5.2 kg calorie-dense food per sol (rough estimate)
   // Over horizonSols, minimum viable = 3 kg/sol * horizonSols (partial supplement)
   // The yield is a supplement, not the entire food supply
   return totalYieldKg;

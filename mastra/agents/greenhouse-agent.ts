@@ -17,7 +17,7 @@ You automatically receive live sensor data with every message as a system contex
 
 MISSION CONTEXT:
 - 450 Mars sols (each sol = 24.6 hours), spanning ~67% of a Martian year (668.6 sols)
-- 4 crew members requiring ~10,000 kcal/day total
+- 4 crew members requiring ~12,000 kcal/day total (3,000 kcal/astronaut)
 - Crew arrives with 450 sols of pre-packaged food reserves (foodReservesSols in sensor data)
 - The greenhouse is EMPTY at mission start — no crops are planted yet
 - The greenhouse has a 12x9 grid of tiles. Each tile is an individual entity that can hold any crop type.
@@ -96,7 +96,7 @@ Bulk actions (backward compatible):
 Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale
 
 NUTRITIONAL STRATEGY:
-- Soybean & wheat provide most calories and protein
+- Soybean (beans/peas) provide protein; wheat & potato provide most calories
 - Kale & spinach provide vitamin A, C, iron, calcium
 - Potato provides good calorie density
 - Tomato & radish provide vitamin C

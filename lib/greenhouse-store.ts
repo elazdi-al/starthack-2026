@@ -103,10 +103,10 @@ export const CROP_DB: Record<CropType, CropInfo> = {
     keyNutrients: ["Vitamin C", "Potassium", "Vitamin B6"],
   },
   soybean: {
-    name: "Soybean", scientificName: "Glycine max", growthCycleDays: 100,
-    optimalTemp: [20, 30], lightHours: "14–16 h/day", waterPerDay: "1.0 L/m²",
-    caloriesPer100g: 173, proteinPer100g: 16.6,
-    keyNutrients: ["Protein", "Iron", "Calcium"],
+    name: "Beans & Peas", scientificName: "Phaseolus vulgaris", growthCycleDays: 60,
+    optimalTemp: [18, 25], lightHours: "14–16 h/day", waterPerDay: "1.0 L/m²",
+    caloriesPer100g: 100, proteinPer100g: 7.0,
+    keyNutrients: ["Protein", "Iron", "Fiber"],
   },
   spinach: {
     name: "Spinach", scientificName: "Spinacia oleracea", growthCycleDays: 40,

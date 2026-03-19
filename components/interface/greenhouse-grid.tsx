@@ -33,9 +33,9 @@ const GREENHOUSE_EJECT_EASE = [0.42, 0, 1, 1] as const;
 const GREENHOUSE_PANEL_TRANSITIONS = {
   north: { duration: 2.0, ease: GREENHOUSE_EJECT_EASE },
   west: { duration: 2.0, ease: GREENHOUSE_EJECT_EASE, delay: 0.02 },
-  roof: { duration: 2.3, ease: GREENHOUSE_EJECT_EASE, delay: 0.04 },
-  east: { duration: 2.1, ease: GREENHOUSE_EJECT_EASE, delay: 0.01 },
-  south: { duration: 2.1, ease: GREENHOUSE_EJECT_EASE, delay: 0.03 },
+  roof: { duration: 2.0, ease: GREENHOUSE_EJECT_EASE, delay: 0.02 },
+  east: { duration: 2.0, ease: GREENHOUSE_EJECT_EASE, delay: 0.01 },
+  south: { duration: 2.0, ease: GREENHOUSE_EJECT_EASE, delay: 0.01 },
 } as const;
 
 export type GreenhouseIntroStage = "sealed" | "opening" | "open";
@@ -288,9 +288,15 @@ const CropTooltip = memo(function CropTooltip({
   data: TileData;
   info: CropInfo;
 }) {
-  const meta = data.crop ? CROP_HOVER_META[data.crop] : null;
+  const env = useGreenhouseStore((s) => s.environment);
+  const tileCrop = data.tileId ? env.tileCrops?.[data.tileId] : undefined;
+  const cropEnv = data.crop ? (tileCrop || env.crops[data.crop]) : null;
 
-  if (!meta || !data.crop) return null;
+  if (!data.crop) return null;
+
+  const healthPct = cropEnv ? Math.round(cropEnv.healthScore * 100) : null;
+  const moisturePct = cropEnv ? Math.round(cropEnv.soilMoisture) : data.water;
+  const diseasePct = cropEnv ? Math.round(cropEnv.diseaseRisk * 100) : null;
 
   return (
     <div className="crop-tooltip-card">
@@ -302,31 +308,59 @@ const CropTooltip = memo(function CropTooltip({
           <div className="crop-tooltip-heading">
             <p className="type-label crop-tooltip-title">{info.name}</p>
             <p className="type-caption crop-tooltip-meta">
-              {meta.label} · {meta.detail}
+              {GROWTH_LABEL[data.growth]}{cropEnv ? ` · ${Math.round(cropEnv.daysSincePlanting)} sols` : ""}
             </p>
           </div>
-          <p className="type-small crop-tooltip-summary">{meta.summary}</p>
+          {healthPct !== null && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-black/6 dark:bg-white/8">
+                <div
+                  className={`h-full rounded-full ${
+                    healthPct > 70
+                      ? "bg-green-700/50 dark:bg-green-400/55"
+                      : healthPct > 40
+                        ? "bg-amber-500/60 dark:bg-amber-400/65"
+                        : "bg-red-500/60 dark:bg-red-400/65"
+                  }`}
+                  style={{ width: `${healthPct}%` }}
+                />
+              </div>
+              <span className="type-small font-mono tabular-nums text-black/50 dark:text-white/55">
+                {healthPct}%
+              </span>
+            </div>
+          )}
         </div>
       </div>
       <dl className="crop-tooltip-stats">
         <div className="crop-tooltip-stat">
-          <dt className="type-caption crop-tooltip-stat-label">Water</dt>
-          <dd className="type-label crop-tooltip-stat-value">{info.waterPerDay}</dd>
+          <dt className="type-caption crop-tooltip-stat-label">Moisture</dt>
+          <dd className="type-label crop-tooltip-stat-value">{moisturePct}%</dd>
         </div>
         <div className="crop-tooltip-stat">
-          <dt className="type-caption crop-tooltip-stat-label">Stage</dt>
+          <dt className="type-caption crop-tooltip-stat-label">Yield</dt>
           <dd className="type-label crop-tooltip-stat-value">
-            {GROWTH_LABEL[data.growth]}
+            {cropEnv ? `${cropEnv.estimatedYieldKg.toFixed(1)} kg` : "—"}
           </dd>
         </div>
         <div className="crop-tooltip-stat">
-          <dt className="type-caption crop-tooltip-stat-label">Light</dt>
-          <dd className="type-label crop-tooltip-stat-value">{info.lightHours}</dd>
+          <dt className="type-caption crop-tooltip-stat-label">Disease</dt>
+          <dd className="type-label crop-tooltip-stat-value">
+            {diseasePct !== null ? (
+              <span className={diseasePct > 30 ? "text-red-600 dark:text-red-400" : ""}>
+                {diseasePct}%
+              </span>
+            ) : "—"}
+          </dd>
         </div>
         <div className="crop-tooltip-stat">
           <dt className="type-caption crop-tooltip-stat-label">Status</dt>
           <dd className="type-label crop-tooltip-stat-value">
-            {data.status === "warn" ? "Attention" : "Healthy"}
+            {cropEnv?.isBolting
+              ? "Bolting"
+              : data.status === "warn"
+                ? "Attention"
+                : "Healthy"}
           </dd>
         </div>
       </dl>
@@ -494,11 +528,9 @@ function MarsPreparedPad() {
 
 export function GreenhouseGrid({
   introStage = "open",
-  greenhouseVisible = false,
   showBackdrop = true,
 }: {
   introStage?: GreenhouseIntroStage;
-  greenhouseVisible?: boolean;
   showBackdrop?: boolean;
 }) {
   const grid = useGreenhouseStore((s) => s.grid);
@@ -508,23 +540,36 @@ export function GreenhouseGrid({
   const handleSelect = useCallback((tile: TileData) => setSelected(tile), []);
   const handleClose = useCallback(() => setSelected(null), []);
   const interactive = introStage === "open";
-  const cropInteractionsEnabled = interactive && !greenhouseVisible;
-  const overlayVisible = introStage === "sealed" || (interactive && greenhouseVisible);
-
-  useEffect(() => {
-    if (!greenhouseVisible || selected === null) {
-      return;
-    }
-
-    const frameId = window.requestAnimationFrame(() => {
-      setSelected(null);
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [greenhouseVisible, selected]);
 
   // ── Pan & Zoom ────────────────────────────────────────────────────────
   const [zoom, setZoom] = useState(1);
+
+  // ── Zoom-driven wall visibility with hysteresis ────────────────────────
+  // Walls hide at default zoom (1.0) and closer; show when zoomed out.
+  // Hysteresis prevents flickering at the boundary.
+  const ZOOM_HIDE_THRESHOLD = 1.0;  // zoom in past this → walls hide
+  const ZOOM_SHOW_THRESHOLD = 0.95; // zoom out past this → walls return
+  const [wallsVisible, setWallsVisible] = useState(false);
+
+  useEffect(() => {
+    if (zoom > ZOOM_HIDE_THRESHOLD && wallsVisible) {
+      setWallsVisible(false);
+    } else if (zoom < ZOOM_SHOW_THRESHOLD && !wallsVisible) {
+      setWallsVisible(true);
+    }
+  }, [zoom, wallsVisible]);
+
+  const cropInteractionsEnabled = interactive && !wallsVisible;
+  const overlayVisible = introStage === "sealed" || (interactive && wallsVisible);
+
+  useEffect(() => {
+    if (wallsVisible && selected !== null) {
+      const frameId = window.requestAnimationFrame(() => {
+        setSelected(null);
+      });
+      return () => window.cancelAnimationFrame(frameId);
+    }
+  }, [wallsVisible, selected]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });

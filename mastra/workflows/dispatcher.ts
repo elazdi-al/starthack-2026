@@ -31,6 +31,7 @@ import {
   type ConflictType,
   type WinningAgent,
 } from '../../lib/secretary-store';
+import { ingestSecretaryReports } from '../tools/secretary-vector-tool';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -736,6 +737,11 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       simulationP90,
       reasoning: arbiterReasoning,
     });
+
+    // Fire-and-forget: ingest latest decision into vector store for RAG
+    ingestSecretaryReports(Date.now() - 5000).catch(err =>
+      console.warn('[dispatcher] vector ingestion failed (non-blocking):', err),
+    );
 
     return {
       triggerType: logTriggerType,
