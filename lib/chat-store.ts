@@ -148,9 +148,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 parsed.result?.success &&
                 Array.isArray(parsed.result.changes)
               ) {
-                useGreenhouseStore
-                  .getState()
-                  .applyParameterChanges(parsed.result.changes);
+                const store = useGreenhouseStore.getState();
+                const paramChanges: Array<{ type: "greenhouse" | "crop"; param: string; value: number; crop?: string }> = [];
+
+                for (const c of parsed.result.changes as Array<{ type: string; param?: string; value?: number; crop?: string }>) {
+                  if (c.type === "harvest" && c.crop) {
+                    store.doHarvest(c.crop as Parameters<typeof store.doHarvest>[0]);
+                  } else if (c.type === "replant" && c.crop) {
+                    store.doReplant(c.crop as Parameters<typeof store.doReplant>[0]);
+                  } else if ((c.type === "greenhouse" || c.type === "crop") && c.param && c.value !== undefined) {
+                    paramChanges.push(c as typeof paramChanges[number]);
+                  }
+                }
+
+                if (paramChanges.length > 0) {
+                  useGreenhouseStore.getState().applyParameterChanges(paramChanges);
+                }
               }
             } else if (parsed.type === "error") {
               updateMessage(assistantId, {

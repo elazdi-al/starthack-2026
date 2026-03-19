@@ -14,6 +14,7 @@ import {
 import {
   useGreenhouseStore,
   CROP_DB,
+  TOTAL_MISSION_SOLS,
   type CropInfo,
   type CropType,
   type TileData,
@@ -74,8 +75,8 @@ const CROP_HOVER_META: Record<CropType, CropHoverMeta> = {
 };
 
 const GROWTH_LABEL: Record<number, string> = {
-  0: "Not planted",
-  1: "Seedling",
+  0: "Seed",
+  1: "Germination",
   2: "Vegetative",
   3: "Flowering",
   4: "Fruiting",
@@ -320,6 +321,8 @@ function CropTooltip({
 
 export function GreenhouseGrid() {
   const grid = useGreenhouseStore((s) => s.grid);
+  const missionSol = useGreenhouseStore((s) => s.missionSol);
+  const dustStormActive = useGreenhouseStore((s) => s.dustStormActive);
   const [selected, setSelected] = useState<TileData | null>(null);
 
   return (
@@ -329,7 +332,13 @@ export function GreenhouseGrid() {
           Greenhouse Module
         </span>
         <span className="text-sm text-black/15">·</span>
-        <span className="font-mono text-xs text-black/25">Sol 1 / 450</span>
+        <span className="font-mono text-xs text-black/25">Sol {missionSol + 1} / {TOTAL_MISSION_SOLS}</span>
+        {dustStormActive && (
+          <>
+            <span className="text-sm text-black/15">·</span>
+            <span className="font-mono text-xs text-amber-600/70">Dust Storm</span>
+          </>
+        )}
       </div>
 
       <TooltipProvider delay={120} closeDelay={0}>
@@ -568,6 +577,8 @@ function CropDialog({
   const open = data !== null && data.crop !== undefined && data.growth > 0;
   const info = data?.crop ? CROP_DB[data.crop] : null;
   const hoverMeta = data?.crop ? CROP_HOVER_META[data.crop] : null;
+  const env = useGreenhouseStore((s) => s.environment);
+  const cropEnv = data?.crop ? env.crops[data.crop] : null;
 
   return (
     <Dialog.Root
@@ -653,34 +664,50 @@ function CropDialog({
                             <SectionLabel>Growth</SectionLabel>
                             <div className="mt-3 flex flex-col gap-3">
                               <DataRow label="Stage" value={GROWTH_LABEL[data.growth]} />
-                              <DataRow label="Water Level">
+                              {cropEnv && (
+                                <DataRow label="Health">
+                                  <div className="flex items-center gap-2.5">
+                                    <span className="font-mono text-xs text-black/60 dark:text-white/65">
+                                      {Math.round(cropEnv.healthScore * 100)}%
+                                    </span>
+                                    <div className="h-[3px] w-20 overflow-hidden rounded-full bg-black/6 dark:bg-white/8">
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          cropEnv.healthScore > 0.7
+                                            ? "bg-green-700/40 dark:bg-green-400/45"
+                                            : "bg-amber-500/50 dark:bg-amber-400/55"
+                                        }`}
+                                        style={{ width: `${cropEnv.healthScore * 100}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                </DataRow>
+                              )}
+                              <DataRow label="Soil Moisture">
                                 <div className="flex items-center gap-2.5">
                                   <span className="font-mono text-xs text-black/60 dark:text-white/65">
                                     {data.water}%
                                   </span>
                                   <div className="h-[3px] w-20 overflow-hidden rounded-full bg-black/6 dark:bg-white/8">
                                     <div
-                                      className="h-full rounded-full bg-green-700/40 dark:bg-green-400/45"
+                                      className="h-full rounded-full bg-blue-500/40 dark:bg-blue-400/45"
                                       style={{ width: `${data.water}%` }}
                                     />
                                   </div>
                                 </div>
                               </DataRow>
-                              <DataRow
-                                label="Status"
-                                value={
-                                  data.status === "ok"
-                                    ? "Healthy"
-                                    : data.status === "warn"
-                                      ? "Needs Attention"
-                                      : "-"
-                                }
-                                valueClassName={
-                                  data.status === "warn"
-                                    ? "text-amber-600/80"
-                                    : undefined
-                                }
-                              />
+                              {cropEnv && (
+                                <>
+                                  <DataRow
+                                    label="Days Planted"
+                                    value={`${Math.round(cropEnv.daysSincePlanting)} sols`}
+                                  />
+                                  <DataRow
+                                    label="Est. Yield"
+                                    value={`${cropEnv.estimatedYieldKg.toFixed(1)} kg`}
+                                  />
+                                </>
+                              )}
                               <DataRow
                                 label="Harvest Cycle"
                                 value={`${info.growthCycleDays} days`}
@@ -787,6 +814,7 @@ function LiveEnvReadings() {
   const humidity = useGreenhouseStore((s) => s.humidity);
   const co2Level = useGreenhouseStore((s) => s.co2Level);
   const lightLevel = useGreenhouseStore((s) => s.lightLevel);
+  const env = useGreenhouseStore((s) => s.environment);
 
   return (
     <div className="mt-8 flex items-center gap-4">
@@ -794,7 +822,9 @@ function LiveEnvReadings() {
       <EnvDivider />
       <EnvReading label="Humidity" value={`${Math.round(humidity)}%`} />
       <EnvDivider />
-      <EnvReading label="CO2" value={`${Math.round(co2Level)} ppm`} />
+      <EnvReading label="CO₂" value={`${Math.round(co2Level)} ppm`} />
+      <EnvDivider />
+      <EnvReading label="O₂" value={`${Math.round(env.o2Level * 10) / 10}%`} />
       <EnvDivider />
       <EnvReading label="Light" value={`${Math.round(lightLevel)} lux`} />
     </div>

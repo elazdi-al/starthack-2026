@@ -2,6 +2,9 @@
 
 import { cn } from "@/lib/utils";
 import { GearSix, Check, CircleNotch } from "@phosphor-icons/react";
+import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
+import "streamdown/styles.css";
 
 export interface ToolCallData {
   toolCallId: string;
@@ -31,6 +34,8 @@ const PARAM_LABELS: Record<string, string> = {
   lightingPower: "Lighting",
   waterPumpRate: "Water pump",
   localHeatingPower: "Zone heat",
+  harvest: "Harvest",
+  replant: "Replant",
 };
 
 const PARAM_UNITS: Record<string, string> = {
@@ -77,15 +82,23 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallData }) {
       {changes.length > 0 && (
         <div className="mt-1 flex flex-col gap-0.5 text-[var(--dial-text-tertiary)]">
           {changes.map((c, i) => (
-            <div key={`${c.param}-${i}`} className="flex items-center gap-1">
+            <div key={`${c.param ?? c.type}-${i}`} className="flex items-center gap-1">
               <span className="opacity-50">→</span>
-              <span>
-                {PARAM_LABELS[c.param] ?? c.param}
-                {c.crop ? ` (${c.crop})` : ""}
-              </span>
-              <span className="ml-auto tabular-nums font-medium text-[var(--dial-text-secondary)]">
-                {c.value} {PARAM_UNITS[c.param] ?? ""}
-              </span>
+              {c.type === "harvest" || c.type === "replant" ? (
+                <span>
+                  {c.type === "harvest" ? "Harvest" : "Replant"} {c.crop}
+                </span>
+              ) : (
+                <>
+                  <span>
+                    {PARAM_LABELS[c.param] ?? c.param}
+                    {c.crop ? ` (${c.crop})` : ""}
+                  </span>
+                  <span className="ml-auto tabular-nums font-medium text-[var(--dial-text-secondary)]">
+                    {c.value} {PARAM_UNITS[c.param] ?? ""}
+                  </span>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -120,13 +133,17 @@ export function ChatMessage({ message, isGrouped, isStreaming }: ChatMessageProp
               <span className="size-[5px] rounded-full bg-current opacity-40 animate-pulse [animation-delay:150ms]" />
               <span className="size-[5px] rounded-full bg-current opacity-40 animate-pulse [animation-delay:300ms]" />
             </span>
+          ) : isUser ? (
+            <span className="whitespace-pre-wrap">{message.content}</span>
           ) : (
-            <>
-              <span className="whitespace-pre-wrap">{message.content}</span>
-              {isStreaming && (
-                <span className="ml-0.5 inline-block h-[14px] w-[2px] animate-pulse bg-current opacity-60 align-text-bottom" />
-              )}
-            </>
+            <Streamdown
+              plugins={{ code }}
+              isAnimating={isStreaming}
+              animated={isStreaming}
+              caret={isStreaming ? "circle" : undefined}
+            >
+              {message.content}
+            </Streamdown>
           )}
         </div>
       )}

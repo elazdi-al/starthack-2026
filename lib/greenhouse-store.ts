@@ -3,6 +3,9 @@ import {
   createInitialEnvironment,
   createInitialGreenhouseState,
   createSimulation,
+  SOL_HOURS,
+  CROP_PROFILES,
+  STAGE_TO_GROWTH_INDEX,
 } from "@/greenhouse/implementations/multi-crop";
 import type {
   CropType,
@@ -11,15 +14,26 @@ import type {
   ConcreteGreenhouseState,
   ConcreteState,
   CropControls,
+  GrowthStage,
+  SimEvent,
+  NutritionalOutput,
+  MissionResources,
 } from "@/greenhouse/implementations/multi-crop/types";
-import { updateGreenhouseParam, updateCropParam } from "@/greenhouse/implementations/multi-crop/transformation";
+import {
+  updateGreenhouseParam,
+  updateCropParam,
+  harvestCrop as harvestCropTransform,
+  replantCrop as replantCropTransform,
+} from "@/greenhouse/implementations/multi-crop/transformation";
 
-export type { CropType };
+export type { CropType, GrowthStage };
+
+// ─── UI Types ───────────────────────────────────────────────────────────────────
 
 export type TileKind = "crop" | "path";
 export type Status = "ok" | "warn" | null;
-
 export type SpeedKey = "x1" | "x2" | "x5" | "x10" | "x20" | "x50" | "x100";
+export const TOTAL_MISSION_SOLS = 450;
 
 export interface CropInfo {
   name: string;
@@ -35,91 +49,51 @@ export interface CropInfo {
 
 export const CROP_DB: Record<CropType, CropInfo> = {
   lettuce: {
-    name: "Lettuce",
-    scientificName: "Lactuca sativa",
-    growthCycleDays: 45,
-    optimalTemp: [18, 24],
-    lightHours: "16–18 h/day",
-    waterPerDay: "0.8 L/m²",
-    caloriesPer100g: 15,
-    proteinPer100g: 1.4,
+    name: "Lettuce", scientificName: "Lactuca sativa", growthCycleDays: 45,
+    optimalTemp: [18, 24], lightHours: "16–18 h/day", waterPerDay: "0.8 L/m²",
+    caloriesPer100g: 15, proteinPer100g: 1.4,
     keyNutrients: ["Vitamin A", "Vitamin K", "Folate"],
   },
   tomato: {
-    name: "Tomato",
-    scientificName: "Solanum lycopersicum",
-    growthCycleDays: 80,
-    optimalTemp: [20, 28],
-    lightHours: "14–18 h/day",
-    waterPerDay: "1.5 L/m²",
-    caloriesPer100g: 18,
-    proteinPer100g: 0.9,
+    name: "Tomato", scientificName: "Solanum lycopersicum", growthCycleDays: 80,
+    optimalTemp: [20, 28], lightHours: "14–18 h/day", waterPerDay: "1.5 L/m²",
+    caloriesPer100g: 18, proteinPer100g: 0.9,
     keyNutrients: ["Vitamin C", "Lycopene", "Potassium"],
   },
   potato: {
-    name: "Potato",
-    scientificName: "Solanum tuberosum",
-    growthCycleDays: 90,
-    optimalTemp: [15, 22],
-    lightHours: "12–16 h/day",
-    waterPerDay: "1.2 L/m²",
-    caloriesPer100g: 77,
-    proteinPer100g: 2.0,
+    name: "Potato", scientificName: "Solanum tuberosum", growthCycleDays: 90,
+    optimalTemp: [15, 22], lightHours: "12–16 h/day", waterPerDay: "1.2 L/m²",
+    caloriesPer100g: 77, proteinPer100g: 2.0,
     keyNutrients: ["Vitamin C", "Potassium", "Vitamin B6"],
   },
   soybean: {
-    name: "Soybean",
-    scientificName: "Glycine max",
-    growthCycleDays: 100,
-    optimalTemp: [20, 30],
-    lightHours: "14–16 h/day",
-    waterPerDay: "1.0 L/m²",
-    caloriesPer100g: 173,
-    proteinPer100g: 16.6,
+    name: "Soybean", scientificName: "Glycine max", growthCycleDays: 100,
+    optimalTemp: [20, 30], lightHours: "14–16 h/day", waterPerDay: "1.0 L/m²",
+    caloriesPer100g: 173, proteinPer100g: 16.6,
     keyNutrients: ["Protein", "Iron", "Calcium"],
   },
   spinach: {
-    name: "Spinach",
-    scientificName: "Spinacia oleracea",
-    growthCycleDays: 40,
-    optimalTemp: [15, 22],
-    lightHours: "14–16 h/day",
-    waterPerDay: "0.7 L/m²",
-    caloriesPer100g: 23,
-    proteinPer100g: 2.9,
+    name: "Spinach", scientificName: "Spinacia oleracea", growthCycleDays: 40,
+    optimalTemp: [15, 22], lightHours: "14–16 h/day", waterPerDay: "0.7 L/m²",
+    caloriesPer100g: 23, proteinPer100g: 2.9,
     keyNutrients: ["Iron", "Vitamin A", "Vitamin C"],
   },
   wheat: {
-    name: "Wheat",
-    scientificName: "Triticum aestivum",
-    growthCycleDays: 120,
-    optimalTemp: [18, 24],
-    lightHours: "16–18 h/day",
-    waterPerDay: "1.1 L/m²",
-    caloriesPer100g: 340,
-    proteinPer100g: 13.2,
+    name: "Wheat", scientificName: "Triticum aestivum", growthCycleDays: 120,
+    optimalTemp: [18, 24], lightHours: "16–18 h/day", waterPerDay: "1.1 L/m²",
+    caloriesPer100g: 340, proteinPer100g: 13.2,
     keyNutrients: ["Fiber", "Manganese", "Selenium"],
   },
   radish: {
-    name: "Radish",
-    scientificName: "Raphanus sativus",
-    growthCycleDays: 30,
-    optimalTemp: [16, 22],
-    lightHours: "12–14 h/day",
-    waterPerDay: "0.6 L/m²",
-    caloriesPer100g: 16,
-    proteinPer100g: 0.7,
+    name: "Radish", scientificName: "Raphanus sativus", growthCycleDays: 30,
+    optimalTemp: [16, 22], lightHours: "12–14 h/day", waterPerDay: "0.6 L/m²",
+    caloriesPer100g: 16, proteinPer100g: 0.7,
     keyNutrients: ["Vitamin C", "Folate", "Potassium"],
   },
   kale: {
-    name: "Kale",
-    scientificName: "Brassica oleracea var. sabellica",
-    growthCycleDays: 55,
-    optimalTemp: [15, 24],
-    lightHours: "14–16 h/day",
-    waterPerDay: "0.9 L/m²",
-    caloriesPer100g: 49,
-    proteinPer100g: 4.3,
+    name: "Kale", scientificName: "Brassica oleracea var. sabellica", growthCycleDays: 55,
+    optimalTemp: [15, 24], lightHours: "14–16 h/day", waterPerDay: "0.9 L/m²",
+    caloriesPer100g: 49, proteinPer100g: 4.3,
     keyNutrients: ["Vitamin K", "Vitamin C", "Calcium"],
   },
 };
@@ -187,28 +161,54 @@ const INITIAL_GRID: TileData[][] = [
 ];
 
 const SPEED_MULTIPLIER: Record<SpeedKey, number> = {
-  x1: 1,
-  x2: 2,
-  x5: 5,
-  x10: 10,
-  x20: 20,
-  x50: 50,
-  x100: 100,
+  x1: 1, x2: 2, x5: 5, x10: 10, x20: 20, x50: 50, x100: 100,
 };
 
-function makeInitialTimestamp(): number {
-  const d = new Date();
-  d.setHours(6, 0, 0, 0);
-  return d.getTime();
+// ─── Snapshot Types ─────────────────────────────────────────────────────────────
+
+export interface CropSnapshot {
+  soilMoisture: number;
+  soilTemperature: number;
+  plantGrowth: number;
+  leafArea: number;
+  fruitCount: number;
+  controls: { waterPumpRate: number; localHeatingPower: number };
+  stage: GrowthStage;
+  stageProgress: number;
+  daysSincePlanting: number;
+  healthScore: number;
+  biomassKg: number;
+  estimatedYieldKg: number;
 }
 
-function buildInitialSimulation() {
-  const env = createInitialEnvironment();
-  env.timestamp = makeInitialTimestamp();
-  const greenhouse = createInitialGreenhouseState();
-  const simulation = createSimulation(env, greenhouse);
-  return { simulation, greenhouse, initialEnv: env };
+export interface EnvironmentSnapshot {
+  missionSol: number;
+  totalMissionSols: number;
+  airTemperature: number;
+  humidity: number;
+  co2Level: number;
+  lightLevel: number;
+  o2Level: number;
+  externalTemp: number;
+  solarRadiation: number;
+  dustStormFactor: number;
+  dustStormActive: boolean;
+  resources: {
+    waterConsumedL: number;
+    energyUsedKWh: number;
+    o2ProducedKg: number;
+    totalHarvestKg: number;
+  };
+  greenhouseControls: {
+    globalHeatingPower: number;
+    co2InjectionRate: number;
+    ventilationRate: number;
+    lightingPower: number;
+  };
+  crops: Partial<Record<CropType, CropSnapshot>>;
 }
+
+// ─── Store Interface ────────────────────────────────────────────────────────────
 
 export interface GreenhouseState {
   grid: TileData[][];
@@ -224,6 +224,11 @@ export interface GreenhouseState {
   co2Level: number;
   lightLevel: number;
 
+  missionSol: number;
+  dustStormActive: boolean;
+  events: SimEvent[];
+  totalHarvestKg: number;
+
   setSpeed: (speed: SpeedKey) => void;
   tick: () => void;
   setGrid: (grid: TileData[][]) => void;
@@ -236,60 +241,72 @@ export interface GreenhouseState {
       crop?: string;
     }>,
   ) => void;
+  doHarvest: (crop: CropType) => void;
+  doReplant: (crop: CropType) => void;
 }
 
-export interface CropSnapshot {
-  soilMoisture: number;
-  soilTemperature: number;
-  plantGrowth: number;
-  leafArea: number;
-  fruitCount: number;
-  controls: { waterPumpRate: number; localHeatingPower: number };
-}
-
-export interface EnvironmentSnapshot {
-  airTemperature: number;
-  humidity: number;
-  co2Level: number;
-  lightLevel: number;
-  externalTemp: number;
-  solarRadiation: number;
-  greenhouseControls: {
-    globalHeatingPower: number;
-    co2InjectionRate: number;
-    ventilationRate: number;
-    lightingPower: number;
-  };
-  crops: Partial<Record<CropType, CropSnapshot>>;
-}
+// ─── Helpers ────────────────────────────────────────────────────────────────────
 
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+function syncGridFromEnv(grid: TileData[][], env: ConcreteEnvironment): TileData[][] {
+  return grid.map((row) =>
+    row.map((tile) => {
+      if (tile.kind !== "crop" || !tile.crop) return tile;
+      const c = env.crops[tile.crop];
+      return {
+        ...tile,
+        growth: STAGE_TO_GROWTH_INDEX[c.stage],
+        water: Math.round(c.soilMoisture),
+        status: c.healthScore > 0.7 ? ("ok" as const) : c.healthScore > 0 ? ("warn" as const) : null,
+      };
+    }),
+  );
+}
+
 function buildSnapshot(
   env: ConcreteEnvironment,
   gh: ConcreteGreenhouseState,
+  totalHarvestKg: number,
 ): EnvironmentSnapshot {
   const crops: EnvironmentSnapshot["crops"] = {};
-  for (const [key, cropEnv] of Object.entries(env.crops) as [CropType, CropEnvironment][]) {
+  for (const [key, ce] of Object.entries(env.crops) as [CropType, CropEnvironment][]) {
     crops[key] = {
-      soilMoisture: round1(cropEnv.soilMoisture),
-      soilTemperature: round1(cropEnv.soilTemperature),
-      plantGrowth: round1(cropEnv.plantGrowth),
-      leafArea: Math.round(cropEnv.leafArea * 100) / 100,
-      fruitCount: cropEnv.fruitCount,
+      soilMoisture: round1(ce.soilMoisture),
+      soilTemperature: round1(ce.soilTemperature),
+      plantGrowth: round1(ce.plantGrowth),
+      leafArea: Math.round(ce.leafArea * 100) / 100,
+      fruitCount: ce.fruitCount,
       controls: { ...gh.crops[key] },
+      stage: ce.stage,
+      stageProgress: Math.round(ce.stageProgress * 100) / 100,
+      daysSincePlanting: round1(ce.daysSincePlanting),
+      healthScore: Math.round(ce.healthScore * 100) / 100,
+      biomassKg: round1(ce.biomassKg),
+      estimatedYieldKg: round1(ce.estimatedYieldKg),
     };
   }
 
   return {
+    missionSol: env.missionSol,
+    totalMissionSols: TOTAL_MISSION_SOLS,
     airTemperature: round1(env.airTemperature),
     humidity: round1(env.humidity),
     co2Level: Math.round(env.co2Level),
     lightLevel: Math.round(env.lightLevel),
+    o2Level: round1(env.o2Level),
     externalTemp: round1(env.externalTemp),
     solarRadiation: Math.round(env.solarRadiation),
+    dustStormFactor: Math.round(env.dustStormFactor * 100) / 100,
+    dustStormActive: env.dustStormFactor < 0.9,
+    resources: {
+      waterConsumedL: round1(env.waterConsumedL),
+      energyUsedKWh: round1(env.energyUsedKWh),
+      o2ProducedKg: round1(env.o2ProducedKg),
+      totalHarvestKg: round1(totalHarvestKg),
+    },
     greenhouseControls: {
       globalHeatingPower: gh.globalHeatingPower,
       co2InjectionRate: gh.co2InjectionRate,
@@ -300,12 +317,22 @@ function buildSnapshot(
   };
 }
 
+// ─── Store ──────────────────────────────────────────────────────────────────────
+
+function buildInitialSimulation() {
+  const env = createInitialEnvironment();
+  const greenhouse = createInitialGreenhouseState();
+  const simulation = createSimulation(env, greenhouse);
+  return { simulation, greenhouse, initialEnv: env };
+}
+
 const { simulation, greenhouse, initialEnv } = buildInitialSimulation();
 const initialEnvironment = simulation.getEnvironment(0);
+const initialGrid = syncGridFromEnv(INITIAL_GRID, initialEnvironment);
 
 export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
-  grid: INITIAL_GRID,
-  simulationTime: new Date(makeInitialTimestamp()),
+  grid: initialGrid,
+  simulationTime: new Date(initialEnvironment.timestamp),
   speed: "x1",
 
   simState: { simulation, greenhouse },
@@ -317,31 +344,56 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   co2Level: initialEnvironment.co2Level,
   lightLevel: initialEnvironment.lightLevel,
 
+  missionSol: initialEnvironment.missionSol,
+  dustStormActive: initialEnvironment.dustStormFactor < 0.9,
+  events: [],
+  totalHarvestKg: 0,
+
   setSpeed: (speed) => set({ speed }),
 
   tick: () => {
-    const { elapsedMinutes, speed, simState } = get();
+    const { elapsedMinutes, speed, simState, grid, events, missionSol: prevSol } = get();
     const mult = SPEED_MULTIPLIER[speed];
     const nextMinutes = elapsedMinutes + mult / 60;
     const env = simState.simulation.getEnvironment(nextMinutes);
     const simTime = new Date(env.timestamp);
+    const newGrid = syncGridFromEnv(grid, env);
+
+    const newEvents = [...events];
+    const nowDust = env.dustStormFactor < 0.9;
+    const wasDust = get().dustStormActive;
+    if (nowDust && !wasDust) {
+      newEvents.push({
+        sol: env.missionSol, type: "dust_storm_start", severity: "warning",
+        message: `Dust storm detected — solar output reduced to ${Math.round(env.dustStormFactor * 100)}%`,
+      });
+    } else if (!nowDust && wasDust) {
+      newEvents.push({
+        sol: env.missionSol, type: "dust_storm_end", severity: "info",
+        message: "Dust storm has cleared — solar output returning to normal",
+      });
+    }
 
     set({
       elapsedMinutes: nextMinutes,
       environment: env,
       simulationTime: simTime,
+      grid: newGrid,
       temperature: env.airTemperature,
       humidity: env.humidity,
       co2Level: env.co2Level,
       lightLevel: env.lightLevel,
+      missionSol: env.missionSol,
+      dustStormActive: nowDust,
+      events: newEvents,
     });
   },
 
   setGrid: (grid) => set({ grid }),
 
   getEnvironmentSnapshot: () => {
-    const { environment, simState } = get();
-    return buildSnapshot(environment, simState.greenhouse);
+    const { environment, simState, totalHarvestKg } = get();
+    return buildSnapshot(environment, simState.greenhouse, totalHarvestKg);
   },
 
   applyParameterChanges: (changes) => {
@@ -374,62 +426,92 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       humidity: env.humidity,
       co2Level: env.co2Level,
       lightLevel: env.lightLevel,
+      grid: syncGridFromEnv(get().grid, env),
+    });
+  },
+
+  doHarvest: (crop) => {
+    const { simState, elapsedMinutes, events, totalHarvestKg } = get();
+    const { state: newState, yieldKg } = harvestCropTransform(simState, crop, elapsedMinutes);
+    const env = newState.simulation.getEnvironment(0);
+
+    const newEvents: SimEvent[] = [...events, {
+      sol: env.missionSol, type: "harvest", severity: "info",
+      message: `Harvested ${crop}: ${yieldKg.toFixed(1)} kg`,
+      crop, data: { yieldKg },
+    }];
+
+    set({
+      simState: newState,
+      elapsedMinutes: 0,
+      environment: env,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+      grid: syncGridFromEnv(get().grid, env),
+      events: newEvents,
+      totalHarvestKg: totalHarvestKg + yieldKg,
+    });
+  },
+
+  doReplant: (crop) => {
+    const { simState, elapsedMinutes, events } = get();
+    const newState = replantCropTransform(simState, crop, elapsedMinutes);
+    const env = newState.simulation.getEnvironment(0);
+
+    const newEvents: SimEvent[] = [...events, {
+      sol: env.missionSol, type: "replant", severity: "info",
+      message: `Replanted ${crop} — new growth cycle started`,
+      crop,
+    }];
+
+    set({
+      simState: newState,
+      elapsedMinutes: 0,
+      environment: env,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+      grid: syncGridFromEnv(get().grid, env),
+      events: newEvents,
     });
   },
 }));
+
+// ─── Display Helpers ────────────────────────────────────────────────────────────
 
 export function getHourProgress(time: Date): number {
   return time.getHours() + time.getMinutes() / 60 + time.getSeconds() / 3600;
 }
 
 export function getSkyColors(hour: number): { bg: string; overlay: string } {
-  if (hour < 5) {
-    return { bg: "#0d1117", overlay: "rgba(10, 15, 30, 0.06)" };
-  }
+  if (hour < 5) return { bg: "#0d1117", overlay: "rgba(10, 15, 30, 0.06)" };
   if (hour < 6.5) {
     const t = (hour - 5) / 1.5;
-    return {
-      bg: lerpColor("#0d1117", "#2c1810", t),
-      overlay: `rgba(50, 30, 20, ${0.04 + t * 0.03})`,
-    };
+    return { bg: lerpColor("#0d1117", "#2c1810", t), overlay: `rgba(50, 30, 20, ${0.04 + t * 0.03})` };
   }
   if (hour < 8) {
     const t = (hour - 6.5) / 1.5;
-    return {
-      bg: lerpColor("#2c1810", "#faf6f0", t),
-      overlay: `rgba(255, 180, 100, ${0.06 - t * 0.04})`,
-    };
+    return { bg: lerpColor("#2c1810", "#faf6f0", t), overlay: `rgba(255, 180, 100, ${0.06 - t * 0.04})` };
   }
   if (hour < 11) {
     const t = (hour - 8) / 3;
-    return {
-      bg: lerpColor("#faf6f0", "#ffffff", t),
-      overlay: `rgba(255, 255, 255, ${0.02 - t * 0.02})`,
-    };
+    return { bg: lerpColor("#faf6f0", "#ffffff", t), overlay: `rgba(255, 255, 255, ${0.02 - t * 0.02})` };
   }
-  if (hour < 15) {
-    return { bg: "#ffffff", overlay: "rgba(255, 255, 255, 0)" };
-  }
+  if (hour < 15) return { bg: "#ffffff", overlay: "rgba(255, 255, 255, 0)" };
   if (hour < 17.5) {
     const t = (hour - 15) / 2.5;
-    return {
-      bg: lerpColor("#ffffff", "#fdf8f0", t),
-      overlay: `rgba(255, 200, 120, ${t * 0.03})`,
-    };
+    return { bg: lerpColor("#ffffff", "#fdf8f0", t), overlay: `rgba(255, 200, 120, ${t * 0.03})` };
   }
   if (hour < 19.5) {
     const t = (hour - 17.5) / 2;
-    return {
-      bg: lerpColor("#fdf8f0", "#1a1520", t),
-      overlay: `rgba(200, 100, 60, ${0.03 + t * 0.04})`,
-    };
+    return { bg: lerpColor("#fdf8f0", "#1a1520", t), overlay: `rgba(200, 100, 60, ${0.03 + t * 0.04})` };
   }
   if (hour < 21) {
     const t = (hour - 19.5) / 1.5;
-    return {
-      bg: lerpColor("#1a1520", "#0d1117", t),
-      overlay: `rgba(20, 15, 40, ${0.06 - t * 0.02})`,
-    };
+    return { bg: lerpColor("#1a1520", "#0d1117", t), overlay: `rgba(20, 15, 40, ${0.06 - t * 0.02})` };
   }
   return { bg: "#0d1117", overlay: "rgba(10, 15, 30, 0.06)" };
 }

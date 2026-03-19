@@ -6,44 +6,114 @@ export const ALL_CROP_TYPES: CropType[] = [
   "lettuce", "tomato", "potato", "soybean", "spinach", "wheat", "radish", "kale",
 ];
 
-// Crop-specific environment readings (sensor data)
+export type GrowthStage = 'seed' | 'germination' | 'vegetative' | 'flowering' | 'fruiting' | 'harvest_ready' | 'harvested';
+
+export const GROWTH_STAGES: GrowthStage[] = [
+  'seed', 'germination', 'vegetative', 'flowering', 'fruiting', 'harvest_ready',
+];
+
+export const STAGE_TO_GROWTH_INDEX: Record<GrowthStage, number> = {
+  seed: 0,
+  germination: 1,
+  vegetative: 2,
+  flowering: 3,
+  fruiting: 4,
+  harvest_ready: 5,
+  harvested: 0,
+};
+
 export interface CropEnvironment {
-  soilMoisture: number; // percentage
-  soilTemperature: number; // Celsius
-  plantGrowth: number; // 0-100%
-  leafArea: number; // m²
+  soilMoisture: number;
+  soilTemperature: number;
+
+  stage: GrowthStage;
+  stageProgress: number;
+  daysSincePlanting: number;
+
+  healthScore: number;
+  stressAccumulator: number;
+
+  biomassKg: number;
+  estimatedYieldKg: number;
+
+  plantGrowth: number;
+  leafArea: number;
   fruitCount: number;
 }
 
-// Crop-specific machine outputs
 export interface CropControls {
-  waterPumpRate: number; // L/hour
-  localHeatingPower: number; // Watts
+  waterPumpRate: number;
+  localHeatingPower: number;
 }
 
-// Environment with per-crop sensor data
 export interface ConcreteEnvironment extends Environment {
   timestamp: number;
-  airTemperature: number; // Celsius
-  humidity: number; // percentage
-  co2Level: number; // ppm
-  lightLevel: number; // lux
-  externalTemp: number; // Mars outside temp
-  solarRadiation: number; // W/m²
+  missionStartMs: number;
+  missionElapsedHours: number;
+  missionSol: number;
+  solFraction: number;
+
+  airTemperature: number;
+  humidity: number;
+  co2Level: number;
+  lightLevel: number;
+  o2Level: number;
+  externalTemp: number;
+  solarRadiation: number;
+  dustStormFactor: number;
+
+  waterConsumedL: number;
+  energyUsedKWh: number;
+  o2ProducedKg: number;
+
   crops: Record<CropType, CropEnvironment>;
 }
 
-// Greenhouse controls with per-crop settings
 export interface ConcreteGreenhouseState extends GreenhouseState {
-  lightingPower: number; // Watts
-  globalHeatingPower: number; // Watts
-  co2InjectionRate: number; // ppm/hour
-  ventilationRate: number; // m³/hour
+  lightingPower: number;
+  globalHeatingPower: number;
+  co2InjectionRate: number;
+  ventilationRate: number;
   crops: Record<CropType, CropControls>;
 }
 
-// Complete state
 export interface ConcreteState extends State {
   simulation: SimulationState<ConcreteEnvironment>;
   greenhouse: ConcreteGreenhouseState;
 }
+
+export interface SimEvent {
+  sol: number;
+  type: 'harvest' | 'replant' | 'stress_alert' | 'dust_storm_start' | 'dust_storm_end' | 'resource_warning' | 'crop_death' | 'stage_change';
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  crop?: CropType;
+  data?: Record<string, unknown>;
+}
+
+export interface NutritionalOutput {
+  caloriesPerDay: number;
+  proteinGPerDay: number;
+  vitaminC_mgPerDay: number;
+  vitaminA_mcgPerDay: number;
+  iron_mgPerDay: number;
+  calcium_mgPerDay: number;
+  fiber_gPerDay: number;
+}
+
+export interface MissionResources {
+  waterConsumedL: number;
+  energyUsedKWh: number;
+  o2ProducedKg: number;
+  totalHarvestKg: number;
+}
+
+export const CREW_DAILY_TARGETS = {
+  calories: 10_000,
+  proteinG: 224,
+  vitaminC_mg: 360,
+  vitaminA_mcg: 3_600,
+  iron_mg: 48,
+  calcium_mg: 4_000,
+  fiber_g: 100,
+} as const;

@@ -3,6 +3,9 @@
 @import "shadcn/tailwind.css";
 @import "../components/ui/central-control/styles.css";
 
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
+
 @font-face {
   font-family: "Interface Sans";
   font-style: normal;

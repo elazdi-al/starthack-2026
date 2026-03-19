@@ -1,9 +1,10 @@
 import type { StateTransformation } from '../../state/types';
-import type { ConcreteState, ConcreteGreenhouseState, CropControls, CropType } from './types';
+import type {
+  ConcreteState, ConcreteGreenhouseState, CropControls, CropType, CropEnvironment,
+} from './types';
 import { ALL_CROP_TYPES } from './types';
 import { CROP_PROFILES, createSimulation } from './simulation';
 
-// Deep-clone greenhouse state (spreads each crop's controls)
 function cloneGreenhouse(gh: ConcreteGreenhouseState): ConcreteGreenhouseState {
   const crops = {} as Record<CropType, CropControls>;
   for (const ct of ALL_CROP_TYPES) {
@@ -12,7 +13,6 @@ function cloneGreenhouse(gh: ConcreteGreenhouseState): ConcreteGreenhouseState {
   return { ...gh, crops };
 }
 
-// Update a global greenhouse parameter
 export const updateGreenhouseParam = <K extends keyof ConcreteGreenhouseState>(
   paramName: K,
   value: ConcreteGreenhouseState[K],
@@ -30,7 +30,6 @@ export const updateGreenhouseParam = <K extends keyof ConcreteGreenhouseState>(
   };
 };
 
-// Update a crop-specific parameter
 export const updateCropParam = <K extends keyof CropControls>(
   crop: CropType,
   paramName: K,
@@ -47,28 +46,24 @@ export const updateCropParam = <K extends keyof CropControls>(
   };
 };
 
-// Simple rule-based transformation (adjusts all crops based on their profiles)
 export const simpleTransformation = (time: number): StateTransformation => {
   return (currentState) => {
     const state = currentState as ConcreteState;
     const env = state.simulation.getEnvironment(time);
     let newState = currentState;
 
-    // Global heating
     if (env.airTemperature < 18) {
       newState = updateGreenhouseParam('globalHeatingPower', 5000, time)(newState);
     } else if (env.airTemperature > 25) {
       newState = updateGreenhouseParam('globalHeatingPower', 1000, time)(newState);
     }
 
-    // CO2
     if (env.co2Level < 800) {
       newState = updateGreenhouseParam('co2InjectionRate', 100, time)(newState);
     } else if (env.co2Level > 1200) {
       newState = updateGreenhouseParam('co2InjectionRate', 20, time)(newState);
     }
 
-    // Per-crop watering based on each crop's optimal moisture
     for (const ct of ALL_CROP_TYPES) {
       const profile = CROP_PROFILES[ct];
       const moisture = env.crops[ct].soilMoisture;
@@ -83,7 +78,6 @@ export const simpleTransformation = (time: number): StateTransformation => {
   };
 };
 
-// Apply a sequence of transformations (used by the agent tool and callers)
 export function applyTransformations(
   initialState: ConcreteState,
   time: number,
@@ -114,4 +108,62 @@ export function applyTransformations(
   }
 
   return state;
+}
+
+/** Harvest a crop and return updated state + yield information. */
+export function harvestCrop(
+  state: ConcreteState,
+  crop: CropType,
+  time: number,
+): { state: ConcreteState; yieldKg: number } {
+  const env = state.simulation.getEnvironment(time);
+  const cropEnv = env.crops[crop];
+
+  const yieldKg = cropEnv.estimatedYieldKg;
+
+  const newCrops = { ...env.crops };
+  newCrops[crop] = {
+    ...cropEnv,
+    stage: 'harvested' as const,
+    stageProgress: 0,
+    biomassKg: 0,
+    estimatedYieldKg: 0,
+    plantGrowth: 0,
+    leafArea: 0,
+    fruitCount: 0,
+  };
+
+  const newEnv = { ...env, crops: newCrops };
+  const simulation = createSimulation(newEnv, state.greenhouse);
+  return { state: { simulation, greenhouse: state.greenhouse }, yieldKg };
+}
+
+/** Replant a harvested crop back to seed stage. */
+export function replantCrop(
+  state: ConcreteState,
+  crop: CropType,
+  time: number,
+): ConcreteState {
+  const env = state.simulation.getEnvironment(time);
+  const cropEnv = env.crops[crop];
+
+  const newCrops = { ...env.crops };
+  newCrops[crop] = {
+    soilMoisture: cropEnv.soilMoisture,
+    soilTemperature: cropEnv.soilTemperature,
+    stage: 'seed' as const,
+    stageProgress: 0,
+    daysSincePlanting: 0,
+    healthScore: 1,
+    stressAccumulator: 0,
+    biomassKg: 0,
+    estimatedYieldKg: 0,
+    plantGrowth: 0,
+    leafArea: 0,
+    fruitCount: 0,
+  };
+
+  const newEnv = { ...env, crops: newCrops };
+  const simulation = createSimulation(newEnv, state.greenhouse);
+  return { simulation, greenhouse: state.greenhouse };
 }

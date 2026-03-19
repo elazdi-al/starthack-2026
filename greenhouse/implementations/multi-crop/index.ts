@@ -1,8 +1,13 @@
-// Multi-crop greenhouse implementation
-export type { CropType, CropEnvironment, CropControls, ConcreteEnvironment, ConcreteGreenhouseState, ConcreteState } from './types';
-export { ALL_CROP_TYPES } from './types';
+export type {
+  CropType, CropEnvironment, CropControls,
+  ConcreteEnvironment, ConcreteGreenhouseState, ConcreteState,
+  GrowthStage, SimEvent, NutritionalOutput, MissionResources,
+} from './types';
+export { ALL_CROP_TYPES, GROWTH_STAGES, STAGE_TO_GROWTH_INDEX, CREW_DAILY_TARGETS } from './types';
 
-export { simulate, createSimulation, CROP_PROFILES } from './simulation';
+export { CROP_PROFILES, type CropProfile } from './profiles';
+
+export { simulate, createSimulation, SOL_HOURS } from './simulation';
 
 export {
   createInitialEnvironment,
@@ -15,4 +20,6 @@ export {
   updateGreenhouseParam,
   updateCropParam,
   applyTransformations,
+  harvestCrop,
+  replantCrop,
 } from './transformation';
