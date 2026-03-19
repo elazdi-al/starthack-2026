@@ -75,7 +75,9 @@ import {
 } from "@phosphor-icons/react";
 >>>>>>> aca35ad (feat: add central control)
 
+import { ClockWidget } from "@/components/interface/clock-widget";
 import { SettingsButton } from "@/components/interface/settings-button";
+import { TemperatureWidget } from "@/components/interface/temperature-widget";
 import { SidebarToggle } from "@/components/interface/sidebar-toggle";
 import { SpeedSelector } from "@/components/interface/speed-selector";
 
@@ -100,6 +102,11 @@ export default function Home() {
       className="relative min-h-screen bg-background text-foreground"
       style={lightModeVars}
     >
+      <div className="absolute left-6 top-6 flex items-center gap-2">
+        <ClockWidget />
+        <TemperatureWidget />
+      </div>
+
       <div className="absolute right-6 top-6 flex items-center gap-3">
         <SpeedSelector value={speed} onValueChange={setSpeed} />
         <SidebarToggle
