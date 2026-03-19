@@ -334,7 +334,7 @@ export function GreenhouseGrid() {
           className="pointer-events-auto"
           style={{ transform: "scaleY(0.58) rotate(-45deg)" }}
         >
-          <div className="relative rounded-lg border border-black/4 bg-black/0.5 p-2 shadow-[inset_0_0_80px_rgba(82,130,82,0.012)]">
+          <div className="relative rounded-lg border border-black/4 bg-black/0.5 p-2 shadow-[inset_0_0_80px_rgba(82,130,82,0.012)] dark:border-white/4 dark:bg-white/0.5">
             <Corner position="top-left" />
             <Corner position="top-right" />
             <Corner position="bottom-left" />
@@ -362,17 +362,7 @@ export function GreenhouseGrid() {
         </div>
       </TooltipProvider>
 
-      <div className="mt-8 flex items-center gap-4">
-        <EnvReading label="Temp" value="22°C" />
-        <EnvDivider />
-        <EnvReading label="Humidity" value="65%" />
-        <EnvDivider />
-        <EnvReading label="CO2" value="800 ppm" />
-        <EnvDivider />
-        <EnvReading label="Light" value="420 umol" />
-        <EnvDivider />
-        <EnvReading label="H2O Reserve" value="94%" />
-      </div>
+      <LiveEnvReadings />
 
       <CropDialog data={selected} onClose={() => setSelected(null)} />
     </div>
@@ -388,10 +378,10 @@ function GridTile({
 }) {
   if (data.kind === "path") {
     return (
-      <div className="relative cursor-default rounded border border-black/2.5 bg-black/1 transition-colors duration-150 hover:bg-black/2">
+      <div className="relative cursor-default rounded border border-black/2.5 bg-black/1 transition-colors duration-150 hover:bg-black/2 dark:border-white/4 dark:bg-white/2 dark:hover:bg-white/4">
         {data.sensor && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-[7px] w-[7px] rounded-full border border-black/7" />
+            <div className="h-[7px] w-[7px] rounded-full border border-black/7 dark:border-white/10" />
           </div>
         )}
       </div>
@@ -405,14 +395,16 @@ function GridTile({
     <button
       type="button"
       onClick={planted && cropInfo ? onSelect : undefined}
-      className={`relative h-full w-full rounded border border-green-800/5.5 bg-green-800/4.5 transition-colors duration-150 hover:bg-green-800/8 ${
+      className={`relative h-full w-full rounded border border-green-800/5.5 bg-green-800/4.5 transition-colors duration-150 hover:bg-green-800/8 dark:border-green-400/6 dark:bg-green-400/4.5 dark:hover:bg-green-400/10 ${
         planted && cropInfo ? "cursor-pointer" : "cursor-default"
       }`}
     >
       {data.status && planted && (
         <div
           className={`absolute right-2.5 top-2.5 h-[5px] w-[5px] rounded-full ${
-            data.status === "ok" ? "bg-green-700/35" : "bg-amber-500/50"
+            data.status === "ok"
+              ? "bg-green-700/35 dark:bg-green-400/40"
+              : "bg-amber-500/50 dark:bg-amber-400/55"
           }`}
         />
       )}
@@ -426,9 +418,9 @@ function GridTile({
       )}
 
       {planted && (
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden rounded-b-sm bg-green-800/6">
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden rounded-b-sm bg-green-800/6 dark:bg-green-400/8">
           <div
-            className="h-full bg-green-800/18"
+            className="h-full bg-green-800/18 dark:bg-green-400/25"
             style={{ width: `${data.water}%` }}
           />
         </div>
@@ -484,7 +476,7 @@ function CropDialog({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                    className="fixed inset-0 z-9998 bg-white/60 backdrop-blur-2xl"
+                    className="fixed inset-0 z-9998 bg-white/60 dark:bg-black/60 backdrop-blur-2xl"
                     style={{ willChange: "opacity" }}
                   />
                 }
@@ -504,7 +496,7 @@ function CropDialog({
                 }
                 className="fixed inset-0 z-9999 flex items-center justify-center p-8 pointer-events-none outline-none"
               >
-                <div className="relative h-[540px] w-full max-w-[960px] overflow-hidden rounded-2xl border border-black/6 bg-white shadow-[0_32px_80px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04)]">
+                <div className="pointer-events-auto relative h-[540px] w-full max-w-[960px] overflow-hidden rounded-2xl border border-black/6 bg-white shadow-[0_32px_80px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04)] dark:border-white/10 dark:bg-[#212121] dark:shadow-[0_32px_80px_rgba(0,0,0,0.4),0_1px_3px_rgba(0,0,0,0.2)]">
                   <Dialog.Title className="sr-only">
                     {info?.name ?? "Crop"} Details
                   </Dialog.Title>
@@ -512,23 +504,23 @@ function CropDialog({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="absolute right-5 top-5 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-black/4 transition-colors hover:bg-black/8"
+                    className="absolute right-5 top-5 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-black/4 transition-colors hover:bg-black/8 dark:bg-white/8 dark:hover:bg-white/14"
                     aria-label="Close"
                   >
-                    <X size={14} weight="bold" className="text-black/40" />
+                    <X size={14} weight="bold" className="text-black/40 dark:text-white/50" />
                   </button>
 
                   <div className="flex h-full">
-                    <div className="flex flex-1 items-center justify-center border-r border-black/4">
+                    <div className="flex flex-1 items-center justify-center border-r border-black/4 dark:border-white/6">
                       <div className="flex flex-col items-center gap-4">
                         <div className="crop-dialog-preview">
                           {hoverMeta ? (
                             <CropPreview crop={data.crop!} />
                           ) : (
-                            <div className="h-6 w-6 rounded-full bg-green-800/12" />
+                            <div className="h-6 w-6 rounded-full bg-green-800/12 dark:bg-green-400/15" />
                           )}
                         </div>
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-black/20">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-black/20 dark:text-white/20">
                           Plant Preview
                         </span>
                       </div>
@@ -538,8 +530,10 @@ function CropDialog({
                       {info && data && (
                         <>
                           <div className="mb-8">
-                            <h2 className="type-title text-black/90">{info.name}</h2>
-                            <p className="mt-0.5 type-small italic text-black/35">
+                            <h2 className="type-title text-black/90 dark:text-white/95">
+                              {info.name}
+                            </h2>
+                            <p className="mt-0.5 type-small italic text-black/35 dark:text-white/40">
                               {info.scientificName}
                             </p>
                           </div>
@@ -550,12 +544,12 @@ function CropDialog({
                               <DataRow label="Stage" value={GROWTH_LABEL[data.growth]} />
                               <DataRow label="Water Level">
                                 <div className="flex items-center gap-2.5">
-                                  <span className="font-mono text-xs text-black/60">
+                                  <span className="font-mono text-xs text-black/60 dark:text-white/65">
                                     {data.water}%
                                   </span>
-                                  <div className="h-[3px] w-20 overflow-hidden rounded-full bg-black/6">
+                                  <div className="h-[3px] w-20 overflow-hidden rounded-full bg-black/6 dark:bg-white/8">
                                     <div
-                                      className="h-full rounded-full bg-green-700/40"
+                                      className="h-full rounded-full bg-green-700/40 dark:bg-green-400/45"
                                       style={{ width: `${data.water}%` }}
                                     />
                                   </div>
@@ -628,7 +622,7 @@ function CropDialog({
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-black/25">
+    <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-black/25 dark:text-white/30">
       {children}
     </h3>
   );
@@ -647,9 +641,9 @@ function DataRow({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="type-caption text-black/40">{label}</span>
+      <span className="type-caption text-black/40 dark:text-white/45">{label}</span>
       {children ?? (
-        <span className={`font-mono text-xs ${valueClassName ?? "text-black/60"}`}>
+        <span className={`font-mono text-xs ${valueClassName ?? "text-black/60 dark:text-white/65"}`}>
           {value}
         </span>
       )}
@@ -671,23 +665,42 @@ function Corner({
 
   return (
     <>
-      <div className={`absolute ${pos} h-px w-3 bg-black/8`} />
-      <div className={`absolute ${pos} h-3 w-px bg-black/8`} />
+      <div className={`absolute ${pos} h-px w-3 bg-black/8 dark:bg-white/10`} />
+      <div className={`absolute ${pos} h-3 w-px bg-black/8 dark:bg-white/10`} />
     </>
+  );
+}
+
+function LiveEnvReadings() {
+  const temperature = useGreenhouseStore((s) => s.temperature);
+  const humidity = useGreenhouseStore((s) => s.humidity);
+  const co2Level = useGreenhouseStore((s) => s.co2Level);
+  const lightLevel = useGreenhouseStore((s) => s.lightLevel);
+
+  return (
+    <div className="mt-8 flex items-center gap-4">
+      <EnvReading label="Temp" value={`${Math.round(temperature * 10) / 10}°C`} />
+      <EnvDivider />
+      <EnvReading label="Humidity" value={`${Math.round(humidity)}%`} />
+      <EnvDivider />
+      <EnvReading label="CO2" value={`${Math.round(co2Level)} ppm`} />
+      <EnvDivider />
+      <EnvReading label="Light" value={`${Math.round(lightLevel)} lux`} />
+    </div>
   );
 }
 
 function EnvReading({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-1.5">
-      <span className="text-[10px] font-medium uppercase tracking-widest text-black/30">
+      <span className="text-[10px] font-medium uppercase tracking-widest text-black/30 dark:text-white/35">
         {label}
       </span>
-      <span className="font-mono text-xs text-black/50">{value}</span>
+      <span className="font-mono text-xs text-black/50 dark:text-white/55">{value}</span>
     </div>
   );
 }
 
 function EnvDivider() {
-  return <div className="h-3 w-px bg-black/6" />;
+  return <div className="h-3 w-px bg-black/6 dark:bg-white/8" />;
 }

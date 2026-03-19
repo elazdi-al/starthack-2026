@@ -17,7 +17,7 @@ export function ChatInput({
   onChange,
   onSubmit,
   disabled,
-  placeholder = "Message…",
+  placeholder = "Message...",
 }: ChatInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const canSend = value.trim().length > 0 && !disabled;
@@ -29,6 +29,7 @@ export function ChatInput({
     }
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resize when value changes
   React.useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -39,9 +40,9 @@ export function ChatInput({
   return (
     <div
       className={cn(
-        "relative flex items-end rounded-[20px] pl-3.5 pr-[5px]",
+        "relative flex items-end gap-1.5 rounded-[22px] py-[5px] pl-4 pr-[5px]",
         "bg-[var(--dial-surface)] border border-[var(--dial-border)]",
-        "transition-[border-color,box-shadow] duration-200",
+        "transition-[border-color] duration-150",
         "focus-within:border-[var(--dial-border-hover)]",
       )}
     >
@@ -53,32 +54,30 @@ export function ChatInput({
         disabled={disabled}
         placeholder={placeholder}
         rows={1}
-        style={{ margin: 0, padding: 0 }}
         className={cn(
-          "my-[9px] flex-1 resize-none bg-transparent",
+          "my-[5px] flex-1 resize-none bg-transparent",
           "text-[15px] leading-[20px] font-normal",
           "text-[var(--dial-text-primary)] placeholder:text-[var(--dial-text-tertiary)]",
           "outline-none scrollbar-none",
         )}
       />
-      <div className="flex shrink-0 items-center pb-[5px] pl-2">
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={!canSend}
-          aria-label="Send message"
-          className={cn(
-            "flex size-[28px] items-center justify-center rounded-full",
-            "transition-[background-color,opacity,transform] duration-150",
-            "active:scale-[0.85]",
-            canSend
-              ? "bg-[#007AFF] text-white"
-              : "bg-transparent text-[var(--dial-text-tertiary)] opacity-0 pointer-events-none",
-          )}
-        >
-          <ArrowUp size={16} weight="bold" />
-        </button>
-      </div>
+
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={!canSend}
+        aria-label="Send message"
+        className={cn(
+          "flex size-[30px] shrink-0 items-center justify-center rounded-full",
+          "transition-all duration-150",
+          "active:scale-90",
+          canSend
+            ? "bg-[#007AFF] text-white"
+            : "bg-transparent text-[var(--dial-text-tertiary)] opacity-0 pointer-events-none",
+        )}
+      >
+        <ArrowUp size={16} weight="bold" />
+      </button>
     </div>
   );
 }

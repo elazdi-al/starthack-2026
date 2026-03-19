@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import type { CSSProperties } from "react";
 
 import { CentralControlExample } from "@/components/examples/central-control-example";
 import { GreenhouseGrid } from "@/components/interface/greenhouse-grid";
@@ -13,35 +12,6 @@ import { TemperatureWidget } from "@/components/interface/temperature-widget";
 import { SidebarToggle } from "@/components/interface/sidebar-toggle";
 import { SpeedSelector } from "@/components/interface/speed-selector";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
-
-
-const lightModeVars = {
-  "--background": "#ffffff",
-  "--foreground": "rgb(23 23 23)",
-  "--accent": "rgb(0 0 0 / 0.06)",
-  "--border": "rgb(0 0 0 / 0.05)",
-  "--ring": "rgb(0 0 0 / 0.12)",
-  "--dial-surface": "#fafafa",
-  "--dial-surface-hover": "#f5f5f5",
-  "--dial-surface-active": "#ffffff",
-  "--dial-text-root": "#171717",
-  "--dial-text-section": "#525252",
-  "--dial-text-label": "#737373",
-  "--dial-text-primary": "rgb(23 23 23)",
-  "--dial-text-secondary": "rgb(82 82 91)",
-  "--dial-text-tertiary": "#a3a3a3",
-  "--dial-border": "rgb(0 0 0 / 0.05)",
-  "--dial-border-hover": "rgb(0 0 0 / 0.09)",
-  "--dial-glass-bg": "#ffffff",
-  "--dial-backdrop-blur": "14px",
-  "--dial-radius": "8px",
-  "--dial-panel-radius": "14px",
-  "--dial-row-height": "36px",
-  "--dial-shadow": "0 8px 24px rgb(0 0 0 / 0.04)",
-  "--icon-strong": "rgba(17, 24, 39, 0.92)",
-  "--icon-muted": "rgba(17, 24, 39, 0.76)",
-  "--icon-subtle": "rgba(17, 24, 39, 0.52)",
-} as CSSProperties;
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -63,7 +33,7 @@ export default function Home() {
   };
 
   return (
-    <div style={lightModeVars} className="relative min-h-screen bg-background text-foreground">
+    <div className="relative min-h-screen bg-background text-foreground">
       <main
         ref={mainRef}
         className="relative min-h-screen transition-[margin-right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"

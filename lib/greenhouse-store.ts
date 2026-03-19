@@ -180,53 +180,154 @@ const SPEED_MULTIPLIER: Record<SpeedKey, number> = {
   x10: 10,
 };
 
-function temperatureForHour(hour: number): number {
-  // Sine curve: peak ~14:00, trough ~4:00, range 18–25°C
-  const base = 21.5;
-  const amplitude = 3.5;
-  const shifted = hour - 14;
-  return Math.round((base + amplitude * Math.cos((shifted * Math.PI) / 12)) * 10) / 10;
+function makeInitialTimestamp(): number {
+  const d = new Date();
+  d.setHours(6, 0, 0, 0);
+  return d.getTime();
+}
+
+function buildInitialSimulation() {
+  const env = createInitialEnvironment();
+  env.timestamp = makeInitialTimestamp();
+  const greenhouse = createInitialGreenhouseState();
+  const simulation = createSimulation(env, greenhouse);
+  return { simulation, greenhouse, initialEnv: env };
 }
 
 export interface GreenhouseState {
   grid: TileData[][];
   simulationTime: Date;
   speed: SpeedKey;
+
+  simState: ConcreteState;
+  environment: ConcreteEnvironment;
+  elapsedMinutes: number;
+
   temperature: number;
   humidity: number;
+  co2Level: number;
+  lightLevel: number;
 
   setSpeed: (speed: SpeedKey) => void;
   tick: () => void;
   setGrid: (grid: TileData[][]) => void;
+  getEnvironmentSnapshot: () => EnvironmentSnapshot;
 }
 
-function makeInitialTime(): Date {
-  const d = new Date();
-  d.setHours(6, 0, 0, 0);
-  return d;
+export interface EnvironmentSnapshot {
+  airTemperature: number;
+  humidity: number;
+  co2Level: number;
+  lightLevel: number;
+  externalTemp: number;
+  solarRadiation: number;
+  greenhouseControls: {
+    globalHeatingPower: number;
+    co2InjectionRate: number;
+    ventilationRate: number;
+    lightingPower: number;
+  };
+  tomatoes: {
+    soilMoisture: number;
+    soilTemperature: number;
+    plantGrowth: number;
+    leafArea: number;
+    fruitCount: number;
+    controls: { waterPumpRate: number; localHeatingPower: number };
+  };
+  carrots: {
+    soilMoisture: number;
+    soilTemperature: number;
+    plantGrowth: number;
+    leafArea: number;
+    fruitCount: number;
+    controls: { waterPumpRate: number; localHeatingPower: number };
+  };
 }
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+function buildSnapshot(
+  env: ConcreteEnvironment,
+  gh: ConcreteGreenhouseState,
+): EnvironmentSnapshot {
+  return {
+    airTemperature: round1(env.airTemperature),
+    humidity: round1(env.humidity),
+    co2Level: Math.round(env.co2Level),
+    lightLevel: Math.round(env.lightLevel),
+    externalTemp: round1(env.externalTemp),
+    solarRadiation: Math.round(env.solarRadiation),
+    greenhouseControls: {
+      globalHeatingPower: gh.globalHeatingPower,
+      co2InjectionRate: gh.co2InjectionRate,
+      ventilationRate: gh.ventilationRate,
+      lightingPower: gh.lightingPower,
+    },
+    tomatoes: {
+      soilMoisture: round1(env.tomatoes.soilMoisture),
+      soilTemperature: round1(env.tomatoes.soilTemperature),
+      plantGrowth: round1(env.tomatoes.plantGrowth),
+      leafArea: Math.round(env.tomatoes.leafArea * 100) / 100,
+      fruitCount: env.tomatoes.fruitCount,
+      controls: { ...gh.tomatoes },
+    },
+    carrots: {
+      soilMoisture: round1(env.carrots.soilMoisture),
+      soilTemperature: round1(env.carrots.soilTemperature),
+      plantGrowth: round1(env.carrots.plantGrowth),
+      leafArea: Math.round(env.carrots.leafArea * 100) / 100,
+      fruitCount: env.carrots.fruitCount,
+      controls: { ...gh.carrots },
+    },
+  };
+}
+
+const { simulation, greenhouse, initialEnv } = buildInitialSimulation();
+const initialEnvironment = simulation.getEnvironment(0);
 
 export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   grid: INITIAL_GRID,
-  simulationTime: makeInitialTime(),
+  simulationTime: new Date(makeInitialTimestamp()),
   speed: "x1",
-  temperature: temperatureForHour(6),
-  humidity: 65,
+
+  simState: { simulation, greenhouse },
+  environment: initialEnvironment,
+  elapsedMinutes: 0,
+
+  temperature: initialEnvironment.airTemperature,
+  humidity: initialEnvironment.humidity,
+  co2Level: initialEnvironment.co2Level,
+  lightLevel: initialEnvironment.lightLevel,
 
   setSpeed: (speed) => set({ speed }),
 
   tick: () => {
-    const { simulationTime, speed } = get();
+    const { elapsedMinutes, speed, simState } = get();
     const mult = SPEED_MULTIPLIER[speed];
-    const next = new Date(simulationTime.getTime() + mult * 1000);
-    const hour = next.getHours() + next.getMinutes() / 60;
+    const nextMinutes = elapsedMinutes + mult / 60;
+    const env = simState.simulation.getEnvironment(nextMinutes);
+    const simTime = new Date(env.timestamp);
+
     set({
-      simulationTime: next,
-      temperature: temperatureForHour(hour),
+      elapsedMinutes: nextMinutes,
+      environment: env,
+      simulationTime: simTime,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
     });
   },
 
   setGrid: (grid) => set({ grid }),
+
+  getEnvironmentSnapshot: () => {
+    const { environment, simState } = get();
+    return buildSnapshot(environment, simState.greenhouse);
+  },
 }));
 
 export function getHourProgress(time: Date): number {
@@ -238,7 +339,6 @@ export function getSkyColors(hour: number): { bg: string; overlay: string } {
     return { bg: "#0d1117", overlay: "rgba(10, 15, 30, 0.06)" };
   }
   if (hour < 6.5) {
-    // Pre-dawn → dawn
     const t = (hour - 5) / 1.5;
     return {
       bg: lerpColor("#0d1117", "#2c1810", t),
@@ -246,7 +346,6 @@ export function getSkyColors(hour: number): { bg: string; overlay: string } {
     };
   }
   if (hour < 8) {
-    // Sunrise golden hour
     const t = (hour - 6.5) / 1.5;
     return {
       bg: lerpColor("#2c1810", "#faf6f0", t),
@@ -254,7 +353,6 @@ export function getSkyColors(hour: number): { bg: string; overlay: string } {
     };
   }
   if (hour < 11) {
-    // Morning → midday
     const t = (hour - 8) / 3;
     return {
       bg: lerpColor("#faf6f0", "#ffffff", t),
@@ -262,11 +360,9 @@ export function getSkyColors(hour: number): { bg: string; overlay: string } {
     };
   }
   if (hour < 15) {
-    // Midday
     return { bg: "#ffffff", overlay: "rgba(255, 255, 255, 0)" };
   }
   if (hour < 17.5) {
-    // Afternoon warmth
     const t = (hour - 15) / 2.5;
     return {
       bg: lerpColor("#ffffff", "#fdf8f0", t),
@@ -274,7 +370,6 @@ export function getSkyColors(hour: number): { bg: string; overlay: string } {
     };
   }
   if (hour < 19.5) {
-    // Sunset
     const t = (hour - 17.5) / 2;
     return {
       bg: lerpColor("#fdf8f0", "#1a1520", t),
@@ -282,14 +377,12 @@ export function getSkyColors(hour: number): { bg: string; overlay: string } {
     };
   }
   if (hour < 21) {
-    // Twilight
     const t = (hour - 19.5) / 1.5;
     return {
       bg: lerpColor("#1a1520", "#0d1117", t),
       overlay: `rgba(20, 15, 40, ${0.06 - t * 0.02})`,
     };
   }
-  // Night
   return { bg: "#0d1117", overlay: "rgba(10, 15, 30, 0.06)" };
 }
 
@@ -305,8 +398,8 @@ function lerpColor(a: string, b: string, t: number): string {
 function parseHex(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
   return [
-    parseInt(h.substring(0, 2), 16),
-    parseInt(h.substring(2, 4), 16),
-    parseInt(h.substring(4, 6), 16),
+    Number.parseInt(h.substring(0, 2), 16),
+    Number.parseInt(h.substring(2, 4), 16),
+    Number.parseInt(h.substring(4, 6), 16),
   ];
 }
