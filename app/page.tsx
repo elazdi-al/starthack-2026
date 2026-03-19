@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { CentralControlExample } from "@/components/examples/central-control-example";
 import { GreenhouseGrid } from "@/components/interface/greenhouse-grid";
@@ -20,24 +21,39 @@ import { SimulationOverrides } from "@/components/interface/simulation-overrides
 import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
 import { Planet, Leaf, Robot } from "@phosphor-icons/react";
 
+type IntroStage = "sealed" | "opening" | "open";
+
 export default function Home() {
   const tickInFlight      = useGreenhouseStore((s) => s.tickInFlight);
   const autonomousEnabled = useGreenhouseStore((s) => s.autonomousEnabled);
   const decisionCount     = useGreenhouseStore((s) => s.agentDecisions.length);
-
+  const shouldReduceMotion = useReducedMotion();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [controlOpen, setControlOpen] = React.useState(false);
-  const [speedOpen, setSpeedOpen]     = React.useState(false);
   const [marsOpen, setMarsOpen]       = React.useState(false);
   const [greenhouseOpen, setGreenhouseOpen] = React.useState(false);
   const [agentOpen, setAgentOpen]     = React.useState(false);
-
-  const [portalContainer, setPortalContainer] = React.useState<HTMLElement | null>(null);
-  const mainRef = React.useCallback((node: HTMLElement | null) => {
-    setPortalContainer(node);
-  }, []);
-
+  const [introStage, setIntroStage] = React.useState<IntroStage>("sealed");
   const setFocusedCrop = useGreenhouseStore((s) => s.setFocusedCrop);
+
+  React.useEffect(() => {
+    if (shouldReduceMotion) {
+      setIntroStage("open");
+      return;
+    }
+
+    const openingTimer = window.setTimeout(() => {
+      setIntroStage("opening");
+    }, 800);
+    const completeTimer = window.setTimeout(() => {
+      setIntroStage("open");
+    }, 2350);
+
+    return () => {
+      window.clearTimeout(openingTimer);
+      window.clearTimeout(completeTimer);
+    };
+  }, [shouldReduceMotion]);
 
   const handleControlOpenChange = (next: boolean) => {
     setControlOpen(next);
@@ -52,82 +68,137 @@ export default function Home() {
     }
   };
 
+  const interfaceVisible = introStage === "open";
+
   return (
     <div className="relative min-h-screen bg-background text-foreground">
       <main
+        aria-hidden={false}
         className="relative min-h-screen transition-[margin-right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
         style={{ marginRight: sidebarOpen ? 360 : 0 }}
       >
         <CentralControlExample />
-        <GreenhouseGrid />
+        <SimulationOverrides />
+        <GreenhouseGrid introStage={introStage} />
 
-        <div className="absolute left-6 top-6 flex items-center gap-2">
-          <ClockWidget />
-          <TemperatureWidget />
-          <EnvWidgetShells />
-        </div>
+        <AnimatePresence>
+          {interfaceVisible && (
+            <>
+              <motion.div
+                initial={{ opacity: 0, y: -10, filter: "blur(10px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -6, filter: "blur(8px)" }}
+                transition={{ duration: 0.42, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute left-6 top-6 flex items-center gap-2"
+              >
+                <ClockWidget />
+                <TemperatureWidget />
+                <EnvWidgetShells />
+              </motion.div>
 
-        <div className={`absolute right-6 top-6 flex items-center gap-3 ${controlOpen ? "z-50" : ""}`}>
-          <CentralControlPanel
-            open={controlOpen}
-            onOpenChange={handleControlOpenChange}
-          />
-          <div className="size-10 shrink-0" />
-        </div>
+              <motion.div
+                initial={{ opacity: 0, y: -10, filter: "blur(10px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -6, filter: "blur(8px)" }}
+                transition={{ duration: 0.42, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+                className={`absolute right-6 top-6 flex items-center gap-3 ${controlOpen ? "z-50" : ""}`}
+              >
+                <CentralControlPanel
+                  open={controlOpen}
+                  onOpenChange={handleControlOpenChange}
+                />
+                <div className="size-10 shrink-0" />
+              </motion.div>
 
-        {/* Mars environment panel */}
-        {marsOpen && (
-          <div className="absolute bottom-20 left-6">
-            <MarsEnvironmentPanel onClose={() => setMarsOpen(false)} />
-          </div>
-        )}
+              {marsOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: 6, filter: "blur(8px)" }}
+                  transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute bottom-20 left-6"
+                >
+                  <MarsEnvironmentPanel onClose={() => setMarsOpen(false)} />
+                </motion.div>
+              )}
 
-        {/* Greenhouse progress panel */}
-        {greenhouseOpen && (
-          <div className="absolute bottom-20 right-6">
-            <GreenhouseProgressPanel onClose={() => setGreenhouseOpen(false)} />
-          </div>
-        )}
+              {greenhouseOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: 6, filter: "blur(8px)" }}
+                  transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute bottom-20 right-6"
+                >
+                  <GreenhouseProgressPanel onClose={() => setGreenhouseOpen(false)} />
+                </motion.div>
+              )}
 
-        {/* Agent decision panel */}
-        {agentOpen && (
-          <div className="absolute top-20 left-6">
-            <AgentDecisionPanel onClose={() => setAgentOpen(false)} />
-          </div>
-        )}
+              {agentOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: 6, filter: "blur(8px)" }}
+                  transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute top-20 left-6"
+                >
+                  <AgentDecisionPanel onClose={() => setAgentOpen(false)} />
+                </motion.div>
+              )}
 
-        <div className="absolute bottom-6 left-6 flex items-center gap-2">
-          <SettingsButton />
-          <DashboardToggle
-            icon={<Planet size={16} weight="fill" />}
-            label="Mars Environment"
-            active={marsOpen}
-            onClick={() => setMarsOpen((v) => !v)}
-          />
-          <DashboardToggle
-            icon={<Leaf size={16} weight="fill" />}
-            label="Greenhouse Progress"
-            active={greenhouseOpen}
-            onClick={() => setGreenhouseOpen((v) => !v)}
-          />
-          <AgentToggle
-            active={agentOpen}
-            running={tickInFlight}
-            autonomousEnabled={autonomousEnabled}
-            decisionCount={decisionCount}
-            onClick={() => setAgentOpen((v) => !v)}
-          />
-        </div>
+              <motion.div
+                initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: 6, filter: "blur(8px)" }}
+                transition={{ duration: 0.42, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute bottom-6 left-6 flex items-center gap-2"
+              >
+                <SettingsButton />
+                <DashboardToggle
+                  icon={<Planet size={16} weight="fill" />}
+                  label="Mars Environment"
+                  active={marsOpen}
+                  onClick={() => setMarsOpen((v) => !v)}
+                />
+                <DashboardToggle
+                  icon={<Leaf size={16} weight="fill" />}
+                  label="Greenhouse Progress"
+                  active={greenhouseOpen}
+                  onClick={() => setGreenhouseOpen((v) => !v)}
+                />
+                <AgentToggle
+                  active={agentOpen}
+                  running={tickInFlight}
+                  autonomousEnabled={autonomousEnabled}
+                  decisionCount={decisionCount}
+                  onClick={() => setAgentOpen((v) => !v)}
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </main>
 
-      <div className={`fixed right-6 top-6 ${controlOpen ? "z-40" : "z-60"}`}>
-        <SidebarToggle
-          pressed={sidebarOpen}
-          onPressedChange={setSidebarOpen}
-        />
-      </div>
+      <AnimatePresence>
+        {interfaceVisible && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, x: 12, filter: "blur(10px)" }}
+              animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, x: 8, filter: "blur(8px)" }}
+              transition={{ duration: 0.42, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+              className={`fixed right-6 top-6 ${controlOpen ? "z-40" : "z-60"}`}
+            >
+              <SidebarToggle
+                pressed={sidebarOpen}
+                onPressedChange={setSidebarOpen}
+              />
+            </motion.div>
 
-      <ChatSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
+            <ChatSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

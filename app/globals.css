@@ -192,6 +192,20 @@
   --filter-bar-button-shadow:
     inset 0 1px 0 var(--glass-panel-highlight),
     0 1px 2px rgb(0 0 0 / 0.04);
+  --greenhouse-shadow: rgba(105, 138, 118, 0.065);
+  --greenhouse-floor-start: rgba(236, 247, 241, 0.4);
+  --greenhouse-floor-end: rgba(214, 234, 224, 0.14);
+  --greenhouse-glass-front-start: rgba(255, 255, 255, 0.29);
+  --greenhouse-glass-front-end: rgba(223, 242, 233, 0.12);
+  --greenhouse-glass-side-start: rgba(248, 255, 252, 0.23);
+  --greenhouse-glass-side-end: rgba(213, 236, 226, 0.09);
+  --greenhouse-roof-back-start: rgba(255, 255, 255, 0.34);
+  --greenhouse-roof-back-end: rgba(226, 244, 236, 0.12);
+  --greenhouse-roof-front-start: rgba(251, 255, 253, 0.24);
+  --greenhouse-roof-front-end: rgba(218, 241, 231, 0.1);
+  --greenhouse-line-soft: rgba(160, 195, 176, 0.22);
+  --greenhouse-line-mid: rgba(140, 179, 158, 0.35);
+  --greenhouse-line-strong: rgba(120, 162, 140, 0.48);
 }
 
 .dark {
@@ -278,6 +292,20 @@
   --filter-bar-button-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 1px 2px rgba(0, 0, 0, 0.24);
+  --greenhouse-shadow: rgba(128, 156, 140, 0.035);
+  --greenhouse-floor-start: rgba(248, 255, 252, 0.07);
+  --greenhouse-floor-end: rgba(220, 249, 236, 0.025);
+  --greenhouse-glass-front-start: rgba(250, 255, 252, 0.11);
+  --greenhouse-glass-front-end: rgba(216, 247, 236, 0.05);
+  --greenhouse-glass-side-start: rgba(255, 255, 255, 0.09);
+  --greenhouse-glass-side-end: rgba(219, 245, 236, 0.035);
+  --greenhouse-roof-back-start: rgba(255, 255, 255, 0.13);
+  --greenhouse-roof-back-end: rgba(229, 252, 242, 0.055);
+  --greenhouse-roof-front-start: rgba(246, 255, 250, 0.1);
+  --greenhouse-roof-front-end: rgba(217, 247, 235, 0.05);
+  --greenhouse-line-soft: rgba(247, 255, 252, 0.12);
+  --greenhouse-line-mid: rgba(249, 255, 252, 0.2);
+  --greenhouse-line-strong: rgba(252, 255, 253, 0.55);
 }
 
 @layer base {
@@ -727,17 +755,22 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
+    transition: opacity 180ms ease;
   }
 
   .crop-tile-plant {
     position: absolute;
     transform:
-      translate(-50%, -100%)
+      translate(-50%, calc(-100% + var(--crop-plant-lift, 0px)))
       rotate(45deg)
       scaleY(1.72414)
       perspective(120px)
-      rotateX(-14deg);
+      rotateX(-14deg)
+      scale(var(--crop-plant-scale, 1));
     transform-origin: center bottom;
+    transition:
+      transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      filter 180ms ease;
   }
 
   .crop-preview-svg--tile {
@@ -746,6 +779,80 @@
     filter:
       drop-shadow(0 14px 10px rgb(0 0 0 / 0.18))
       drop-shadow(0 2px 3px rgb(255 255 255 / 0.08));
+  }
+
+  .crop-tile-button:hover .crop-tile-plants,
+  .crop-tile-button:focus-visible .crop-tile-plants {
+    opacity: 1;
+  }
+
+  .crop-tile-button:hover .crop-tile-plant,
+  .crop-tile-button:focus-visible .crop-tile-plant {
+    --crop-plant-lift: -6px;
+    --crop-plant-scale: 1.04;
+    filter:
+      drop-shadow(0 16px 12px rgb(0 0 0 / 0.16))
+      drop-shadow(0 3px 4px rgb(255 255 255 / 0.12));
+  }
+
+  .gh-shadow {
+    fill: var(--greenhouse-shadow);
+  }
+
+  .gh-floor-start {
+    stop-color: var(--greenhouse-floor-start);
+  }
+
+  .gh-floor-end {
+    stop-color: var(--greenhouse-floor-end);
+  }
+
+  .gh-front-start {
+    stop-color: var(--greenhouse-glass-front-start);
+  }
+
+  .gh-front-end {
+    stop-color: var(--greenhouse-glass-front-end);
+  }
+
+  .gh-side-start {
+    stop-color: var(--greenhouse-glass-side-start);
+  }
+
+  .gh-side-end {
+    stop-color: var(--greenhouse-glass-side-end);
+  }
+
+  .gh-roof-back-start {
+    stop-color: var(--greenhouse-roof-back-start);
+  }
+
+  .gh-roof-back-end {
+    stop-color: var(--greenhouse-roof-back-end);
+  }
+
+  .gh-roof-front-start {
+    stop-color: var(--greenhouse-roof-front-start);
+  }
+
+  .gh-roof-front-end {
+    stop-color: var(--greenhouse-roof-front-end);
+  }
+
+  .gh-line-soft {
+    stroke: var(--greenhouse-line-soft);
+  }
+
+  .gh-line-mid {
+    stroke: var(--greenhouse-line-mid);
+  }
+
+  .gh-line-strong {
+    stroke: var(--greenhouse-line-strong);
+  }
+
+  .gh-side-fill {
+    fill: var(--greenhouse-glass-side-end);
   }
 
   .crop-preview-leaf-1 {

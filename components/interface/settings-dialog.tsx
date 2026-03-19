@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Dialog } from "@base-ui/react/dialog"
 import { AnimatePresence, motion } from "motion/react"
+import { useSyncExternalStore } from "react"
 import {
   Check,
   Moon,
@@ -15,6 +16,11 @@ import {
 
 import { cn } from "@/lib/utils"
 import { triggerHaptic } from "@/lib/haptics"
+import {
+  readSystemThemeSnapshot,
+  readThemeSnapshot,
+  subscribeToTheme,
+} from "@/lib/theme"
 import {
   useSettingsStore,
   type TempUnit,
@@ -214,14 +220,24 @@ function SettingRow({
 }
 
 function AppearanceSection() {
-  const theme = useSettingsStore((s) => s.theme)
-  const setTheme = useSettingsStore((s) => s.setTheme)
+  const themePreference = useSettingsStore((s) => s.themePreference)
+  const setThemePreference = useSettingsStore((s) => s.setThemePreference)
+  const systemTheme = useSyncExternalStore(
+    subscribeToTheme,
+    readSystemThemeSnapshot,
+    () => "light"
+  )
+  const effectiveTheme = useSyncExternalStore(
+    subscribeToTheme,
+    readThemeSnapshot,
+    () => "light"
+  )
 
   return (
     <SectionShell>
       <SectionHeader
         title="Appearance"
-        description="Customize the look and feel"
+        description="Choose a fixed theme or follow your operating system"
       />
 
       <div className="space-y-2">
@@ -229,12 +245,11 @@ function AppearanceSection() {
           Theme
         </p>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <ThemeCard
-            id="light"
             label="Light"
-            active={theme === "light"}
-            onClick={() => setTheme("light")}
+            active={themePreference === "light"}
+            onClick={() => setThemePreference("light")}
             preview={
               <div className="w-full h-full rounded-md bg-[#f8f8f8] border border-black/6 flex flex-col items-center justify-center gap-1.5">
                 <Sun size={16} weight="fill" className="text-amber-500" />
@@ -243,10 +258,9 @@ function AppearanceSection() {
             }
           />
           <ThemeCard
-            id="dark"
             label="Dark"
-            active={theme === "dark"}
-            onClick={() => setTheme("dark")}
+            active={themePreference === "dark"}
+            onClick={() => setThemePreference("dark")}
             preview={
               <div className="w-full h-full rounded-md bg-[#1a1a1a] border border-white/8 flex flex-col items-center justify-center gap-1.5">
                 <Moon size={16} weight="fill" className="text-indigo-300" />
@@ -254,20 +268,35 @@ function AppearanceSection() {
               </div>
             }
           />
+          <ThemeCard
+            label="System"
+            active={themePreference === "system"}
+            onClick={() => setThemePreference("system")}
+            preview={
+              <div className="w-full h-full rounded-md border border-black/6 bg-[linear-gradient(135deg,#f8f8f8_0%,#f8f8f8_50%,#1a1a1a_50%,#1a1a1a_100%)] dark:border-white/8 flex items-center justify-center">
+                <Monitor size={18} weight="fill" className="text-white mix-blend-difference" />
+              </div>
+            }
+          />
         </div>
+
+        <p className="type-caption text-[var(--dial-text-tertiary)]">
+          Current system appearance: {systemTheme === "dark" ? "Dark" : "Light"}
+        </p>
+        <p className="type-caption text-[var(--dial-text-tertiary)]">
+          Active app appearance: {effectiveTheme === "dark" ? "Dark" : "Light"}
+        </p>
       </div>
     </SectionShell>
   )
 }
 
 function ThemeCard({
-  id,
   label,
   active,
   onClick,
   preview,
 }: {
-  id: string
   label: string
   active: boolean
   onClick: () => void

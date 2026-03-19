@@ -26,6 +26,11 @@ const TILE = 120;
 const GAP = 3;
 const COLS = 8;
 const ROWS = 5;
+const STEP = TILE + GAP;
+const GRID_WIDTH = COLS * TILE + (COLS - 1) * GAP;
+const GRID_HEIGHT = ROWS * TILE + (ROWS - 1) * GAP;
+
+export type GreenhouseIntroStage = "sealed" | "opening" | "open";
 
 interface CropHoverMeta {
   label: string;
@@ -321,20 +326,49 @@ const CropTooltip = memo(function CropTooltip({
   );
 });
 
-export function GreenhouseGrid() {
+export function GreenhouseGrid({
+  introStage = "open",
+}: {
+  introStage?: GreenhouseIntroStage;
+}) {
   const grid = useGreenhouseStore((s) => s.grid);
+  const missionSol = useGreenhouseStore((s) => s.missionSol);
+  const dustStormActive = useGreenhouseStore((s) => s.dustStormActive);
   const focusedCrop = useGreenhouseStore((s) => s.focusedCrop);
   const [selected, setSelected] = useState<TileData | null>(null);
   const handleSelect = useCallback((tile: TileData) => setSelected(tile), []);
   const handleClose = useCallback(() => setSelected(null), []);
+  const interfaceVisible = introStage === "open";
+  const interactive = introStage === "open";
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-   
+      <motion.div
+        initial={false}
+        animate={{
+          opacity: interfaceVisible ? 1 : 0,
+          y: interfaceVisible ? 0 : -8,
+          filter: interfaceVisible ? "blur(0px)" : "blur(8px)",
+        }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="mb-6 flex items-center gap-2"
+      >
+        <span className="text-[13px] font-medium tracking-wide text-black/40">
+          Greenhouse Module
+        </span>
+        <span className="text-sm text-black/15">·</span>
+        <span className="font-mono text-xs text-black/25">Sol {missionSol + 1} / {TOTAL_MISSION_SOLS}</span>
+        {dustStormActive && (
+          <>
+            <span className="text-sm text-black/15">·</span>
+            <span className="font-mono text-xs text-amber-600/70">Dust Storm</span>
+          </>
+        )}
+      </motion.div>
 
       <TooltipProvider delay={120} closeDelay={0}>
         <div
-          className="pointer-events-auto"
+          className={interactive ? "pointer-events-auto" : "pointer-events-none"}
           style={{ transform: "scaleY(0.58) rotate(-45deg)" }}
         >
           <div className="relative rounded-lg border border-black/4 bg-black/0.5 p-2 shadow-[inset_0_0_80px_rgba(82,130,82,0.012)] dark:border-white/4 dark:bg-white/0.5">
@@ -342,6 +376,7 @@ export function GreenhouseGrid() {
             <Corner position="top-right" />
             <Corner position="bottom-left" />
             <Corner position="bottom-right" />
+            <GreenhouseOverlay introStage={introStage} />
 
             <div
               className="grid"
@@ -368,8 +403,346 @@ export function GreenhouseGrid() {
         </div>
       </TooltipProvider>
 
-      <CropDialog data={selected} onClose={handleClose} />
+      <motion.div
+        initial={false}
+        animate={{
+          opacity: interfaceVisible ? 1 : 0,
+          y: interfaceVisible ? 0 : 8,
+          filter: interfaceVisible ? "blur(0px)" : "blur(8px)",
+        }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="mt-8 min-h-[14px]"
+      >
+        <LiveEnvReadings />
+      </motion.div>
+
+      {interactive && <CropDialog data={selected} onClose={handleClose} />}
     </div>
+  );
+}
+
+function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage }) {
+  const inset = 6;
+  const rise = 128;
+  const roofPeak = 64;
+  const shadowOffsetX = 16;
+  const shadowOffsetY = 20;
+  const startCol = 0;
+  const startRow = 0;
+  const colSpan = COLS;
+  const rowSpan = ROWS;
+
+  const x = startCol * STEP + inset;
+  const y = startRow * STEP + inset;
+  const width = colSpan * TILE + (colSpan - 1) * GAP - inset * 2;
+  const height = rowSpan * TILE + (rowSpan - 1) * GAP - inset * 2;
+
+  const baseTL: [number, number] = [x, y];
+  const baseTR: [number, number] = [x + width, y];
+  const baseBR: [number, number] = [x + width, y + height];
+  const baseBL: [number, number] = [x, y + height];
+
+  const eaveTL: [number, number] = [x + rise, y - rise];
+  const eaveTR: [number, number] = [x + width + rise, y - rise];
+  const eaveBR: [number, number] = [x + width + rise, y + height - rise];
+  const eaveBL: [number, number] = [x + rise, y + height - rise];
+
+  const ridgeL: [number, number] = [x + rise + roofPeak, y - rise + height / 2 - roofPeak];
+  const ridgeR: [number, number] = [x + width + rise + roofPeak, y - rise + height / 2 - roofPeak];
+
+  const poly = (...points: [number, number][]) => points.map(([px, py]) => `${px},${py}`).join(" ");
+  const rafterFractions = [0.18, 0.38, 0.58, 0.78];
+  const showShell = introStage !== "open";
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute left-2 top-2 z-20 overflow-visible"
+      width={GRID_WIDTH}
+      height={GRID_HEIGHT}
+      viewBox={`0 0 ${GRID_WIDTH} ${GRID_HEIGHT}`}
+      fill="none"
+    >
+      <defs>
+        <linearGradient id="greenhouse-floor-fill" x1={x} y1={y} x2={x + width} y2={y + height}>
+          <stop offset="0%" className="gh-floor-start" />
+          <stop offset="100%" className="gh-floor-end" />
+        </linearGradient>
+        <linearGradient id="greenhouse-glass-front" x1={x} y1={y} x2={x + width} y2={y + height}>
+          <stop offset="0%" className="gh-front-start" />
+          <stop offset="100%" className="gh-front-end" />
+        </linearGradient>
+        <linearGradient id="greenhouse-glass-side" x1={x} y1={y} x2={x + rise} y2={y + height}>
+          <stop offset="0%" className="gh-side-start" />
+          <stop offset="100%" className="gh-side-end" />
+        </linearGradient>
+        <linearGradient id="greenhouse-roof-back" x1={x + rise} y1={y - rise} x2={x + width + rise} y2={y - rise + height / 2}>
+          <stop offset="0%" className="gh-roof-back-start" />
+          <stop offset="100%" className="gh-roof-back-end" />
+        </linearGradient>
+        <linearGradient id="greenhouse-roof-front" x1={x + rise} y1={y + height - rise} x2={x + width + rise} y2={y - rise + height / 2}>
+          <stop offset="0%" className="gh-roof-front-start" />
+          <stop offset="100%" className="gh-roof-front-end" />
+        </linearGradient>
+        <filter id="greenhouse-shadow" x="-20%" y="-20%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="10" />
+        </filter>
+      </defs>
+
+      {showShell && (
+        <>
+          {introStage === "sealed" && (
+            <g>
+              <polygon
+              points={poly(
+                [baseTL[0] + shadowOffsetX, baseTL[1] + shadowOffsetY],
+                [baseTR[0] + shadowOffsetX, baseTR[1] + shadowOffsetY],
+                [baseBR[0] + shadowOffsetX, baseBR[1] + shadowOffsetY],
+                [baseBL[0] + shadowOffsetX, baseBL[1] + shadowOffsetY],
+              )}
+              className="gh-shadow"
+              filter="url(#greenhouse-shadow)"
+            />
+            <polygon
+              points={poly(baseTL, baseTR, baseBR, baseBL)}
+              fill="url(#greenhouse-floor-fill)"
+              className="gh-line-soft"
+              strokeWidth="0.95"
+            />
+            </g>
+          )}
+
+          <motion.g
+            initial={false}
+            animate={
+              introStage === "sealed"
+                ? { x: 0, y: 0, rotate: 0 }
+                : { x: 0, y: -3600, rotate: 0 }
+            }
+            transition={{ duration: 2.0, ease: [0.42, 0, 1, 1] }}
+            style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          >
+            <polygon
+              points={poly(baseTL, baseTR, eaveTR, eaveTL)}
+              fill="url(#greenhouse-glass-front)"
+              className="gh-line-soft"
+              strokeWidth="0.9"
+            />
+          </motion.g>
+
+          <motion.g
+            initial={false}
+            animate={
+              introStage === "sealed"
+                ? { x: 0, y: 0, rotate: 0 }
+                : { x: -3600, y: 0, rotate: 0 }
+            }
+            transition={{ duration: 2.0, ease: [0.42, 0, 1, 1], delay: 0.02 }}
+            style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          >
+            <polygon
+              points={poly(baseTL, baseBL, eaveBL, eaveTL)}
+              fill="url(#greenhouse-glass-side)"
+              className="gh-line-soft"
+              strokeWidth="0.9"
+            />
+            <line
+              x1={baseBL[0]}
+              y1={baseBL[1]}
+              x2={eaveBL[0]}
+              y2={eaveBL[1]}
+              className="gh-line-strong"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </motion.g>
+
+          <motion.g
+            initial={false}
+            animate={
+              introStage === "sealed"
+                ? { x: 0, y: 0, rotate: 0 }
+                : { x: rise * 32, y: -rise * 32, rotate: 0 }
+            }
+            transition={{ duration: 2.3, ease: [0.42, 0, 1, 1], delay: 0.04 }}
+            style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          >
+            <polygon
+              points={poly(eaveTL, eaveTR, ridgeR, ridgeL)}
+              fill="url(#greenhouse-roof-back)"
+              className="gh-line-soft"
+              strokeWidth="0.85"
+            />
+            <polygon
+              points={poly(eaveBL, eaveBR, ridgeR, ridgeL)}
+              fill="url(#greenhouse-roof-front)"
+              className="gh-line-mid"
+              strokeWidth="0.9"
+            />
+            <polygon
+              points={poly(eaveTL, eaveBL, ridgeL)}
+              className="gh-side-fill gh-line-soft"
+              strokeWidth="0.85"
+            />
+            <polygon
+              points={poly(eaveTR, eaveBR, ridgeR)}
+              className="gh-side-fill gh-line-soft"
+              strokeWidth="0.8"
+            />
+            <line
+              x1={ridgeL[0]}
+              y1={ridgeL[1]}
+              x2={ridgeR[0]}
+              y2={ridgeR[1]}
+              className="gh-line-mid"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+            <line
+              x1={eaveBL[0]}
+              y1={eaveBL[1]}
+              x2={eaveBR[0]}
+              y2={eaveBR[1]}
+              className="gh-line-mid"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+            <line
+              x1={eaveBL[0]}
+              y1={eaveBL[1]}
+              x2={ridgeL[0]}
+              y2={ridgeL[1]}
+              className="gh-line-soft"
+              strokeWidth="1.05"
+              strokeLinecap="round"
+            />
+            <line
+              x1={eaveBR[0]}
+              y1={eaveBR[1]}
+              x2={ridgeR[0]}
+              y2={ridgeR[1]}
+              className="gh-line-soft"
+              strokeWidth="1.05"
+              strokeLinecap="round"
+            />
+            {rafterFractions.map((fraction) => {
+              const postBaseX = x + width * fraction;
+              const frontPostTopX = postBaseX + rise;
+              const roofJointX = postBaseX + rise + roofPeak;
+              const postTopY = y + height - rise;
+              const backPostBaseY = y;
+              const backPostTopY = y - rise;
+              const roofJointY = y - rise + height / 2 - roofPeak;
+
+              return (
+                <g key={fraction}>
+                  <line
+                    x1={postBaseX}
+                    y1={backPostBaseY}
+                    x2={frontPostTopX}
+                    y2={backPostTopY}
+                    className="gh-line-soft"
+                    strokeWidth="0.8"
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={frontPostTopX}
+                    y1={backPostTopY}
+                    x2={roofJointX}
+                    y2={roofJointY}
+                    className="gh-line-soft"
+                    strokeWidth="0.75"
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={frontPostTopX}
+                    y1={postTopY}
+                    x2={roofJointX}
+                    y2={roofJointY}
+                    className="gh-line-soft"
+                    strokeWidth="0.78"
+                    strokeLinecap="round"
+                  />
+                </g>
+              );
+            })}
+          </motion.g>
+
+          <motion.g
+            initial={false}
+            animate={
+              introStage === "sealed"
+                ? { x: 0, y: 0, rotate: 0 }
+                : { x: 3600, y: 0, rotate: 0 }
+            }
+            transition={{ duration: 2.1, ease: [0.42, 0, 1, 1], delay: 0.01 }}
+            style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          >
+            <polygon
+              points={poly(baseTR, baseBR, eaveBR, eaveTR)}
+              fill="url(#greenhouse-glass-side)"
+              className="gh-line-soft"
+              strokeWidth="0.85"
+            />
+            <line
+              x1={baseBR[0]}
+              y1={baseBR[1]}
+              x2={eaveBR[0]}
+              y2={eaveBR[1]}
+              className="gh-line-mid"
+              strokeWidth="1.25"
+              strokeLinecap="round"
+            />
+          </motion.g>
+
+          <motion.g
+            initial={false}
+            animate={
+              introStage === "sealed"
+                ? { x: 0, y: 0, rotate: 0 }
+                : { x: 0, y: 3600, rotate: 0 }
+            }
+            transition={{ duration: 2.1, ease: [0.42, 0, 1, 1], delay: 0.03 }}
+            style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          >
+            <polygon
+              points={poly(baseBL, baseBR, eaveBR, eaveBL)}
+              fill="url(#greenhouse-glass-front)"
+              className="gh-line-mid"
+              strokeWidth="1"
+            />
+            {rafterFractions.map((fraction) => {
+              const postBaseX = x + width * fraction;
+              const frontPostTopX = postBaseX + rise;
+              const frontPostBaseY = y + height;
+              const postTopY = y + height - rise;
+
+              return (
+                <line
+                  key={`front-${fraction}`}
+                  x1={postBaseX}
+                  y1={frontPostBaseY}
+                  x2={frontPostTopX}
+                  y2={postTopY}
+                  className="gh-line-mid"
+                  strokeWidth="0.9"
+                  strokeLinecap="round"
+                />
+              );
+            })}
+            <line
+              x1={baseBL[0]}
+              y1={baseBL[1]}
+              x2={baseBR[0]}
+              y2={baseBR[1]}
+              className="gh-line-strong"
+              strokeWidth="1.45"
+              strokeLinecap="round"
+            />
+          </motion.g>
+        </>
+      )}
+    </svg>
   );
 }
 
@@ -495,11 +868,15 @@ const GridTile = memo(function GridTile({
     <button
       type="button"
       onClick={planted && cropInfo ? () => onSelect(data) : undefined}
-      className={`relative h-full w-full rounded border transition-colors duration-150 ${
+      className={`crop-tile-button group/crop-tile relative h-full w-full rounded border transition-[background-color,border-color,transform,box-shadow] duration-200 ${
         focused && planted
           ? "grid-tile-focused border-yellow-500/40 bg-yellow-500/8 dark:border-yellow-400/35 dark:bg-yellow-400/6"
-          : "border-green-800/5.5 bg-green-800/4.5 hover:bg-green-800/8 dark:border-green-400/6 dark:bg-green-400/4.5 dark:hover:bg-green-400/10"
-      } ${planted && cropInfo ? "cursor-pointer" : "cursor-default"}`}
+          : "border-green-800/5.5 bg-green-800/4.5 hover:border-emerald-700/10 hover:bg-emerald-700/8 dark:border-green-400/6 dark:bg-green-400/4.5 dark:hover:border-green-400/10 dark:hover:bg-green-400/10"
+      } ${
+        planted && cropInfo
+          ? "cursor-pointer hover:z-30 hover:shadow-[0_12px_28px_rgba(122,168,141,0.08)] focus-visible:z-30"
+          : "cursor-default"
+      }`}
     >
       {data.status && planted && (
         <div
