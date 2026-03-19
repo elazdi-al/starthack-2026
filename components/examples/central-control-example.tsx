@@ -108,8 +108,6 @@ export function CentralControlExample() {
       aerationRate:          [c.aerationRate, 0, 100, 1],
     });
 
-    setFocusedCrop(selectedCropRef.current);
-
     return () => {
       DialStore.unregisterPanel(PANEL.ext);
       DialStore.unregisterPanel(PANEL.gh);
