@@ -133,7 +133,7 @@ function DecisionCard({ decision, defaultOpen }: { decision: AgentDecision; defa
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 mb-0.5">
             <span className="type-caption text-[var(--dial-text-tertiary)] tabular-nums shrink-0">
-              Sol {decision.sol}
+              Sol {decision.sol} {decision.time}
             </span>
             <ActionBadge count={decision.actionCount} />
           </div>

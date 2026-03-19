@@ -45,6 +45,7 @@ export interface AgentDecision {
   id: string;
   sol: number;
   elapsedMinutes: number;
+  time: string;
   summary: string;
   reasoning: string;
   actions: AgentAction[];
@@ -476,6 +477,9 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   },
 
   tick: () => {
+    // Freeze time while the agent is thinking so a speed change mid-tick
+    // doesn't cause the simulation to jump when actions are applied.
+    if (get().tickInFlight) return;
     const { elapsedMinutes, speed, simState, grid, events, missionSol: prevSol } = get();
     const mult = SPEED_MULTIPLIER[speed];
     const nextMinutes = elapsedMinutes + mult * TICK_INTERVAL_MS / 60000;
@@ -551,21 +555,26 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     const { simState, elapsedMinutes } = get();
     let currentState: ConcreteState = simState;
 
+    // Pass elapsedMinutes only to the first transform so it advances
+    // time once. Subsequent changes use 0 to avoid double-advancing.
+    let timeConsumed = false;
     for (const change of changes) {
+      const t = timeConsumed ? 0 : elapsedMinutes;
       if (change.type === "greenhouse") {
         currentState = updateGreenhouseParam(
           change.param as keyof ConcreteGreenhouseState,
           change.value as ConcreteGreenhouseState[keyof ConcreteGreenhouseState],
-          elapsedMinutes,
+          t,
         )(currentState) as ConcreteState;
       } else if (change.type === "crop" && change.crop) {
         currentState = updateCropParam(
           change.crop as CropType,
           change.param as keyof CropControls,
           change.value,
-          elapsedMinutes,
+          t,
         )(currentState) as ConcreteState;
       }
+      timeConsumed = true;
     }
 
     const env = currentState.simulation.getEnvironment(0);
@@ -686,10 +695,14 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
 
       // Record decision and push to event log
       const currentEnv = get().environment;
+      const simTime = get().simulationTime;
+      const hh = String(simTime.getHours()).padStart(2, "0");
+      const mm = String(simTime.getMinutes()).padStart(2, "0");
       const decision: AgentDecision = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         sol: currentEnv.missionSol,
         elapsedMinutes,
+        time: `${hh}:${mm}`,
         summary: data.summary ?? 'Autonomous tick completed',
         reasoning: data.reasoning ?? '',
         actions: data.actions as AgentAction[],
@@ -730,7 +743,7 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     } catch (err) {
       console.error('[autonomousTick] error:', err);
     } finally {
-      set({ tickInFlight: false });
+      set({ tickInFlight: false, lastTickSimMinutes: get().elapsedMinutes });
     }
   },
 }));
