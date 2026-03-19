@@ -1,16 +1,10 @@
 import { create } from "zustand";
+import type { CropType } from "../greenhouse/implementations/multi-crop/types";
+
+export type { CropType };
 
 export type TileKind = "crop" | "path";
 export type Status = "ok" | "warn" | null;
-export type CropType =
-  | "lettuce"
-  | "tomato"
-  | "potato"
-  | "soybean"
-  | "spinach"
-  | "wheat"
-  | "radish"
-  | "kale";
 
 export type SpeedKey = "x1" | "x2" | "x5" | "x10";
 

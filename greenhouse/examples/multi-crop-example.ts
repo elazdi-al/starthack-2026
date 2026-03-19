@@ -1,5 +1,6 @@
 import { createInitialState } from '../implementations/multi-crop/initial';
 import { applyTransformations } from '../implementations/multi-crop/transformation';
+import { ALL_CROP_TYPES } from '../implementations/multi-crop/types';
 
 function runExample() {
   const state = createInitialState();
@@ -9,51 +10,41 @@ function runExample() {
   console.log('Air Temperature:', env0.airTemperature.toFixed(1), '°C');
   console.log('Humidity:', env0.humidity.toFixed(1), '%');
   console.log('CO2:', env0.co2Level.toFixed(0), 'ppm');
-  console.log('\nTomatoes:');
-  console.log('  Soil Moisture:', env0.tomatoes.soilMoisture.toFixed(1), '%');
-  console.log('  Soil Temp:', env0.tomatoes.soilTemperature.toFixed(1), '°C');
-  console.log('  Growth:', env0.tomatoes.plantGrowth.toFixed(1), '%');
-  console.log('\nCarrots:');
-  console.log('  Soil Moisture:', env0.carrots.soilMoisture.toFixed(1), '%');
-  console.log('  Soil Temp:', env0.carrots.soilTemperature.toFixed(1), '°C');
-  console.log('  Growth:', env0.carrots.plantGrowth.toFixed(1), '%');
+  for (const ct of ALL_CROP_TYPES) {
+    const crop = env0.crops[ct];
+    console.log(`\n${ct}:`);
+    console.log('  Soil Moisture:', crop.soilMoisture.toFixed(1), '%');
+    console.log('  Soil Temp:', crop.soilTemperature.toFixed(1), '°C');
+    console.log('  Growth:', crop.plantGrowth.toFixed(1), '%');
+  }
 
   // Simulate 60 minutes
   console.log('\n=== After 60 minutes ===');
   const env60 = state.simulation.getEnvironment(60);
   console.log('Air Temperature:', env60.airTemperature.toFixed(1), '°C');
-  console.log('Humidity:', env60.humidity.toFixed(1), '%');
-  console.log('CO2:', env60.co2Level.toFixed(0), 'ppm');
-  console.log('\nTomatoes:');
-  console.log('  Soil Moisture:', env60.tomatoes.soilMoisture.toFixed(1), '%');
-  console.log('  Soil Temp:', env60.tomatoes.soilTemperature.toFixed(1), '°C');
-  console.log('  Growth:', env60.tomatoes.plantGrowth.toFixed(1), '%');
-  console.log('  Leaf Area:', env60.tomatoes.leafArea.toFixed(2), 'm²');
-  console.log('\nCarrots:');
-  console.log('  Soil Moisture:', env60.carrots.soilMoisture.toFixed(1), '%');
-  console.log('  Soil Temp:', env60.carrots.soilTemperature.toFixed(1), '°C');
-  console.log('  Growth:', env60.carrots.plantGrowth.toFixed(1), '%');
-  console.log('  Leaf Area:', env60.carrots.leafArea.toFixed(2), 'm²');
+  for (const ct of ALL_CROP_TYPES) {
+    const crop = env60.crops[ct];
+    console.log(`\n${ct}:`);
+    console.log('  Soil Moisture:', crop.soilMoisture.toFixed(1), '%');
+    console.log('  Growth:', crop.plantGrowth.toFixed(1), '%');
+    console.log('  Leaf Area:', crop.leafArea.toFixed(2), 'm²');
+  }
 
   // Adjust controls using immutable transformations (snapshot at t=60)
   console.log('\n=== Adjusting controls ===');
   const updatedState = applyTransformations(state, 60, [
-    { type: 'crop', param: 'waterPumpRate', value: 15, crop: 'tomatoes' },
-    { type: 'crop', param: 'waterPumpRate', value: 12, crop: 'carrots' },
+    { type: 'crop', param: 'waterPumpRate', value: 15, crop: 'tomato' },
+    { type: 'crop', param: 'waterPumpRate', value: 12, crop: 'potato' },
     { type: 'greenhouse', param: 'globalHeatingPower', value: 5000 },
   ]);
-  console.log('Increased water and heating');
+  console.log('Increased tomato/potato water and global heating');
 
   // Simulate another 60 minutes from the updated snapshot
   console.log('\n=== After 120 minutes total ===');
   const env120 = updatedState.simulation.getEnvironment(60);
   console.log('Air Temperature:', env120.airTemperature.toFixed(1), '°C');
-  console.log('\nTomatoes:');
-  console.log('  Soil Moisture:', env120.tomatoes.soilMoisture.toFixed(1), '%');
-  console.log('  Growth:', env120.tomatoes.plantGrowth.toFixed(1), '%');
-  console.log('\nCarrots:');
-  console.log('  Soil Moisture:', env120.carrots.soilMoisture.toFixed(1), '%');
-  console.log('  Growth:', env120.carrots.plantGrowth.toFixed(1), '%');
+  console.log('\ntomato: Soil Moisture:', env120.crops.tomato.soilMoisture.toFixed(1), '%');
+  console.log('potato: Soil Moisture:', env120.crops.potato.soilMoisture.toFixed(1), '%');
 }
 
 if (require.main === module) {

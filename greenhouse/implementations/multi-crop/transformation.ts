@@ -1,10 +1,15 @@
 import type { StateTransformation } from '../../state/types';
-import type { ConcreteState, ConcreteGreenhouseState, CropControls } from './types';
-import { createSimulation } from './simulation';
+import type { ConcreteState, ConcreteGreenhouseState, CropControls, CropType } from './types';
+import { ALL_CROP_TYPES } from './types';
+import { CROP_PROFILES, createSimulation } from './simulation';
 
-// Deep-clone greenhouse state (spreads crop controls to avoid shared refs)
+// Deep-clone greenhouse state (spreads each crop's controls)
 function cloneGreenhouse(gh: ConcreteGreenhouseState): ConcreteGreenhouseState {
-  return { ...gh, tomatoes: { ...gh.tomatoes }, carrots: { ...gh.carrots } };
+  const crops = {} as Record<CropType, CropControls>;
+  for (const ct of ALL_CROP_TYPES) {
+    crops[ct] = { ...gh.crops[ct] };
+  }
+  return { ...gh, crops };
 }
 
 // Update a global greenhouse parameter
@@ -27,7 +32,7 @@ export const updateGreenhouseParam = <K extends keyof ConcreteGreenhouseState>(
 
 // Update a crop-specific parameter
 export const updateCropParam = <K extends keyof CropControls>(
-  crop: 'tomatoes' | 'carrots',
+  crop: CropType,
   paramName: K,
   value: CropControls[K],
   time: number,
@@ -35,44 +40,43 @@ export const updateCropParam = <K extends keyof CropControls>(
   return (currentState) => {
     const state = currentState as ConcreteState;
     const env = state.simulation.getEnvironment(time);
-    const newGreenhouse: ConcreteGreenhouseState = {
-      ...cloneGreenhouse(state.greenhouse),
-      [crop]: { ...state.greenhouse[crop], [paramName]: value },
-    };
+    const newGreenhouse = cloneGreenhouse(state.greenhouse);
+    newGreenhouse.crops[crop] = { ...newGreenhouse.crops[crop], [paramName]: value };
     const simulation = createSimulation(env, newGreenhouse);
     return { simulation, greenhouse: newGreenhouse };
   };
 };
 
-// Simple rule-based transformation
+// Simple rule-based transformation (adjusts all crops based on their profiles)
 export const simpleTransformation = (time: number): StateTransformation => {
   return (currentState) => {
     const state = currentState as ConcreteState;
     const env = state.simulation.getEnvironment(time);
     let newState = currentState;
 
+    // Global heating
     if (env.airTemperature < 18) {
       newState = updateGreenhouseParam('globalHeatingPower', 5000, time)(newState);
     } else if (env.airTemperature > 25) {
       newState = updateGreenhouseParam('globalHeatingPower', 1000, time)(newState);
     }
 
+    // CO2
     if (env.co2Level < 800) {
       newState = updateGreenhouseParam('co2InjectionRate', 100, time)(newState);
     } else if (env.co2Level > 1200) {
       newState = updateGreenhouseParam('co2InjectionRate', 20, time)(newState);
     }
 
-    if (env.tomatoes.soilMoisture < 60) {
-      newState = updateCropParam('tomatoes', 'waterPumpRate', 15, time)(newState);
-    } else if (env.tomatoes.soilMoisture > 80) {
-      newState = updateCropParam('tomatoes', 'waterPumpRate', 5, time)(newState);
-    }
-
-    if (env.carrots.soilMoisture < 55) {
-      newState = updateCropParam('carrots', 'waterPumpRate', 12, time)(newState);
-    } else if (env.carrots.soilMoisture > 75) {
-      newState = updateCropParam('carrots', 'waterPumpRate', 4, time)(newState);
+    // Per-crop watering based on each crop's optimal moisture
+    for (const ct of ALL_CROP_TYPES) {
+      const profile = CROP_PROFILES[ct];
+      const moisture = env.crops[ct].soilMoisture;
+      if (moisture < profile.optimalMoisture - 10) {
+        newState = updateCropParam(ct, 'waterPumpRate', 15, time)(newState);
+      } else if (moisture > profile.optimalMoisture + 10) {
+        newState = updateCropParam(ct, 'waterPumpRate', 4, time)(newState);
+      }
     }
 
     return newState;
@@ -87,7 +91,7 @@ export function applyTransformations(
     type: 'greenhouse' | 'crop';
     param: string;
     value: number;
-    crop?: 'tomatoes' | 'carrots';
+    crop?: CropType;
   }>,
 ): ConcreteState {
   let state = initialState;

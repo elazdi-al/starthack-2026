@@ -13,7 +13,9 @@ export const transformationTool = createTool({
       type: z.enum(['greenhouse', 'crop']).describe('Type of transformation: greenhouse for global parameters, crop for crop-specific parameters'),
       param: z.string().describe('Parameter name to update (e.g., globalHeatingPower, co2InjectionRate, waterPumpRate)'),
       value: z.number().describe('New numeric value for the parameter'),
-      crop: z.enum(['tomatoes', 'carrots']).optional().describe('Crop name (required only for crop type transformations)'),
+      crop: z.enum([
+        'lettuce', 'tomato', 'potato', 'soybean', 'spinach', 'wheat', 'radish', 'kale',
+      ]).optional().describe('Crop name (required only for crop type transformations)'),
     })).describe('Array of transformations to apply in sequence'),
   }),
   execute: async (inputData) => {

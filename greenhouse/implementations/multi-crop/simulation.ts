@@ -1,5 +1,18 @@
 import type { SimulationState } from '../../state/types';
-import type { ConcreteEnvironment, ConcreteGreenhouseState, CropEnvironment, CropControls } from './types';
+import type { ConcreteEnvironment, ConcreteGreenhouseState, CropEnvironment, CropControls, CropType } from './types';
+import { ALL_CROP_TYPES } from './types';
+
+// Optimal growing parameters per crop (used by the growth-rate model)
+export const CROP_PROFILES: Record<CropType, { optimalTemp: number; optimalMoisture: number }> = {
+  lettuce:  { optimalTemp: 21, optimalMoisture: 70 },
+  tomato:   { optimalTemp: 24, optimalMoisture: 70 },
+  potato:   { optimalTemp: 18, optimalMoisture: 65 },
+  soybean:  { optimalTemp: 25, optimalMoisture: 65 },
+  spinach:  { optimalTemp: 18, optimalMoisture: 65 },
+  wheat:    { optimalTemp: 21, optimalMoisture: 60 },
+  radish:   { optimalTemp: 19, optimalMoisture: 60 },
+  kale:     { optimalTemp: 19, optimalMoisture: 65 },
+};
 
 /**
  * Pure simulation function. Computes greenhouse environment at a given time
@@ -29,9 +42,13 @@ export function simulate(
   airTemp -= (airTemp - externalTemp) * 0.05 * deltaHours;
   airTemp -= greenhouse.ventilationRate * 0.01 * deltaHours;
 
+  // Average soil moisture across all crops
+  const avgSoilMoisture = ALL_CROP_TYPES.reduce(
+    (sum, ct) => sum + initialEnv.crops[ct].soilMoisture, 0,
+  ) / ALL_CROP_TYPES.length;
+
   // Humidity
   let humidity = initialEnv.humidity;
-  const avgSoilMoisture = (initialEnv.tomatoes.soilMoisture + initialEnv.carrots.soilMoisture) / 2;
   humidity += (avgSoilMoisture - humidity) * 0.1 * deltaHours;
   humidity -= greenhouse.ventilationRate * 0.05 * deltaHours;
   humidity = Math.max(0, Math.min(100, humidity));
@@ -46,17 +63,16 @@ export function simulate(
   // Light level
   const lightLevel = greenhouse.lightingPower * 2 + solarRadiation * 5;
 
-  const tomatoes = simulateCrop(
-    initialEnv.tomatoes, greenhouse.tomatoes,
-    airTemp, humidity, co2Level, lightLevel, deltaHours,
-    { optimalTemp: 22, optimalMoisture: 70 },
-  );
-
-  const carrots = simulateCrop(
-    initialEnv.carrots, greenhouse.carrots,
-    airTemp, humidity, co2Level, lightLevel, deltaHours,
-    { optimalTemp: 18, optimalMoisture: 65 },
-  );
+  // Simulate each crop
+  const crops = {} as Record<CropType, CropEnvironment>;
+  for (const ct of ALL_CROP_TYPES) {
+    crops[ct] = simulateCrop(
+      initialEnv.crops[ct],
+      greenhouse.crops[ct],
+      airTemp, humidity, co2Level, lightLevel, deltaHours,
+      CROP_PROFILES[ct],
+    );
+  }
 
   return {
     timestamp: simulationMs,
@@ -66,8 +82,7 @@ export function simulate(
     lightLevel,
     externalTemp,
     solarRadiation,
-    tomatoes,
-    carrots,
+    crops,
   };
 }
 

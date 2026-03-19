@@ -1,6 +1,12 @@
 import type { Environment, GreenhouseState, SimulationState, State } from '../../state/types';
 
-// Crop-specific environment readings
+export type CropType = "lettuce" | "tomato" | "potato" | "soybean" | "spinach" | "wheat" | "radish" | "kale";
+
+export const ALL_CROP_TYPES: CropType[] = [
+  "lettuce", "tomato", "potato", "soybean", "spinach", "wheat", "radish", "kale",
+];
+
+// Crop-specific environment readings (sensor data)
 export interface CropEnvironment {
   soilMoisture: number; // percentage
   soilTemperature: number; // Celsius
@@ -15,7 +21,7 @@ export interface CropControls {
   localHeatingPower: number; // Watts
 }
 
-// Environment with per-crop data
+// Environment with per-crop sensor data
 export interface ConcreteEnvironment extends Environment {
   timestamp: number;
   airTemperature: number; // Celsius
@@ -24,8 +30,7 @@ export interface ConcreteEnvironment extends Environment {
   lightLevel: number; // lux
   externalTemp: number; // Mars outside temp
   solarRadiation: number; // W/m²
-  tomatoes: CropEnvironment;
-  carrots: CropEnvironment;
+  crops: Record<CropType, CropEnvironment>;
 }
 
 // Greenhouse controls with per-crop settings
@@ -34,12 +39,10 @@ export interface ConcreteGreenhouseState extends GreenhouseState {
   globalHeatingPower: number; // Watts
   co2InjectionRate: number; // ppm/hour
   ventilationRate: number; // m³/hour
-  tomatoes: CropControls;
-  carrots: CropControls;
+  crops: Record<CropType, CropControls>;
 }
 
-// Complete state — simulation is typed to return ConcreteEnvironment,
-// so callers get full type information without casting.
+// Complete state
 export interface ConcreteState extends State {
   simulation: SimulationState<ConcreteEnvironment>;
   greenhouse: ConcreteGreenhouseState;

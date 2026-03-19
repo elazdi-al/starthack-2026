@@ -13,15 +13,15 @@ async function testGreenhouseAgent() {
   console.log('Initial State:');
   console.log('- Air Temperature:', initialEnv.airTemperature);
   console.log('- Global Heating:', initialState.greenhouse.globalHeatingPower);
-  console.log('- Tomato Water Pump:', initialState.greenhouse.tomatoes.waterPumpRate);
-  console.log('- Carrot Water Pump:', initialState.greenhouse.carrots.waterPumpRate);
+  console.log('- Tomato Water Pump:', initialState.greenhouse.crops.tomato.waterPumpRate);
+  console.log('- Lettuce Water Pump:', initialState.greenhouse.crops.lettuce.waterPumpRate);
   console.log();
 
   const transformations = [
     { type: 'greenhouse' as const, param: 'globalHeatingPower', value: 4000 },
     { type: 'greenhouse' as const, param: 'co2InjectionRate', value: 80 },
-    { type: 'crop' as const, param: 'waterPumpRate', value: 15, crop: 'tomatoes' as const },
-    { type: 'crop' as const, param: 'waterPumpRate', value: 12, crop: 'carrots' as const },
+    { type: 'crop' as const, param: 'waterPumpRate', value: 15, crop: 'tomato' as const },
+    { type: 'crop' as const, param: 'waterPumpRate', value: 10, crop: 'lettuce' as const },
   ];
 
   console.log('Applying transformations:');
@@ -40,8 +40,8 @@ async function testGreenhouseAgent() {
   console.log('Final State:');
   console.log('- Air Temperature:', finalEnv.airTemperature);
   console.log('- Global Heating:', finalState.greenhouse.globalHeatingPower);
-  console.log('- Tomato Water Pump:', finalState.greenhouse.tomatoes.waterPumpRate);
-  console.log('- Carrot Water Pump:', finalState.greenhouse.carrots.waterPumpRate);
+  console.log('- Tomato Water Pump:', finalState.greenhouse.crops.tomato.waterPumpRate);
+  console.log('- Lettuce Water Pump:', finalState.greenhouse.crops.lettuce.waterPumpRate);
   console.log();
 
   console.log('Testing agent text generation...');

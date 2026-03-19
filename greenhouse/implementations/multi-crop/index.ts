@@ -1,7 +1,8 @@
-// Multi-crop greenhouse implementation (tomatoes and carrots)
-export type { CropEnvironment, CropControls, ConcreteEnvironment, ConcreteGreenhouseState, ConcreteState } from './types';
+// Multi-crop greenhouse implementation
+export type { CropType, CropEnvironment, CropControls, ConcreteEnvironment, ConcreteGreenhouseState, ConcreteState } from './types';
+export { ALL_CROP_TYPES } from './types';
 
-export { simulate, createSimulation } from './simulation';
+export { simulate, createSimulation, CROP_PROFILES } from './simulation';
 
 export {
   createInitialEnvironment,
