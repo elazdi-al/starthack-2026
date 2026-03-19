@@ -15,10 +15,11 @@ import { PresetManager } from './PresetManager';
 interface PanelProps {
   panel: PanelConfig;
   defaultOpen?: boolean;
+  open?: boolean;
   inline?: boolean;
 }
 
-export function Panel({ panel, defaultOpen = true, inline = false }: PanelProps) {
+export function Panel({ panel, defaultOpen = true, open, inline = false }: PanelProps) {
   const [copied, setCopied] = useState(false);
 
   // Subscribe to panel value changes
@@ -245,7 +246,7 @@ Apply these values as the new defaults in the useDialKit call.`;
 
   return (
     <div className="dialkit-panel-wrapper">
-      <Folder title={panel.name} defaultOpen={defaultOpen} isRoot={true} inline={inline} toolbar={toolbar}>
+      <Folder title={panel.name} defaultOpen={defaultOpen} open={open} isRoot={true} inline={inline} toolbar={toolbar}>
         {renderControls()}
       </Folder>
     </div>

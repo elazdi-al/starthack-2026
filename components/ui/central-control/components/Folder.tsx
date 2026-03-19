@@ -7,19 +7,23 @@ interface FolderProps {
   title: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  open?: boolean;
   isRoot?: boolean;
   inline?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
   toolbar?: ReactNode;
 }
 
-export function Folder({ title, children, defaultOpen = true, isRoot = false, inline = false, onOpenChange, toolbar }: FolderProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+export function Folder({ title, children, defaultOpen = true, open, isRoot = false, inline = false, onOpenChange, toolbar }: FolderProps) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isOpen = open !== undefined ? open : internalOpen;
 
   const handleToggle = () => {
     if (inline && isRoot) return;
     const next = !isOpen;
-    setIsOpen(next);
+    if (open === undefined) {
+      setInternalOpen(next);
+    }
     triggerHaptic(next ? 'selection' : 'soft');
     onOpenChange?.(next);
   };

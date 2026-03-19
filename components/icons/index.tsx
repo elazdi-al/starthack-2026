@@ -12,6 +12,7 @@ import {
   CopyIcon,
   DotsThreeOutlineIcon,
   EyeIcon,
+  FadersIcon,
   EyeSlashIcon,
   GearSixIcon,
   type IconWeight,
@@ -211,6 +212,11 @@ export const SettingsGearIcon = createIcon(GearSixIcon, {
 });
 
 export const SidebarPanelIcon = createIcon(SidebarSimpleIcon, {
+  size: 22,
+  weight: "fill",
+});
+
+export const ControlPanelIcon = createIcon(FadersIcon, {
   size: 22,
   weight: "fill",
 });

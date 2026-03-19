@@ -9,10 +9,11 @@ export type DialMode = 'popover' | 'inline';
 interface DialRootProps {
   position?: DialPosition;
   defaultOpen?: boolean;
+  open?: boolean;
   mode?: DialMode;
 }
 
-export function DialRoot({ position = 'top-right', defaultOpen = true, mode = 'popover' }: DialRootProps) {
+export function DialRoot({ position = 'top-right', defaultOpen = true, open, mode = 'popover' }: DialRootProps) {
   const [panels, setPanels] = useState<PanelConfig[]>([]);
   const [mounted, setMounted] = useState(false);
   const inline = mode === 'inline';
@@ -43,7 +44,7 @@ export function DialRoot({ position = 'top-right', defaultOpen = true, mode = 'p
     <div className="dialkit-root" data-mode={mode}>
       <div className="dialkit-panel" data-position={inline ? undefined : position} data-mode={mode}>
         {panels.map((panel) => (
-          <Panel key={panel.id} panel={panel} defaultOpen={inline || defaultOpen} inline={inline} />
+          <Panel key={panel.id} panel={panel} defaultOpen={inline || defaultOpen} open={inline ? undefined : open} inline={inline} />
         ))}
       </div>
     </div>

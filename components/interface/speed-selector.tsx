@@ -17,6 +17,9 @@ interface SpeedSelectorProps {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  portalContainer?: HTMLElement | null;
   className?: string;
 }
 
@@ -24,11 +27,19 @@ export function SpeedSelector({
   value,
   defaultValue = "x1",
   onValueChange,
+  open: controlledOpen,
+  onOpenChange,
+  portalContainer,
   className,
 }: SpeedSelectorProps) {
-  const [open, setOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [internalValue, setInternalValue] = React.useState(defaultValue);
-  const triggerRef = React.useRef<HTMLElement | null>(null);
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
 
   const currentValue = value ?? internalValue;
 
@@ -58,7 +69,8 @@ export function SpeedSelector({
         <DropdownMenuContent
           align="end"
           sideOffset={8}
-          className="w-36 border-[rgba(24,24,27,0.08)] bg-[#f5f5f4] text-[#18181b]"
+          className="w-36"
+          container={portalContainer}
         >
           <DropdownMenuRadioGroup
             value={currentValue}

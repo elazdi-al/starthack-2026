@@ -92,10 +92,19 @@
   height: 100%;
 }
 
+/* Hide built-in toggle when panel is externally controlled */
+.dialkit-panel[data-position] > .dialkit-panel-wrapper > .dialkit-panel-toggle {
+  display: none;
+}
+
+[data-embedded] .dialkit-panel-toggle {
+  display: none;
+}
+
 /* Position variants */
 .dialkit-panel[data-position="top-right"] {
-  top: 16px;
-  right: 16px;
+  top: 72px;
+  right: 24px;
 }
 
 .dialkit-panel[data-position="top-left"] {
@@ -1056,4 +1065,30 @@
   width: 14px;
   height: 14px;
   color: var(--dial-text-label);
+}
+
+/* Morph container overrides — strip inner panel decoration */
+.cc-morph-content .dialkit-panel-inline {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+  height: auto;
+}
+
+.cc-morph-content .dialkit-panel-wrapper {
+  width: 100%;
+  display: flex;
+}
+
+.cc-morph-content {
+  padding: 4px 12px 12px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.cc-morph-content::-webkit-scrollbar {
+  display: none;
 }
