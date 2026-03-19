@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Switch } from '@/components/ui/switch';
 
 interface ToggleProps {
@@ -6,7 +7,7 @@ interface ToggleProps {
   onChange: (checked: boolean) => void;
 }
 
-export function Toggle({ label, checked, onChange }: ToggleProps) {
+export const Toggle = memo(function Toggle({ label, checked, onChange }: ToggleProps) {
   return (
     <div className="dialkit-labeled-control">
       <span className="dialkit-labeled-control-label">{label}</span>
@@ -17,4 +18,4 @@ export function Toggle({ label, checked, onChange }: ToggleProps) {
       />
     </div>
   );
-}
+});

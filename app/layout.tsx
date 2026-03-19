@@ -22,6 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body>
+        {process.env.NODE_ENV === "development" && (
+          <script src="https://unpkg.com/react-scan/dist/auto.global.js" crossOrigin="anonymous" />
+        )}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {children}
       </body>

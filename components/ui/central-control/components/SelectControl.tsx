@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { triggerHaptic } from '@/lib/haptics';
@@ -22,13 +22,12 @@ function normalizeOptions(options: SelectOption[]): { value: string; label: stri
   );
 }
 
-export function SelectControl({ label, value, options, onChange }: SelectControlProps) {
+export const SelectControl = memo(function SelectControl({ label, value, options, onChange }: SelectControlProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number; width: number; above: boolean } | null>(null);
-  const normalized = normalizeOptions(options);
+  const normalized = useMemo(() => normalizeOptions(options), [options]);
   const selectedOption = normalized.find((o) => o.value === value);
 
   const updatePos = useCallback(() => {
@@ -46,12 +45,6 @@ export function SelectControl({ label, value, options, onChange }: SelectControl
       above,
     });
   }, [normalized.length]);
-
-  // Resolve portal target (closest .dialkit-root)
-  useEffect(() => {
-    const root = triggerRef.current?.closest('.dialkit-root') as HTMLElement | null;
-    setPortalTarget(root ?? document.body);
-  }, []);
 
   // Position dropdown when opening
   useEffect(() => {
@@ -104,7 +97,7 @@ export function SelectControl({ label, value, options, onChange }: SelectControl
         </div>
       </button>
 
-      {portalTarget && createPortal(
+      {createPortal(
         <AnimatePresence>
           {isOpen && pos && (
             <motion.div
@@ -126,6 +119,7 @@ export function SelectControl({ label, value, options, onChange }: SelectControl
               {normalized.map((option) => (
                 <button
                   key={option.value}
+                  type="button"
                   className="dialkit-select-option"
                   data-selected={String(option.value === value)}
                   onClick={() => {
@@ -140,8 +134,8 @@ export function SelectControl({ label, value, options, onChange }: SelectControl
             </motion.div>
           )}
         </AnimatePresence>,
-        portalTarget
+        document.body
       )}
     </div>
   );
-}
+});

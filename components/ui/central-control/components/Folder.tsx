@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useState, memo, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Faders } from '@phosphor-icons/react';
 import { triggerHaptic } from '@/lib/haptics';
@@ -14,7 +14,7 @@ interface FolderProps {
   toolbar?: ReactNode;
 }
 
-export function Folder({ title, children, defaultOpen = true, open, isRoot = false, inline = false, onOpenChange, toolbar }: FolderProps) {
+export const Folder = memo(function Folder({ title, children, defaultOpen = true, open, isRoot = false, inline = false, onOpenChange, toolbar }: FolderProps) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isOpen = open !== undefined ? open : internalOpen;
 
@@ -160,4 +160,4 @@ export function Folder({ title, children, defaultOpen = true, open, isRoot = fal
   }
 
   return folderContent;
-}
+});

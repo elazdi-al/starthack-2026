@@ -868,6 +868,26 @@
       radial-gradient(circle at top, rgb(255 255 255 / 0.92), rgb(0 0 0 / 0.03));
   }
 
+  /* ── Grid tile focused pulse ── */
+  @keyframes grid-tile-pulse {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+  }
+
+  .grid-tile-focused {
+    position: relative;
+  }
+
+  .grid-tile-focused::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    border: 1.5px solid rgba(234, 179, 8, 0.5);
+    pointer-events: none;
+    animation: grid-tile-pulse 2.4s ease-in-out infinite;
+  }
+
   .hold-to-delete-button {
     position: relative;
     display: flex;

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { X, Leaf, Drop, Lightning, Wind, Thermometer, Plant, Warning, Bug, Syringe, FirstAid } from "@phosphor-icons/react";
+import { AnimatedParameterValue } from "@/components/ui/animated-parameter-value";
 import { useGreenhouseStore, CROP_DB, TOTAL_MISSION_SOLS } from "@/lib/greenhouse-store";
 import type { GrowthStage } from "@/lib/greenhouse-store";
 import { ALL_CROP_TYPES } from "@/greenhouse/implementations/multi-crop";
@@ -159,7 +160,7 @@ export function GreenhouseProgressPanel({ onClose }: Props) {
               : coverage >= 0.4 ? "text-yellow-500 dark:text-yellow-400"
               : "text-red-500 dark:text-red-400"
             }`}>
-              {Math.round(coverage * 100)}%
+              <AnimatedParameterValue value={`${Math.round(coverage * 100)}%`} debounceMs={72} />
             </span>
           </div>
           <div className="h-2 rounded-full overflow-hidden mb-3" style={{ background: "var(--dial-surface)" }}>
@@ -214,7 +215,9 @@ export function GreenhouseProgressPanel({ onClose }: Props) {
           <div className="mt-2">
             <div className="flex items-center justify-between mb-1">
               <span className="type-caption text-[var(--dial-text-tertiary)]">Mission progress</span>
-              <span className="type-caption text-[var(--dial-text-secondary)]">Sol {missionSol} / {TOTAL_MISSION_SOLS}</span>
+              <span className="type-caption text-[var(--dial-text-secondary)]">
+                <AnimatedParameterValue value={`Sol ${missionSol} / ${TOTAL_MISSION_SOLS}`} debounceMs={72} />
+              </span>
             </div>
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--dial-surface)" }}>
               <div
@@ -267,11 +270,11 @@ export function GreenhouseProgressPanel({ onClose }: Props) {
                       <div className={`h-full rounded-full transition-all ${healthColor}`} style={{ width: `${Math.max(0, health * 100)}%` }} />
                     </div>
                     <span className="type-caption text-[var(--dial-text-tertiary)] tabular-nums w-8 text-right">
-                      {Math.round(health * 100)}%
+                      <AnimatedParameterValue value={`${Math.round(health * 100)}%`} debounceMs={72} />
                     </span>
                     {crop.estimatedYieldKg > 0 && (
                       <span className="type-caption text-[var(--dial-text-tertiary)] tabular-nums w-12 text-right">
-                        {crop.estimatedYieldKg.toFixed(1)} kg
+                        <AnimatedParameterValue value={`${crop.estimatedYieldKg.toFixed(1)} kg`} debounceMs={72} />
                       </span>
                     )}
                   </div>
@@ -327,7 +330,9 @@ function AlertBanner({ icon, message, color, bg }: { icon: React.ReactNode; mess
   return (
     <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border ${bg}`}>
       <span className={color}>{icon}</span>
-      <span className={`type-caption font-medium ${color}`}>{message}</span>
+      <span className={`type-caption font-medium ${color}`}>
+        <AnimatedParameterValue value={message} debounceMs={72} />
+      </span>
     </div>
   );
 }
@@ -345,7 +350,9 @@ function AtmoStat({
         <span className="type-caption">{label}</span>
         {warn && <Warning size={9} className="text-red-500 ml-auto" weight="fill" />}
       </div>
-      <p className="type-label text-[var(--dial-text-primary)] font-medium tabular-nums mb-1.5">{value}</p>
+      <p className="type-label text-[var(--dial-text-primary)] font-medium tabular-nums mb-1.5">
+        <AnimatedParameterValue value={value} debounceMs={72} />
+      </p>
       <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--dial-border)" }}>
         <div className={`h-full rounded-full transition-all ${fillColor}`} style={{ width: `${Math.min(1, fill) * 100}%` }} />
       </div>
@@ -358,7 +365,9 @@ function NutritionBar({ label, value, unit, coverage }: { label: string; value: 
   return (
     <div className="rounded-lg px-2 py-1.5" style={{ background: "var(--dial-surface)", border: "1px solid var(--dial-border)" }}>
       <p className="type-caption text-[var(--dial-text-tertiary)] mb-0.5">{label}</p>
-      <p className="type-caption text-[var(--dial-text-primary)] font-medium tabular-nums mb-1">{value} <span className="text-[var(--dial-text-tertiary)]">{unit}</span></p>
+      <p className="type-caption text-[var(--dial-text-primary)] font-medium tabular-nums mb-1">
+        <AnimatedParameterValue value={value} debounceMs={72} /> <span className="text-[var(--dial-text-tertiary)]">{unit}</span>
+      </p>
       <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--dial-border)" }}>
         <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${Math.min(100, coverage * 100)}%` }} />
       </div>
@@ -378,9 +387,13 @@ function ResourceStat({
         {icon}
         <span className="type-caption">{label}</span>
       </div>
-      <span className="type-label text-[var(--dial-text-primary)] font-medium tabular-nums">{value}</span>
+      <span className="type-label text-[var(--dial-text-primary)] font-medium tabular-nums">
+        <AnimatedParameterValue value={value} debounceMs={72} />
+      </span>
       {subLabel && (
-        <span className={`type-caption ${subColor ?? "text-[var(--dial-text-tertiary)]"}`}>{subLabel}</span>
+        <span className={`type-caption ${subColor ?? "text-[var(--dial-text-tertiary)]"}`}>
+          <AnimatedParameterValue value={subLabel} debounceMs={72} />
+        </span>
       )}
     </div>
   );
@@ -393,7 +406,9 @@ function MiniStat({ icon, label, value, warn }: { icon: React.ReactNode; label: 
       <span className={warn ? "text-orange-500 dark:text-orange-400" : "text-[var(--dial-text-tertiary)]"}>{icon}</span>
       <div className="min-w-0">
         <p className="type-caption text-[var(--dial-text-tertiary)]" style={{ fontSize: "9px" }}>{label}</p>
-        <p className={`type-caption font-medium tabular-nums ${warn ? "text-orange-500 dark:text-orange-400" : "text-[var(--dial-text-primary)]"}`} style={{ fontSize: "10px" }}>{value}</p>
+        <p className={`type-caption font-medium tabular-nums ${warn ? "text-orange-500 dark:text-orange-400" : "text-[var(--dial-text-primary)]"}`} style={{ fontSize: "10px" }}>
+          <AnimatedParameterValue value={value} debounceMs={72} />
+        </p>
       </div>
     </div>
   );

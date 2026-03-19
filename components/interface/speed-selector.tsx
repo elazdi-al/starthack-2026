@@ -9,6 +9,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AnimatedParameterValue } from "@/components/ui/animated-parameter-value";
 import { cn } from "@/lib/utils";
 import { useGreenhouseStore, type SpeedKey } from "@/lib/greenhouse-store";
 
@@ -58,7 +59,7 @@ export function SpeedSelector({
             event.currentTarget.blur();
           }}
         >
-          {speed}
+          <AnimatedParameterValue value={speed} debounceMs={64} />
         </DropdownMenuTrigger>
 
         <DropdownMenuContent

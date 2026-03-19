@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { triggerHaptic } from '@/lib/haptics';
 
 interface ColorControlProps {
@@ -9,7 +9,7 @@ interface ColorControlProps {
 
 const HEX_COLOR_REGEX = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
 
-export function ColorControl({ label, value, onChange }: ColorControlProps) {
+export const ColorControl = memo(function ColorControl({ label, value, onChange }: ColorControlProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -78,7 +78,7 @@ export function ColorControl({ label, value, onChange }: ColorControlProps) {
       </div>
     </div>
   );
-}
+});
 
 function expandShorthandHex(hex: string): string {
   if (hex.length !== 4) return hex;

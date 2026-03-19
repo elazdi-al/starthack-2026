@@ -273,6 +273,7 @@ export interface GreenhouseState {
   dustStormActive: boolean;
   events: SimEvent[];
   totalHarvestKg: number;
+  focusedCrop: CropType | null;
 
   // Autonomous agent tick
   lastTickSimMinutes: number;
@@ -281,6 +282,7 @@ export interface GreenhouseState {
   agentDecisions: AgentDecision[];
 
   setSpeed: (speed: SpeedKey) => void;
+  setFocusedCrop: (crop: CropType | null) => void;
   tick: () => void;
   skipToNextSol: () => void;
   setGrid: (grid: TileData[][]) => void;
@@ -423,6 +425,7 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   dustStormActive: initialEnvironment.dustStormFactor < 0.9,
   events: [],
   totalHarvestKg: 0,
+  focusedCrop: null,
 
   lastTickSimMinutes: 0,
   tickInFlight: false,
@@ -430,6 +433,7 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   agentDecisions: [],
 
   setSpeed: (speed) => set({ speed }),
+  setFocusedCrop: (crop) => set({ focusedCrop: crop }),
 
   skipToNextSol: () => {
     const { elapsedMinutes, simState, grid, events } = get();

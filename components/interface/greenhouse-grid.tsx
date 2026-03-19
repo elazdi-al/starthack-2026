@@ -1,9 +1,10 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, memo, useCallback, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "@phosphor-icons/react";
+import { AnimatedParameterValue } from "@/components/ui/animated-parameter-value";
 
 import {
   Tooltip,
@@ -19,6 +20,7 @@ import {
   type CropType,
   type TileData,
 } from "@/lib/greenhouse-store";
+import { useHydrated } from "@/lib/use-hydrated";
 
 const TILE = 120;
 const GAP = 3;
@@ -113,7 +115,7 @@ const PREVIEW_COLORS = {
   kale3: "#456048",
 } as const;
 
-function DepthPoly({
+const DepthPoly = memo(function DepthPoly({
   points,
   fill,
   shadow,
@@ -128,9 +130,9 @@ function DepthPoly({
       <polygon points={points} fill={fill} />
     </>
   );
-}
+});
 
-function CropPreview({
+const CropPreview = memo(function CropPreview({
   crop,
   className,
   size,
@@ -264,9 +266,9 @@ function CropPreview({
       <DepthPoly points="37,55 44,75 31,64" fill={PREVIEW_COLORS.root3} shadow="#7e3c18" />
     </svg>
   );
-}
+});
 
-function CropTooltip({
+const CropTooltip = memo(function CropTooltip({
   data,
   info,
 }: {
@@ -317,29 +319,18 @@ function CropTooltip({
       </dl>
     </div>
   );
-}
+});
 
 export function GreenhouseGrid() {
   const grid = useGreenhouseStore((s) => s.grid);
-  const missionSol = useGreenhouseStore((s) => s.missionSol);
-  const dustStormActive = useGreenhouseStore((s) => s.dustStormActive);
+  const focusedCrop = useGreenhouseStore((s) => s.focusedCrop);
   const [selected, setSelected] = useState<TileData | null>(null);
+  const handleSelect = useCallback((tile: TileData) => setSelected(tile), []);
+  const handleClose = useCallback(() => setSelected(null), []);
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-      <div className="mb-6 flex items-center gap-2">
-        <span className="text-[13px] font-medium tracking-wide text-black/40">
-          Greenhouse Module
-        </span>
-        <span className="text-sm text-black/15">·</span>
-        <span className="font-mono text-xs text-black/25">Sol {missionSol + 1} / {TOTAL_MISSION_SOLS}</span>
-        {dustStormActive && (
-          <>
-            <span className="text-sm text-black/15">·</span>
-            <span className="font-mono text-xs text-amber-600/70">Dust Storm</span>
-          </>
-        )}
-      </div>
+   
 
       <TooltipProvider delay={120} closeDelay={0}>
         <div
@@ -367,7 +358,8 @@ export function GreenhouseGrid() {
                     data={tile}
                     row={r}
                     col={c}
-                    onSelect={() => setSelected(tile)}
+                    focused={tile.kind === "crop" && tile.crop === focusedCrop}
+                    onSelect={handleSelect}
                   />
                 ))
               )}
@@ -376,9 +368,7 @@ export function GreenhouseGrid() {
         </div>
       </TooltipProvider>
 
-      <LiveEnvReadings />
-
-      <CropDialog data={selected} onClose={() => setSelected(null)} />
+      <CropDialog data={selected} onClose={handleClose} />
     </div>
   );
 }
@@ -473,16 +463,18 @@ function generatePlants(row: number, col: number, growth: number): PlantInstance
   });
 }
 
-function GridTile({
+const GridTile = memo(function GridTile({
   data,
   row,
   col,
+  focused,
   onSelect,
 }: {
   data: TileData;
   row: number;
   col: number;
-  onSelect: () => void;
+  focused: boolean;
+  onSelect: (tile: TileData) => void;
 }) {
   if (data.kind === "path") {
     return (
@@ -502,10 +494,12 @@ function GridTile({
   const tile = (
     <button
       type="button"
-      onClick={planted && cropInfo ? onSelect : undefined}
-      className={`relative h-full w-full rounded border border-green-800/5.5 bg-green-800/4.5 transition-colors duration-150 hover:bg-green-800/8 dark:border-green-400/6 dark:bg-green-400/4.5 dark:hover:bg-green-400/10 ${
-        planted && cropInfo ? "cursor-pointer" : "cursor-default"
-      }`}
+      onClick={planted && cropInfo ? () => onSelect(data) : undefined}
+      className={`relative h-full w-full rounded border transition-colors duration-150 ${
+        focused && planted
+          ? "grid-tile-focused border-yellow-500/40 bg-yellow-500/8 dark:border-yellow-400/35 dark:bg-yellow-400/6"
+          : "border-green-800/5.5 bg-green-800/4.5 hover:bg-green-800/8 dark:border-green-400/6 dark:bg-green-400/4.5 dark:hover:bg-green-400/10"
+      } ${planted && cropInfo ? "cursor-pointer" : "cursor-default"}`}
     >
       {data.status && planted && (
         <div
@@ -565,9 +559,20 @@ function GridTile({
       </TooltipContent>
     </Tooltip>
   );
-}
+}, (prev, next) =>
+  prev.row === next.row &&
+  prev.col === next.col &&
+  prev.focused === next.focused &&
+  prev.onSelect === next.onSelect &&
+  prev.data.kind === next.data.kind &&
+  prev.data.crop === next.data.crop &&
+  prev.data.growth === next.data.growth &&
+  prev.data.water === next.data.water &&
+  prev.data.status === next.data.status &&
+  prev.data.sensor === next.data.sensor
+);
 
-function CropDialog({
+const CropDialog = memo(function CropDialog({
   data,
   onClose,
 }: {
@@ -668,7 +673,7 @@ function CropDialog({
                                 <DataRow label="Health">
                                   <div className="flex items-center gap-2.5">
                                     <span className="font-mono text-xs text-black/60 dark:text-white/65">
-                                      {Math.round(cropEnv.healthScore * 100)}%
+                                      <AnimatedParameterValue value={`${Math.round(cropEnv.healthScore * 100)}%`} debounceMs={72} />
                                     </span>
                                     <div className="h-[3px] w-20 overflow-hidden rounded-full bg-black/6 dark:bg-white/8">
                                       <div
@@ -686,7 +691,7 @@ function CropDialog({
                               <DataRow label="Soil Moisture">
                                 <div className="flex items-center gap-2.5">
                                   <span className="font-mono text-xs text-black/60 dark:text-white/65">
-                                    {data.water}%
+                                    <AnimatedParameterValue value={`${data.water}%`} debounceMs={72} />
                                   </span>
                                   <div className="h-[3px] w-20 overflow-hidden rounded-full bg-black/6 dark:bg-white/8">
                                     <div
@@ -756,7 +761,7 @@ function CropDialog({
       </Dialog.Portal>
     </Dialog.Root>
   );
-}
+});
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
@@ -782,14 +787,14 @@ function DataRow({
       <span className="type-caption text-black/40 dark:text-white/45">{label}</span>
       {children ?? (
         <span className={`font-mono text-xs ${valueClassName ?? "text-black/60 dark:text-white/65"}`}>
-          {value}
+          <AnimatedParameterValue value={value ?? ""} debounceMs={72} />
         </span>
       )}
     </div>
   );
 }
 
-function Corner({
+const Corner = memo(function Corner({
   position,
 }: {
   position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -807,7 +812,7 @@ function Corner({
       <div className={`absolute ${pos} h-3 w-px bg-black/8 dark:bg-white/10`} />
     </>
   );
-}
+});
 
 function LiveEnvReadings() {
   const temperature = useGreenhouseStore((s) => s.temperature);
@@ -815,6 +820,23 @@ function LiveEnvReadings() {
   const co2Level = useGreenhouseStore((s) => s.co2Level);
   const lightLevel = useGreenhouseStore((s) => s.lightLevel);
   const env = useGreenhouseStore((s) => s.environment);
+  const isHydrated = useHydrated();
+
+  if (!isHydrated) {
+    return (
+      <div className="mt-8 flex items-center gap-4">
+        <EnvReading label="Temp" value="--°C" />
+        <EnvDivider />
+        <EnvReading label="Humidity" value="--%" />
+        <EnvDivider />
+        <EnvReading label="CO₂" value="-- ppm" />
+        <EnvDivider />
+        <EnvReading label="O₂" value="--%" />
+        <EnvDivider />
+        <EnvReading label="Light" value="-- lux" />
+      </div>
+    );
+  }
 
   return (
     <div className="mt-8 flex items-center gap-4">
@@ -837,7 +859,9 @@ function EnvReading({ label, value }: { label: string; value: string }) {
       <span className="text-[10px] font-medium uppercase tracking-widest text-black/30 dark:text-white/35">
         {label}
       </span>
-      <span className="font-mono text-xs text-black/50 dark:text-white/55">{value}</span>
+      <span className="font-mono text-xs text-black/50 dark:text-white/55">
+        <AnimatedParameterValue value={value} debounceMs={72} />
+      </span>
     </div>
   );
 }

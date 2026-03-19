@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import { AnimatedParameterValue } from "@/components/ui/animated-parameter-value";
 import { useGreenhouseStore, TICK_INTERVAL_MS } from "@/lib/greenhouse-store";
 import { useSettingsStore } from "@/lib/settings-store";
+import { useHydrated } from "@/lib/use-hydrated";
 import { SkipForward } from "@phosphor-icons/react";
 
 export function ClockWidget() {
@@ -11,6 +13,7 @@ export function ClockWidget() {
   const skipToNextSol = useGreenhouseStore((s) => s.skipToNextSol);
   const missionSol = useGreenhouseStore((s) => s.missionSol);
   const timeFormat = useSettingsStore((s) => s.timeFormat);
+  const isHydrated = useHydrated();
 
   useEffect(() => {
     const id = setInterval(tick, TICK_INTERVAL_MS);
@@ -18,27 +21,30 @@ export function ClockWidget() {
   }, [tick]);
 
   let timeDisplay: string;
+
   if (timeFormat === "12h") {
     const h = time.getHours();
     const period = h >= 12 ? "PM" : "AM";
     const h12 = h % 12 || 12;
     const mm = String(time.getMinutes()).padStart(2, "0");
-    timeDisplay = `${h12}:${mm} ${period}`;
+    timeDisplay = isHydrated ? `${h12}:${mm} ${period}` : "--:-- --";
   } else {
     const hh = String(time.getHours()).padStart(2, "0");
     const mm = String(time.getMinutes()).padStart(2, "0");
-    timeDisplay = `${hh}:${mm}`;
+    timeDisplay = isHydrated ? `${hh}:${mm}` : "--:--";
   }
 
   return (
     <div className="relative flex items-center gap-1">
       <div className="rounded-lg flex justify-center items-center h-10 px-3 gap-2 bg-neutral-900 text-white dark:bg-white/8 dark:text-white/90">
         <span className="text-[11px] font-medium text-white/50 whitespace-nowrap font-mono">
-          Sol {missionSol}
+          {isHydrated ? (
+            <AnimatedParameterValue value={`Sol ${missionSol}`} debounceMs={72} />
+          ) : "Sol --"}
         </span>
         <span className="text-white/20">|</span>
         <p className="text-base whitespace-nowrap leading-5 font-mono tabular-nums tracking-wide">
-          {timeDisplay}
+          <AnimatedParameterValue value={timeDisplay} debounceMs={72} />
         </p>
       </div>
       <button

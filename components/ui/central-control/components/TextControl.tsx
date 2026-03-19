@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 interface TextControlProps {
   label: string;
   value: string;
@@ -5,7 +7,7 @@ interface TextControlProps {
   placeholder?: string;
 }
 
-export function TextControl({ label, value, onChange, placeholder }: TextControlProps) {
+export const TextControl = memo(function TextControl({ label, value, onChange, placeholder }: TextControlProps) {
   return (
     <div className="dialkit-text-control">
       <label className="dialkit-text-label">{label}</label>
@@ -18,4 +20,4 @@ export function TextControl({ label, value, onChange, placeholder }: TextControl
       />
     </div>
   );
-}
+});

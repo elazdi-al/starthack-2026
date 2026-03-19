@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { ArrowCounterClockwise, FastForward, Copy, Check } from "@phosphor-icons/react";
 
 import { Button } from "@/components/ui/button";
 import { ControlPanelIcon } from "@/components/icons";
@@ -11,8 +12,12 @@ import {
   type PanelConfig,
 } from "@/components/ui/central-control/store/DialStore";
 import { cn } from "@/lib/utils";
+import { useGreenhouseStore, type SpeedKey, type ManualOverrides } from "@/lib/greenhouse-store";
+import { triggerHaptic } from "@/lib/haptics";
 
 const MORPH_SPRING = { type: "spring" as const, bounce: 0.05, duration: 0.35 };
+
+const SPEED_LEVELS: SpeedKey[] = ["x1", "x2", "x5", "x10", "x20", "x50", "x100", "x1000", "x5000", "x10000"];
 
 interface CentralControlPanelProps {
   open: boolean;
@@ -26,12 +31,17 @@ export function CentralControlPanel({
   const [panels, setPanels] = React.useState<PanelConfig[]>([]);
   const [mounted, setMounted] = React.useState(false);
   const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
+  const [copied, setCopied] = React.useState(false);
   const dragRef = React.useRef<{
     startX: number; startY: number;
     offsetX: number; offsetY: number;
     baseLeft: number; baseTop: number;
     baseWidth: number; baseHeight: number;
   } | null>(null);
+
+  const speed = useGreenhouseStore((s) => s.speed);
+  const setSpeed = useGreenhouseStore((s) => s.setSpeed);
+  const applyOverrides = useGreenhouseStore((s) => s.applyOverrides);
 
   React.useEffect(() => {
     setMounted(true);
@@ -89,6 +99,43 @@ export function CentralControlPanel({
     if (!open) setDragOffset({ x: 0, y: 0 });
   }, [open]);
 
+  const handleReset = () => {
+    setSpeed("x1");
+    // Reset all manual overrides to disabled (returns to natural sim behavior)
+    const resetOverrides: ManualOverrides = {
+      externalTempEnabled: false,
+      externalTemp: -63,
+      solarRadiationEnabled: false,
+      solarRadiation: 590,
+      dustStormEnabled: false,
+      dustStormSeverity: 0,
+      atmosphericPressureEnabled: false,
+      atmosphericPressure: 600,
+      timeOfDayLocked: false,
+      timeOfDayFraction: 0.5,
+    };
+    applyOverrides(resetOverrides);
+    triggerHaptic("light");
+  };
+
+  const handleSpeedCycle = () => {
+    const idx = SPEED_LEVELS.indexOf(speed);
+    const next = SPEED_LEVELS[(idx + 1) % SPEED_LEVELS.length];
+    setSpeed(next);
+    triggerHaptic("selection");
+  };
+
+  const handleCopyJson = () => {
+    const snapshot = useGreenhouseStore.getState().getEnvironmentSnapshot();
+    const json = JSON.stringify(snapshot, null, 2);
+    navigator.clipboard.writeText(json).then(
+      () => triggerHaptic("success"),
+      () => triggerHaptic("error"),
+    );
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   const showPanel = open && mounted && panels.length > 0;
 
   return (
@@ -104,12 +151,12 @@ export function CentralControlPanel({
         className={cn("absolute right-0 top-0", showPanel && "z-9999")}
         initial={false}
         animate={{
-          width: showPanel ? 280 : 40,
+          width: showPanel ? 300 : 40,
           height: showPanel ? "auto" : 40,
           borderRadius: showPanel ? 14 : 20,
         }}
         transition={MORPH_SPRING}
-        style={{ overflow: "hidden" }}
+        style={{ overflow: "hidden", maxHeight: showPanel ? "calc(100vh - 80px)" : 40 }}
       >
         <motion.div
           className="pointer-events-none absolute inset-0"
@@ -161,16 +208,94 @@ export function CentralControlPanel({
           {showPanel && (
             <motion.div
               key="cc-panel-content"
-              className="relative cc-morph-content dialkit-root"
+              className="relative cc-morph-content dialkit-root overflow-y-auto"
               data-embedded=""
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.12 }}
+              style={{ maxHeight: "calc(100vh - 160px)" }}
             >
-              {panels.map((panel) => (
-                <Panel key={panel.id} panel={panel} defaultOpen open inline />
-              ))}
+              {/* Global toolbar */}
+              <div className="cc-toolbar">
+                <button
+                  type="button"
+                  className="cc-toolbar-btn"
+                  onClick={handleReset}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title="Reset simulation"
+                >
+                  <ArrowCounterClockwise size={14} weight="bold" />
+                </button>
+
+                <button
+                  type="button"
+                  className="cc-toolbar-speed"
+                  onClick={handleSpeedCycle}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title={`Speed: ${speed} — click to cycle`}
+                >
+                  <FastForward size={14} weight="fill" />
+                  <span className="cc-toolbar-speed-label">{speed}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="cc-toolbar-btn cc-toolbar-copy"
+                  onClick={handleCopyJson}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title="Copy simulation state as JSON"
+                >
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {copied ? (
+                      <motion.span
+                        key="check"
+                        className="cc-toolbar-icon"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        transition={{ type: "spring", visualDuration: 0.2, bounce: 0.2 }}
+                      >
+                        <Check size={14} weight="bold" />
+                      </motion.span>
+                    ) : (
+                      <motion.span
+                        key="copy"
+                        className="cc-toolbar-icon"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        transition={{ type: "spring", visualDuration: 0.2, bounce: 0.2 }}
+                      >
+                        <Copy size={14} weight="bold" />
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </div>
+
+              {panels.map((panel, idx) => {
+                const sectionLabel =
+                  panel.id === "sim-ext" ? "External" :
+                  panel.id === "sim-gh" ? "Greenhouse" :
+                  panel.id === "sim-crops" ? "Crop" :
+                  panel.name;
+                const isCrop = panel.id === "sim-crops";
+
+                return (
+                  <React.Fragment key={panel.id}>
+                    {idx > 0 && <div className="cc-section-divider" />}
+                    <h3 className="cc-section-title">{sectionLabel}</h3>
+                    {isCrop ? (
+                      <div className="cc-crop-section">
+                        <Panel panel={panel} defaultOpen open inline />
+                      </div>
+                    ) : (
+                      <Panel panel={panel} defaultOpen open inline />
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </motion.div>
           )}
         </AnimatePresence>

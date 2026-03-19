@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { X, Sun, Thermometer, Wind, Planet, Warning, Lightning, Drop, BatteryCharging, BatteryLow } from "@phosphor-icons/react";
+import { AnimatedParameterValue } from "@/components/ui/animated-parameter-value";
 import { useGreenhouseStore, TOTAL_MISSION_SOLS } from "@/lib/greenhouse-store";
 import type { DustStormRisk, SeasonName } from "@/lib/greenhouse-store";
 import { useSettingsStore, formatTemperature } from "@/lib/settings-store";
@@ -90,7 +91,7 @@ export function MarsEnvironmentPanel({ onClose }: Props) {
         <Section label="Mission">
           <div className="flex items-baseline justify-between mb-2">
             <span className="type-display" style={{ fontSize: "1.5rem", lineHeight: 1 }}>
-              Sol {missionSol}
+              <AnimatedParameterValue value={`Sol ${missionSol}`} debounceMs={72} />
             </span>
             <span className="type-caption text-[var(--dial-text-tertiary)]">/ {TOTAL_MISSION_SOLS}</span>
           </div>
@@ -101,8 +102,12 @@ export function MarsEnvironmentPanel({ onClose }: Props) {
             />
           </div>
           <div className="flex justify-between mt-1">
-            <span className="type-caption text-[var(--dial-text-tertiary)]">{Math.round(missionProgress * 100)}% complete</span>
-            <span className="type-caption text-[var(--dial-text-tertiary)]">{TOTAL_MISSION_SOLS - missionSol} sols left</span>
+            <span className="type-caption text-[var(--dial-text-tertiary)]">
+              <AnimatedParameterValue value={`${Math.round(missionProgress * 100)}% complete`} debounceMs={72} />
+            </span>
+            <span className="type-caption text-[var(--dial-text-tertiary)]">
+              <AnimatedParameterValue value={`${TOTAL_MISSION_SOLS - missionSol} sols left`} debounceMs={72} />
+            </span>
           </div>
         </Section>
 
@@ -127,7 +132,7 @@ export function MarsEnvironmentPanel({ onClose }: Props) {
           <div className="flex items-center justify-between mb-1">
             <span className="type-caption text-[var(--dial-text-tertiary)]">Battery charge</span>
             <span className={`type-caption font-medium tabular-nums ${energyWarn ? "text-red-500 dark:text-red-400" : "text-[var(--dial-text-secondary)]"}`}>
-              {Math.round(env.batteryStorageKWh)} kWh
+              <AnimatedParameterValue value={`${Math.round(env.batteryStorageKWh)} kWh`} debounceMs={72} />
             </span>
           </div>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--dial-surface)" }}>
@@ -157,7 +162,7 @@ export function MarsEnvironmentPanel({ onClose }: Props) {
               : recyclingWarn ? "text-yellow-500 dark:text-yellow-400"
               : "text-emerald-500 dark:text-emerald-400"
             }`}>
-              {recyclingPct}%
+              <AnimatedParameterValue value={`${recyclingPct}%`} debounceMs={72} />
             </span>
           </div>
           <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ background: "var(--dial-surface)" }}>
@@ -187,11 +192,15 @@ export function MarsEnvironmentPanel({ onClose }: Props) {
           <div className="flex items-start justify-between">
             <div>
               <p className="type-ui text-[var(--dial-text-primary)] font-medium">{SEASON_LABEL[seasonName]}</p>
-              <p className="type-caption text-[var(--dial-text-secondary)] mt-0.5">Ls {currentLs.toFixed(1)}°</p>
+              <p className="type-caption text-[var(--dial-text-secondary)] mt-0.5">
+                <AnimatedParameterValue value={`Ls ${currentLs.toFixed(1)}°`} debounceMs={72} />
+              </p>
             </div>
             <div className="text-right">
               <p className="type-caption text-[var(--dial-text-tertiary)]">Seasonal flux</p>
-              <p className="type-label text-[var(--dial-text-primary)]">{Math.round(env.seasonalSolarFlux)} W/m²</p>
+              <p className="type-label text-[var(--dial-text-primary)]">
+                <AnimatedParameterValue value={`${Math.round(env.seasonalSolarFlux)} W/m²`} debounceMs={72} />
+              </p>
             </div>
           </div>
         </Section>
@@ -255,7 +264,7 @@ export function MarsEnvironmentPanel({ onClose }: Props) {
               <div className="flex items-center justify-between mb-1">
                 <span className="type-caption text-[var(--dial-text-tertiary)]">Solar attenuation</span>
                 <span className="type-caption text-red-500 dark:text-red-400 font-medium">
-                  {Math.round((1 - env.dustStormFactor) * 100)}% blocked
+                  <AnimatedParameterValue value={`${Math.round((1 - env.dustStormFactor) * 100)}% blocked`} debounceMs={72} />
                 </span>
               </div>
               <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--dial-surface)" }}>
@@ -304,7 +313,9 @@ function Stat({ icon, label, value, warn }: { icon: React.ReactNode; label: stri
         {icon}
         <span className="type-caption truncate">{label}</span>
       </div>
-      <span className={`type-label font-medium tabular-nums ${warn ? "text-orange-500 dark:text-orange-400" : "text-[var(--dial-text-primary)]"}`}>{value}</span>
+      <span className={`type-label font-medium tabular-nums ${warn ? "text-orange-500 dark:text-orange-400" : "text-[var(--dial-text-primary)]"}`}>
+        <AnimatedParameterValue value={value} debounceMs={72} />
+      </span>
     </div>
   );
 }

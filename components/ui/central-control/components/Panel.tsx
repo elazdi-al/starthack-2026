@@ -1,7 +1,6 @@
-import { useState, useSyncExternalStore } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useSyncExternalStore, memo, useCallback } from 'react';
 import { triggerHaptic } from '@/lib/haptics';
-import { DialStore, ControlMeta, PanelConfig, SpringConfig, TransitionConfig } from '../store/DialStore';
+import { DialStore, type ControlMeta, type PanelConfig, type SpringConfig, type TransitionConfig, type DialValue } from '../store/DialStore';
 import { Folder } from './Folder';
 import { Slider } from './Slider';
 import { Toggle } from './Toggle';
@@ -10,7 +9,6 @@ import { TransitionControl } from './TransitionControl';
 import { TextControl } from './TextControl';
 import { SelectControl } from './SelectControl';
 import { ColorControl } from './ColorControl';
-import { PresetManager } from './PresetManager';
 
 interface PanelProps {
   panel: PanelConfig;
@@ -19,9 +17,156 @@ interface PanelProps {
   inline?: boolean;
 }
 
-export function Panel({ panel, defaultOpen = true, open, inline = false }: PanelProps) {
-  const [copied, setCopied] = useState(false);
+/**
+ * Renders a single control within a panel.
+ * Extracted and memoized so each control only re-renders when its own value changes.
+ */
+const PanelControl = memo(function PanelControl({
+  control,
+  panelId,
+  value,
+}: {
+  control: ControlMeta;
+  panelId: string;
+  value: unknown;
+}) {
+  const onChange = useCallback(
+    (v: unknown) => DialStore.updateValue(panelId, control.path, v as DialValue),
+    [panelId, control.path]
+  );
 
+  switch (control.type) {
+    case 'slider':
+      return (
+        <Slider
+          label={control.label}
+          value={value as number}
+          onChange={onChange as (v: number) => void}
+          min={control.min}
+          max={control.max}
+          step={control.step}
+        />
+      );
+
+    case 'toggle':
+      return (
+        <Toggle
+          label={control.label}
+          checked={value as boolean}
+          onChange={onChange as (v: boolean) => void}
+        />
+      );
+
+    case 'spring':
+      return (
+        <SpringControl
+          panelId={panelId}
+          path={control.path}
+          label={control.label}
+          spring={value as SpringConfig}
+          onChange={onChange as (v: SpringConfig) => void}
+        />
+      );
+
+    case 'transition':
+      return (
+        <TransitionControl
+          panelId={panelId}
+          path={control.path}
+          label={control.label}
+          value={value as TransitionConfig}
+          onChange={onChange as (v: TransitionConfig) => void}
+        />
+      );
+
+    case 'folder':
+      return (
+        <FolderControl
+          control={control}
+          panelId={panelId}
+        />
+      );
+
+    case 'text':
+      return (
+        <TextControl
+          label={control.label}
+          value={value as string}
+          onChange={onChange as (v: string) => void}
+          placeholder={control.placeholder}
+        />
+      );
+
+    case 'select':
+      return (
+        <SelectControl
+          label={control.label}
+          value={value as string}
+          options={control.options ?? []}
+          onChange={onChange as (v: string) => void}
+        />
+      );
+
+    case 'color':
+      return (
+        <ColorControl
+          label={control.label}
+          value={value as string}
+          onChange={onChange as (v: string) => void}
+        />
+      );
+
+    case 'action':
+      return (
+        <button
+          type="button"
+          className="dialkit-button"
+          onClick={() => {
+            DialStore.triggerAction(panelId, control.path);
+            triggerHaptic('light');
+          }}
+        >
+          {control.label}
+        </button>
+      );
+
+    default:
+      return null;
+  }
+});
+
+/**
+ * Folder control subscribes to its own panel values so it can pass
+ * the correct value to each child control independently.
+ */
+const FolderControl = memo(function FolderControl({
+  control,
+  panelId,
+}: {
+  control: ControlMeta;
+  panelId: string;
+}) {
+  const values = useSyncExternalStore(
+    (cb) => DialStore.subscribe(panelId, cb),
+    () => DialStore.getValues(panelId),
+    () => DialStore.getValues(panelId)
+  );
+
+  return (
+    <Folder title={control.label} defaultOpen={control.defaultOpen ?? true}>
+      {control.children?.map((child) => (
+        <PanelControl
+          key={child.path}
+          control={child}
+          panelId={panelId}
+          value={values[child.path]}
+        />
+      ))}
+    </Folder>
+  );
+});
+
+export function Panel({ panel, defaultOpen = true, open, inline = false }: PanelProps) {
   // Subscribe to panel value changes
   const values = useSyncExternalStore(
     (cb) => DialStore.subscribe(panel.id, cb),
@@ -29,225 +174,17 @@ export function Panel({ panel, defaultOpen = true, open, inline = false }: Panel
     () => DialStore.getValues(panel.id)
   );
 
-  const presets = DialStore.getPresets(panel.id);
-  const activePresetId = DialStore.getActivePresetId(panel.id);
-
-  const handleAddPreset = () => {
-    const nextNum = presets.length + 2;
-    DialStore.savePreset(panel.id, `Version ${nextNum}`);
-    triggerHaptic('light');
-  };
-
-  const handleCopy = () => {
-    const jsonStr = JSON.stringify(values, null, 2);
-
-    const instruction = `Update the useDialKit configuration for "${panel.name}" with these values:
-
-\`\`\`json
-${jsonStr}
-\`\`\`
-
-Apply these values as the new defaults in the useDialKit call.`;
-
-    navigator.clipboard.writeText(instruction).then(
-      () => triggerHaptic('success'),
-      () => triggerHaptic('error')
-    );
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  const renderControl = (control: ControlMeta) => {
-    const value = values[control.path];
-
-    switch (control.type) {
-      case 'slider':
-        return (
-          <Slider
-            key={control.path}
-            label={control.label}
-            value={value as number}
-            onChange={(v) => DialStore.updateValue(panel.id, control.path, v)}
-            min={control.min}
-            max={control.max}
-            step={control.step}
-          />
-        );
-
-      case 'toggle':
-        return (
-          <Toggle
-            key={control.path}
-            label={control.label}
-            checked={value as boolean}
-            onChange={(v) => DialStore.updateValue(panel.id, control.path, v)}
-          />
-        );
-
-      case 'spring':
-        return (
-          <SpringControl
-            key={control.path}
-            panelId={panel.id}
-            path={control.path}
-            label={control.label}
-            spring={value as SpringConfig}
-            onChange={(v) => DialStore.updateValue(panel.id, control.path, v)}
-          />
-        );
-
-      case 'transition':
-        return (
-          <TransitionControl
-            key={control.path}
-            panelId={panel.id}
-            path={control.path}
-            label={control.label}
-            value={value as TransitionConfig}
-            onChange={(v) => DialStore.updateValue(panel.id, control.path, v)}
-          />
-        );
-
-      case 'folder':
-        return (
-          <Folder key={control.path} title={control.label} defaultOpen={control.defaultOpen ?? true}>
-            {control.children?.map(renderControl)}
-          </Folder>
-        );
-
-      case 'text':
-        return (
-          <TextControl
-            key={control.path}
-            label={control.label}
-            value={value as string}
-            onChange={(v) => DialStore.updateValue(panel.id, control.path, v)}
-            placeholder={control.placeholder}
-          />
-        );
-
-      case 'select':
-        return (
-          <SelectControl
-            key={control.path}
-            label={control.label}
-            value={value as string}
-            options={control.options ?? []}
-            onChange={(v) => DialStore.updateValue(panel.id, control.path, v)}
-          />
-        );
-
-      case 'color':
-        return (
-          <ColorControl
-            key={control.path}
-            label={control.label}
-            value={value as string}
-            onChange={(v) => DialStore.updateValue(panel.id, control.path, v)}
-          />
-        );
-
-      case 'action':
-        return (
-          <button
-            key={control.path}
-            className="dialkit-button"
-            onClick={() => {
-              DialStore.triggerAction(panel.id, control.path);
-              triggerHaptic('light');
-            }}
-          >
-            {control.label}
-          </button>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const renderControls = () => {
-    return panel.controls.map(renderControl);
-  };
-
-  const toolbar = (
-    <>
-      <motion.button
-        className="dialkit-toolbar-add"
-        onClick={handleAddPreset}
-        title="Add preset"
-        whileTap={{ scale: 0.9 }}
-        transition={{ type: 'spring', visualDuration: 0.15, bounce: 0.3 }}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 6H20" />
-          <path d="M4 12H10" />
-          <path d="M15 15L21 15" />
-          <path d="M18 12V18" />
-          <path d="M4 18H10" />
-        </svg>
-      </motion.button>
-
-      <PresetManager
-        panelId={panel.id}
-        presets={presets}
-        activePresetId={activePresetId}
-        onAdd={handleAddPreset}
-      />
-
-      <motion.button
-        className="dialkit-toolbar-copy"
-        onClick={handleCopy}
-        title="Copy parameters"
-        whileTap={{ scale: 0.95 }}
-        transition={{ type: 'spring', visualDuration: 0.15, bounce: 0.3 }}
-      >
-        <span className="dialkit-toolbar-copy-icon-wrap">
-          <AnimatePresence initial={false} mode="popLayout">
-            {copied ? (
-              <motion.svg
-                key="check"
-                className="dialkit-toolbar-copy-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                initial={{ scale: 0.5, opacity: 0, filter: 'blur(4px)' }}
-                animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
-                exit={{ scale: 0.5, opacity: 0, filter: 'blur(4px)' }}
-                transition={{ type: 'spring', visualDuration: 0.3, bounce: 0.2 }}
-              >
-                <path d="M5 12.75L10 19L19 5" />
-              </motion.svg>
-            ) : (
-              <motion.svg
-                key="clipboard"
-                className="dialkit-toolbar-copy-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                initial={{ scale: 0.5, opacity: 0, filter: 'blur(4px)' }}
-                animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
-                exit={{ scale: 0.5, opacity: 0, filter: 'blur(4px)' }}
-                transition={{ type: 'spring', visualDuration: 0.3, bounce: 0.2 }}
-              >
-                <path d="M8 6C8 4.34315 9.34315 3 11 3H13C14.6569 3 16 4.34315 16 6V7H8V6Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-                <path d="M19.2405 16.1852L18.5436 14.3733C18.4571 14.1484 18.241 14 18 14C17.759 14 17.5429 14.1484 17.4564 14.3733L16.7595 16.1852C16.658 16.4493 16.4493 16.658 16.1852 16.7595L14.3733 17.4564C14.1484 17.5429 14 17.759 14 18C14 18.241 14.1484 18.4571 14.3733 18.5436L16.1852 19.2405C16.4493 19.342 16.658 19.5507 16.7595 19.8148L17.4564 21.6267C17.5429 21.8516 17.759 22 18 22C18.241 22 18.4571 21.8516 18.5436 21.6267L19.2405 19.8148C19.342 19.5507 19.5507 19.342 19.8148 19.2405L21.6267 18.5436C21.8516 18.4571 22 18.241 22 18C22 17.759 21.8516 17.5429 21.6267 17.4564L19.8148 16.7595C19.5507 16.658 19.342 16.4493 19.2405 16.1852Z" fill="currentColor"/>
-                <path d="M16 5H17C18.6569 5 20 6.34315 20 8V11M8 5H7C5.34315 5 4 6.34315 4 8V18C4 19.6569 5.34315 21 7 21H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </motion.svg>
-            )}
-          </AnimatePresence>
-        </span>
-        Copy
-      </motion.button>
-    </>
-  );
-
   return (
     <div className="dialkit-panel-wrapper">
-      <Folder title={panel.name} defaultOpen={defaultOpen} open={open} isRoot={true} inline={inline} toolbar={toolbar}>
-        {renderControls()}
+      <Folder title={panel.name} defaultOpen={defaultOpen} open={open} isRoot={true} inline={inline}>
+        {panel.controls.map((control) => (
+          <PanelControl
+            key={control.path}
+            control={control}
+            panelId={panel.id}
+            value={values[control.path]}
+          />
+        ))}
       </Folder>
     </div>
   );

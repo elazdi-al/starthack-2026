@@ -5,20 +5,20 @@ import * as React from "react";
 import { CentralControlExample } from "@/components/examples/central-control-example";
 import { GreenhouseGrid } from "@/components/interface/greenhouse-grid";
 import { CentralControlPanel } from "@/components/interface/central-control-panel";
+import { useGreenhouseStore, type CropType } from "@/lib/greenhouse-store";
+import { DialStore } from "@/components/ui/central-control";
 
 import { ClockWidget } from "@/components/interface/clock-widget";
 import { SettingsButton } from "@/components/interface/settings-button";
 import { TemperatureWidget } from "@/components/interface/temperature-widget";
-import { SeasonWidget } from "@/components/interface/season-widget";
 import { SidebarToggle } from "@/components/interface/sidebar-toggle";
-import { SpeedSelector } from "@/components/interface/speed-selector";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { MarsEnvironmentPanel } from "@/components/interface/mars-environment-panel";
 import { GreenhouseProgressPanel } from "@/components/interface/greenhouse-progress-panel";
 import { AgentDecisionPanel } from "@/components/interface/agent-decision-panel";
 import { SimulationOverrides } from "@/components/interface/simulation-overrides";
+import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
 import { Planet, Leaf, Robot } from "@phosphor-icons/react";
-import { useGreenhouseStore } from "@/lib/greenhouse-store";
 
 export default function Home() {
   const tickInFlight      = useGreenhouseStore((s) => s.tickInFlight);
@@ -37,39 +37,37 @@ export default function Home() {
     setPortalContainer(node);
   }, []);
 
-  const handleControlOpenChange = (next: boolean) => {
-    if (next) setSpeedOpen(false);
-    setControlOpen(next);
-  };
+  const setFocusedCrop = useGreenhouseStore((s) => s.setFocusedCrop);
 
-  const handleSpeedOpenChange = (next: boolean) => {
-    if (next) setControlOpen(false);
-    setSpeedOpen(next);
+  const handleControlOpenChange = (next: boolean) => {
+    setControlOpen(next);
+    if (!next) {
+      setFocusedCrop(null);
+    } else {
+      const cropValues = DialStore.getValues("sim-crops");
+      const selectedCrop = cropValues?.cropType as CropType | undefined;
+      if (selectedCrop) {
+        setFocusedCrop(selectedCrop);
+      }
+    }
   };
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
       <main
-        ref={mainRef}
         className="relative min-h-screen transition-[margin-right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
         style={{ marginRight: sidebarOpen ? 360 : 0 }}
       >
         <CentralControlExample />
-        <SimulationOverrides />
         <GreenhouseGrid />
 
         <div className="absolute left-6 top-6 flex items-center gap-2">
           <ClockWidget />
           <TemperatureWidget />
-          <SeasonWidget />
+          <EnvWidgetShells />
         </div>
 
         <div className={`absolute right-6 top-6 flex items-center gap-3 ${controlOpen ? "z-50" : ""}`}>
-          <SpeedSelector
-            open={speedOpen}
-            onOpenChange={handleSpeedOpenChange}
-            portalContainer={portalContainer}
-          />
           <CentralControlPanel
             open={controlOpen}
             onOpenChange={handleControlOpenChange}

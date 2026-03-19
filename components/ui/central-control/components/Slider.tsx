@@ -1,5 +1,6 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, memo } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'motion/react';
+import { AnimatedParameterValue } from '@/components/ui/animated-parameter-value';
 import { triggerHaptic } from '@/lib/haptics';
 
 interface SliderProps {
@@ -37,7 +38,7 @@ function snapToDecile(rawValue: number, min: number, max: number): number {
   return rawValue;
 }
 
-export function Slider({
+export const Slider = memo(function Slider({
   label,
   value,
   onChange,
@@ -437,10 +438,10 @@ export function Slider({
             onMouseDown={(e) => isValueEditable && e.stopPropagation()}
             style={{ cursor: isValueEditable ? 'text' : 'default' }}
           >
-            {displayValue}
+            <AnimatedParameterValue value={displayValue} debounceMs={64} />
           </span>
         )}
       </motion.div>
     </div>
   );
-}
+});
