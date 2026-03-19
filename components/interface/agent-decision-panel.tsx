@@ -4,7 +4,9 @@ import * as React from "react";
 import {
   X, Robot, ArrowsClockwise, Thermometer, Drop, Wind, Sun,
   Plant, Leaf, CheckCircle, Warning, CaretDown, CaretRight,
+  TreeStructure, ShieldCheck, Heart, Scales,
 } from "@phosphor-icons/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
 import type { AgentDecision, AgentAction } from "@/lib/greenhouse-store";
 
@@ -119,6 +121,18 @@ export function AgentDecisionPanel({ onClose }: Props) {
 function DecisionCard({ decision, defaultOpen }: { decision: AgentDecision; defaultOpen: boolean }) {
   const [open, setOpen] = React.useState(defaultOpen);
 
+  const hasAgentData = !!(
+    decision.survivalJustification ||
+    decision.wellbeingJustification ||
+    decision.winningAgent ||
+    decision.conflictType ||
+    decision.riskScore != null ||
+    decision.wellbeingScore != null
+  );
+
+  // Auto-show graph for the latest decision (defaultOpen === true)
+  const [showGraph, setShowGraph] = React.useState(defaultOpen && hasAgentData);
+
   return (
     <div className="px-4 py-3">
       {/* Card header row */}
@@ -144,8 +158,40 @@ function DecisionCard({ decision, defaultOpen }: { decision: AgentDecision; defa
       {/* Expanded content */}
       {open && (
         <div className="mt-3 flex flex-col gap-2.5 ml-3.5">
-          {/* Reasoning */}
-          {decision.reasoning && (
+          {/* Reasoning graph button */}
+          {hasAgentData && (
+            <button
+              type="button"
+              onClick={() => setShowGraph((v) => !v)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors self-start"
+              style={{
+                background: showGraph ? "var(--highlight-tabs-active-bg, rgba(59,130,246,0.12))" : "var(--dial-surface)",
+                border: `1px solid ${showGraph ? "rgba(59,130,246,0.35)" : "var(--dial-border)"}`,
+                color: showGraph ? "rgb(59,130,246)" : "var(--dial-text-secondary)",
+              }}
+            >
+              <TreeStructure size={11} weight="bold" />
+              <span className="type-caption font-medium" style={{ fontSize: "10px" }}>Reasoning</span>
+            </button>
+          )}
+
+          {/* Reasoning graph */}
+          <AnimatePresence>
+            {showGraph && hasAgentData && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                style={{ overflow: "hidden" }}
+              >
+                <ReasoningGraph decision={decision} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Reasoning text (show when graph is not open) */}
+          {!showGraph && decision.reasoning && (
             <div
               className="rounded-lg px-3 py-2.5"
               style={{ background: "var(--dial-surface)", border: "1px solid var(--dial-border)" }}
@@ -180,6 +226,176 @@ function DecisionCard({ decision, defaultOpen }: { decision: AgentDecision; defa
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Reasoning Graph ──────────────────────────────────────────────────────────────
+
+const AGENT_CONFIG = {
+  survival: { label: "Survival", icon: ShieldCheck, color: "#ef4444", bgColor: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.35)" },
+  wellbeing: { label: "Wellbeing", icon: Heart, color: "#ec4899", bgColor: "rgba(236,72,153,0.12)", borderColor: "rgba(236,72,153,0.35)" },
+  arbiter: { label: "Arbiter", icon: Scales, color: "#3b82f6", bgColor: "rgba(59,130,246,0.12)", borderColor: "rgba(59,130,246,0.35)" },
+} as const;
+
+function ReasoningGraph({ decision }: { decision: AgentDecision }) {
+  const [selectedAgent, setSelectedAgent] = React.useState<"survival" | "wellbeing" | "arbiter" | null>(null);
+
+  const conflictLabel =
+    decision.conflictType === "hard_veto" ? "Hard Veto" :
+    decision.conflictType === "soft_conflict" ? "Soft Conflict" :
+    decision.conflictType === "agreement" ? "Agreement" :
+    "Evaluated";
+
+  const conflictColor =
+    decision.conflictType === "hard_veto" ? "#ef4444" :
+    decision.conflictType === "soft_conflict" ? "#f59e0b" :
+    "#22c55e";
+
+  const winnerLabel =
+    decision.winningAgent === "survival" ? "Survival" :
+    decision.winningAgent === "wellbeing" ? "Wellbeing" :
+    decision.winningAgent === "arbiter" ? "Hybrid" :
+    decision.winningAgent === "both" ? "Both" :
+    decision.winningAgent === "hardcoded" ? "Playbook" :
+    decision.winningAgent ?? "—";
+
+  const selectedText =
+    selectedAgent === "survival" ? (decision.survivalJustification || "No survival data available.") :
+    selectedAgent === "wellbeing" ? (decision.wellbeingJustification || "No wellbeing data available.") :
+    selectedAgent === "arbiter" ? (decision.reasoning || "No arbiter reasoning available.") :
+    null;
+
+  const selectedConfig = selectedAgent ? AGENT_CONFIG[selectedAgent] : null;
+
+  return (
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{ background: "var(--dial-surface)", border: "1px solid var(--dial-border)" }}
+    >
+      {/* SVG Graph */}
+      <svg viewBox="0 0 260 170" className="w-full" style={{ display: "block" }}>
+        {/* Connection lines */}
+        {/* Survival -> Arbiter */}
+        <line x1="68" y1="50" x2="130" y2="110" stroke="var(--dial-border)" strokeWidth="1.5" strokeDasharray="4 3" />
+        {/* Wellbeing -> Arbiter */}
+        <line x1="192" y1="50" x2="130" y2="110" stroke="var(--dial-border)" strokeWidth="1.5" strokeDasharray="4 3" />
+
+        {/* Highlight winning path */}
+        {(decision.winningAgent === "survival" || decision.winningAgent === "both" || decision.winningAgent === "arbiter") && (
+          <line x1="68" y1="50" x2="130" y2="110" stroke={AGENT_CONFIG.survival.color} strokeWidth="1.5" opacity="0.5" />
+        )}
+        {(decision.winningAgent === "wellbeing" || decision.winningAgent === "both" || decision.winningAgent === "arbiter") && (
+          <line x1="192" y1="50" x2="130" y2="110" stroke={AGENT_CONFIG.wellbeing.color} strokeWidth="1.5" opacity="0.5" />
+        )}
+
+        {/* Conflict type label */}
+        <text x="130" y="82" textAnchor="middle" fill={conflictColor} fontSize="8" fontWeight="600" fontFamily="inherit">
+          {conflictLabel}
+        </text>
+
+        {/* Survival Agent node */}
+        <AgentNode
+          cx={68} cy={35}
+          agent="survival"
+          score={decision.riskScore}
+          scoreLabel="Risk"
+          selected={selectedAgent === "survival"}
+          onClick={() => setSelectedAgent(selectedAgent === "survival" ? null : "survival")}
+        />
+
+        {/* Wellbeing Agent node */}
+        <AgentNode
+          cx={192} cy={35}
+          agent="wellbeing"
+          score={decision.wellbeingScore}
+          scoreLabel="Wellbeing"
+          selected={selectedAgent === "wellbeing"}
+          onClick={() => setSelectedAgent(selectedAgent === "wellbeing" ? null : "wellbeing")}
+        />
+
+        {/* Arbiter node */}
+        <AgentNode
+          cx={130} cy={120}
+          agent="arbiter"
+          selected={selectedAgent === "arbiter"}
+          onClick={() => setSelectedAgent(selectedAgent === "arbiter" ? null : "arbiter")}
+        />
+
+        {/* Decision output label */}
+        <text x="130" y="155" textAnchor="middle" fill="var(--dial-text-tertiary)" fontSize="7.5" fontFamily="inherit">
+          Decision: {winnerLabel}
+        </text>
+      </svg>
+
+      {/* Agent text panel */}
+      <AnimatePresence>
+        {selectedAgent && selectedText && selectedConfig && (
+          <motion.div
+            key={selectedAgent}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15 }}
+            style={{ overflow: "hidden" }}
+          >
+            <div
+              className="px-3 py-2.5"
+              style={{ borderTop: `1px solid ${selectedConfig.borderColor}` }}
+            >
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <selectedConfig.icon size={10} weight="fill" style={{ color: selectedConfig.color }} />
+                <span className="type-caption font-semibold" style={{ color: selectedConfig.color, fontSize: "10px" }}>
+                  {selectedConfig.label}
+                </span>
+              </div>
+              <p className="type-caption text-[var(--dial-text-secondary)] leading-relaxed whitespace-pre-line" style={{ fontSize: "10px" }}>
+                {selectedText}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Agent Node (SVG) ─────────────────────────────────────────────────────────────
+
+function AgentNode({
+  cx, cy, agent, score, scoreLabel, selected, onClick,
+}: {
+  cx: number;
+  cy: number;
+  agent: "survival" | "wellbeing" | "arbiter";
+  score?: number;
+  scoreLabel?: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const config = AGENT_CONFIG[agent];
+  const r = 16;
+
+  return (
+    <g onClick={onClick} style={{ cursor: "pointer" }}>
+      {/* Hover / selected ring */}
+      <circle cx={cx} cy={cy} r={r + 3} fill="none" stroke={config.color} strokeWidth={selected ? 1.5 : 0} opacity={selected ? 0.6 : 0} />
+      {/* Background circle */}
+      <circle cx={cx} cy={cy} r={r} fill={config.bgColor} stroke={config.borderColor} strokeWidth="1" />
+      {/* Icon (rendered as text fallback since we can't use React icons in SVG foreignObject reliably) */}
+      <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle" fill={config.color} fontSize="12" fontWeight="bold" fontFamily="inherit">
+        {agent === "survival" ? "S" : agent === "wellbeing" ? "W" : "A"}
+      </text>
+      {/* Label */}
+      <text x={cx} y={cy + r + 10} textAnchor="middle" fill="var(--dial-text-secondary)" fontSize="8" fontWeight="500" fontFamily="inherit">
+        {config.label}
+      </text>
+      {/* Score */}
+      {score !== undefined && scoreLabel && (
+        <text x={cx} y={cy - r - 5} textAnchor="middle" fill={config.color} fontSize="7.5" fontWeight="600" fontFamily="inherit">
+          {scoreLabel}: {score.toFixed(2)}
+        </text>
+      )}
+    </g>
   );
 }
 

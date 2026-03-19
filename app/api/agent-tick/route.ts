@@ -25,13 +25,29 @@ let lastDigestRefreshSol = -1;
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json() as {
+    let body: {
       snapshot: EnvironmentSnapshot;
       triggerType?: 'emergency' | 'routine' | 'crew';
       crewMessage?: string;
     };
 
+    try {
+      body = await req.json();
+    } catch {
+      return Response.json(
+        { ok: false, error: 'Invalid or empty request body', actions: [] },
+        { status: 400 },
+      );
+    }
+
     const { snapshot, triggerType = 'routine', crewMessage } = body;
+
+    if (!snapshot || typeof snapshot !== 'object') {
+      return Response.json(
+        { ok: false, error: 'Missing snapshot in request body', actions: [] },
+        { status: 400 },
+      );
+    }
 
     // Classify emergency triggers deterministically before hitting LLMs
     // Severity-1 conditions (spec §6.1)
@@ -92,10 +108,12 @@ export async function POST(req: Request) {
         summary: (legacyOutput as { summary?: string })?.summary ?? 'Autonomous tick completed',
         actions: (legacyOutput as { actions?: unknown[] })?.actions ?? [],
         triggerType: 'routine',
-        conflictType: 'none',
+        conflictType: 'agreement',
         winningAgent: 'greenhouse',
         riskScore: 0.3,
         wellbeingScore: 0.7,
+        survivalJustification: 'Legacy single-agent tick — no multi-agent evaluation performed.',
+        wellbeingJustification: 'Legacy single-agent tick — no multi-agent evaluation performed.',
         decisionId: null,
       });
     }

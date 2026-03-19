@@ -54,6 +54,13 @@ export interface AgentDecision {
   reasoning: string;
   actions: AgentAction[];
   actionCount: number;
+  // Multi-agent reasoning data
+  conflictType?: string;
+  winningAgent?: string;
+  riskScore?: number;
+  wellbeingScore?: number;
+  survivalJustification?: string;
+  wellbeingJustification?: string;
 }
 
 // ─── UI Types ───────────────────────────────────────────────────────────────────
@@ -892,13 +899,29 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     try {
       const snapshot = buildSnapshot(environment, simState.greenhouse, totalHarvestKg);
 
+      // Guard: ensure snapshot serialises correctly before sending
+      let body: string;
+      try {
+        body = JSON.stringify({ snapshot });
+      } catch (e) {
+        console.error('[autonomousTick] snapshot serialisation failed:', e);
+        return;
+      }
+      if (!body || body === '{}') {
+        console.warn('[autonomousTick] empty snapshot, skipping tick');
+        return;
+      }
+
       const res = await fetch('/api/agent-tick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshot }),
+        body,
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.warn('[autonomousTick] server returned', res.status);
+        return;
+      }
 
       const data = await res.json() as {
         ok: boolean;
@@ -911,6 +934,12 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
           crop?: string;
           tileId?: string;
         }>;
+        conflictType?: string;
+        winningAgent?: string;
+        riskScore?: number;
+        wellbeingScore?: number;
+        survivalJustification?: string;
+        wellbeingJustification?: string;
       };
 
       if (!data.ok || !data.actions) return;
@@ -929,6 +958,12 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
         reasoning: data.reasoning ?? '',
         actions: data.actions as AgentAction[],
         actionCount: data.actions.length,
+        conflictType: data.conflictType,
+        winningAgent: data.winningAgent,
+        riskScore: data.riskScore,
+        wellbeingScore: data.wellbeingScore,
+        survivalJustification: data.survivalJustification,
+        wellbeingJustification: data.wellbeingJustification,
       };
       const agentEvents: SimEvent[] = [...get().events, {
         sol: currentEnv.missionSol,
