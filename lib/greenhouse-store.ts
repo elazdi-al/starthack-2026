@@ -285,7 +285,7 @@ export interface GreenhouseState {
   setSpeed: (speed: SpeedKey) => void;
   setFocusedCrop: (crop: CropType | null) => void;
   tick: () => void;
-  skipToNextSol: () => void;
+  skipTime: (minutes: number) => void;
   setGrid: (grid: TileData[][]) => void;
   getEnvironmentSnapshot: () => EnvironmentSnapshot;
   applyParameterChanges: (
@@ -436,11 +436,11 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   setSpeed: (speed) => set({ speed }),
   setFocusedCrop: (crop) => set({ focusedCrop: crop }),
 
-  skipToNextSol: () => {
+  skipTime: (minutes) => {
     const { elapsedMinutes, simState, grid, events } = get();
+    const targetMinutes = elapsedMinutes + minutes;
     const env = simState.simulation.getEnvironment(elapsedMinutes);
-    const nextSolMinutes = (env.missionSol + 1) * SOL_HOURS * 60;
-    const nextEnv = simState.simulation.getEnvironment(nextSolMinutes);
+    const nextEnv = simState.simulation.getEnvironment(targetMinutes);
     const simTime = new Date(nextEnv.timestamp);
 
     const newEvents = [...events];
@@ -459,7 +459,7 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     }
 
     set({
-      elapsedMinutes: nextSolMinutes,
+      elapsedMinutes: targetMinutes,
       environment: nextEnv,
       simulationTime: simTime,
       grid: syncGridFromEnv(grid, nextEnv),
