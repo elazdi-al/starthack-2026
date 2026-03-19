@@ -206,6 +206,28 @@
   --greenhouse-line-soft: rgba(160, 195, 176, 0.22);
   --greenhouse-line-mid: rgba(140, 179, 158, 0.35);
   --greenhouse-line-strong: rgba(120, 162, 140, 0.48);
+  --mars-bg-top: 251 242 236;
+  --mars-bg-mid: 240 221 209;
+  --mars-bg-bottom: 232 206 191;
+  --mars-glow-main: 212 141 107;
+  --mars-glow-soft: 238 210 193;
+  --mars-accent-a: 187 117 91;
+  --mars-accent-b: 204 134 104;
+  --mars-accent-c: 164 100 78;
+  --mars-band: 198 130 101;
+  --mars-band-soft: 230 200 184;
+  --mars-scratch: 146 91 71;
+  --mars-shadow-core: 129 79 61;
+  --mars-shadow-warm: 188 136 112;
+  --mars-pad-top: 223 182 160;
+  --mars-pad-bottom: 203 148 122;
+  --mars-pad-highlight: 247 233 223;
+  --mars-pad-border: 149 92 71;
+  --mars-pad-ring: 204 152 128;
+  --mars-pad-inner: 255 245 238;
+  --mars-module-border: 132 84 65;
+  --mars-module-surface: 252 250 247;
+  --mars-module-inset: 255 247 240;
 }
 
 .dark {
@@ -292,20 +314,42 @@
   --filter-bar-button-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 1px 2px rgba(0, 0, 0, 0.24);
-  --greenhouse-shadow: rgba(128, 156, 140, 0.035);
-  --greenhouse-floor-start: rgba(248, 255, 252, 0.07);
-  --greenhouse-floor-end: rgba(220, 249, 236, 0.025);
-  --greenhouse-glass-front-start: rgba(250, 255, 252, 0.11);
-  --greenhouse-glass-front-end: rgba(216, 247, 236, 0.05);
-  --greenhouse-glass-side-start: rgba(255, 255, 255, 0.09);
-  --greenhouse-glass-side-end: rgba(219, 245, 236, 0.035);
-  --greenhouse-roof-back-start: rgba(255, 255, 255, 0.13);
-  --greenhouse-roof-back-end: rgba(229, 252, 242, 0.055);
-  --greenhouse-roof-front-start: rgba(246, 255, 250, 0.1);
-  --greenhouse-roof-front-end: rgba(217, 247, 235, 0.05);
-  --greenhouse-line-soft: rgba(247, 255, 252, 0.12);
-  --greenhouse-line-mid: rgba(249, 255, 252, 0.2);
-  --greenhouse-line-strong: rgba(252, 255, 253, 0.55);
+  --greenhouse-shadow: rgba(8, 10, 14, 0.18);
+  --greenhouse-floor-start: rgba(224, 231, 236, 0.22);
+  --greenhouse-floor-end: rgba(126, 138, 148, 0.08);
+  --greenhouse-glass-front-start: rgba(248, 250, 251, 0.16);
+  --greenhouse-glass-front-end: rgba(210, 220, 226, 0.08);
+  --greenhouse-glass-side-start: rgba(250, 251, 252, 0.12);
+  --greenhouse-glass-side-end: rgba(200, 212, 220, 0.06);
+  --greenhouse-roof-back-start: rgba(255, 255, 255, 0.18);
+  --greenhouse-roof-back-end: rgba(210, 221, 228, 0.1);
+  --greenhouse-roof-front-start: rgba(246, 250, 252, 0.15);
+  --greenhouse-roof-front-end: rgba(195, 208, 216, 0.08);
+  --greenhouse-line-soft: rgba(240, 245, 248, 0.18);
+  --greenhouse-line-mid: rgba(223, 230, 236, 0.32);
+  --greenhouse-line-strong: rgba(248, 251, 253, 0.6);
+  --mars-bg-top: 42 28 26;
+  --mars-bg-mid: 74 47 40;
+  --mars-bg-bottom: 102 63 50;
+  --mars-glow-main: 188 109 79;
+  --mars-glow-soft: 142 97 80;
+  --mars-accent-a: 156 94 69;
+  --mars-accent-b: 176 106 78;
+  --mars-accent-c: 116 72 57;
+  --mars-band: 156 94 69;
+  --mars-band-soft: 118 80 67;
+  --mars-scratch: 204 152 124;
+  --mars-shadow-core: 20 12 10;
+  --mars-shadow-warm: 154 101 79;
+  --mars-pad-top: 122 83 66;
+  --mars-pad-bottom: 93 61 49;
+  --mars-pad-highlight: 173 128 107;
+  --mars-pad-border: 184 131 103;
+  --mars-pad-ring: 126 84 66;
+  --mars-pad-inner: 214 180 161;
+  --mars-module-border: 169 176 182;
+  --mars-module-surface: 46 50 54;
+  --mars-module-inset: 216 222 226;
 }
 
 @layer base {

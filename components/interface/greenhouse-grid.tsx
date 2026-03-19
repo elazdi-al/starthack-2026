@@ -15,12 +15,10 @@ import {
 import {
   useGreenhouseStore,
   CROP_DB,
-  TOTAL_MISSION_SOLS,
   type CropInfo,
   type CropType,
   type TileData,
 } from "@/lib/greenhouse-store";
-import { useHydrated } from "@/lib/use-hydrated";
 import { CropVideoPreview } from "@/components/interface/crop-video-preview";
 
 const TILE = 120;
@@ -327,30 +325,201 @@ const CropTooltip = memo(function CropTooltip({
   );
 });
 
+function MarsBackdrop({ dustStormActive }: { dustStormActive: boolean }) {
+  const baseGlow = dustStormActive ? 0.26 : 0.18;
+  const accentGlow = dustStormActive ? 0.2 : 0.14;
+  const dustSweep = dustStormActive ? 0.12 : 0.08;
+
+  return (
+    <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
+      <div
+        className="absolute inset-0"
+        style={{
+          background: [
+            `radial-gradient(circle at 52% 52%, rgb(var(--mars-glow-main) / ${baseGlow}) 0%, rgb(var(--mars-glow-main) / ${baseGlow * 0.42}) 18%, rgb(var(--mars-glow-main) / 0) 42%)`,
+            `radial-gradient(circle at 14% 78%, rgb(var(--mars-accent-a) / ${accentGlow}) 0%, rgb(var(--mars-accent-a) / 0) 30%)`,
+            `radial-gradient(circle at 86% 22%, rgb(var(--mars-accent-b) / ${accentGlow}) 0%, rgb(var(--mars-accent-b) / 0) 28%)`,
+            `radial-gradient(circle at 76% 84%, rgb(var(--mars-accent-c) / ${accentGlow * 0.95}) 0%, rgb(var(--mars-accent-c) / 0) 26%)`,
+            "linear-gradient(180deg, rgb(var(--mars-bg-top)) 0%, rgb(var(--mars-bg-mid)) 42%, rgb(var(--mars-bg-bottom)) 100%)",
+          ].join(", "),
+        }}
+      />
+
+      <div
+        className="absolute inset-[-12%] rotate-[-18deg]"
+        style={{
+          background: `repeating-linear-gradient(90deg, rgb(var(--mars-band) / ${dustSweep}) 0 2px, rgb(var(--mars-band) / 0) 2px 38px)`,
+          opacity: 0.95,
+          filter: "blur(22px)",
+        }}
+      />
+      <div
+        className="absolute inset-[-10%] rotate-[22deg]"
+        style={{
+          background: "repeating-linear-gradient(90deg, rgb(var(--mars-band-soft) / 0.09) 0 1px, rgb(var(--mars-band-soft) / 0) 1px 48px)",
+          filter: "blur(26px)",
+        }}
+      />
+      <div
+        className="absolute left-[-6%] top-[10%] h-[34vmin] w-[54vmin] rounded-full blur-[100px]"
+        style={{
+          background: "radial-gradient(circle, rgb(var(--mars-glow-soft) / 0.38) 0%, rgb(var(--mars-glow-soft) / 0) 74%)",
+        }}
+      />
+      <div
+        className="absolute right-[-4%] top-[18%] h-[34vmin] w-[52vmin] rounded-full blur-[100px]"
+        style={{
+          background: "radial-gradient(circle, rgb(var(--mars-accent-b) / 0.22) 0%, rgb(var(--mars-accent-b) / 0) 72%)",
+        }}
+      />
+      <div
+        className="absolute left-[10%] bottom-[-6%] h-[30vmin] w-[58vmin] rounded-full blur-[110px]"
+        style={{
+          background: "radial-gradient(circle, rgb(var(--mars-accent-c) / 0.22) 0%, rgb(var(--mars-accent-c) / 0) 76%)",
+        }}
+      />
+      <div
+        className="absolute left-[26%] top-[16%] h-[22vmin] w-[52vmin] rotate-[8deg] rounded-full blur-[42px]"
+        style={{
+          background: "linear-gradient(90deg, rgb(var(--mars-band-soft) / 0) 0%, rgb(var(--mars-band-soft) / 0.16) 48%, rgb(var(--mars-band-soft) / 0) 100%)",
+        }}
+      />
+      <div
+        className="absolute left-[18%] top-[58%] h-[18vmin] w-[56vmin] rotate-[-7deg] rounded-full blur-[36px]"
+        style={{
+          background: "linear-gradient(90deg, rgb(var(--mars-band) / 0) 0%, rgb(var(--mars-band) / 0.16) 50%, rgb(var(--mars-band) / 0) 100%)",
+        }}
+      />
+      <div
+        className="absolute left-[14%] top-[22%] h-[1px] w-[18px] rotate-[-20deg] rounded-full"
+        style={{
+          background: "rgb(var(--mars-scratch) / 0.22)",
+          boxShadow: "0 0 18px rgb(var(--mars-scratch) / 0.16)",
+        }}
+      />
+      <div
+        className="absolute right-[13%] top-[25%] h-[1px] w-[20px] rotate-[-18deg] rounded-full"
+        style={{
+          background: "rgb(var(--mars-scratch) / 0.2)",
+          boxShadow: "0 0 18px rgb(var(--mars-scratch) / 0.14)",
+        }}
+      />
+      <div
+        className="absolute right-[16%] bottom-[18%] h-[1px] w-[16px] rotate-[-16deg] rounded-full"
+        style={{
+          background: "rgb(var(--mars-scratch) / 0.18)",
+          boxShadow: "0 0 16px rgb(var(--mars-scratch) / 0.12)",
+        }}
+      />
+    </div>
+  );
+}
+
+function MarsGroundShadow({ dustStormActive }: { dustStormActive: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-1/2 top-1/2 -z-10"
+      style={{
+        width: GRID_WIDTH + 220,
+        height: GRID_HEIGHT + 220,
+        transform: "translate(-50%, -50%)",
+      }}
+    >
+      <div
+        className="absolute left-1/2 top-1/2 h-[66%] w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[54px]"
+        style={{
+          background: dustStormActive
+            ? "radial-gradient(circle, rgb(var(--mars-shadow-core) / 0.28) 0%, rgb(var(--mars-shadow-core) / 0.12) 38%, rgb(var(--mars-shadow-core) / 0) 72%)"
+            : "radial-gradient(circle, rgb(var(--mars-shadow-core) / 0.18) 0%, rgb(var(--mars-shadow-core) / 0.08) 40%, rgb(var(--mars-shadow-core) / 0) 72%)",
+        }}
+      />
+      <div
+        className="absolute left-1/2 top-1/2 h-[44%] w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[28px]"
+        style={{
+          background: dustStormActive
+            ? "rgb(var(--mars-shadow-warm) / 0.16)"
+            : "rgb(var(--mars-shadow-warm) / 0.1)",
+        }}
+      />
+    </div>
+  );
+}
+
+function MarsPreparedPad() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-1/2 top-1/2 -z-10"
+      style={{
+        width: GRID_WIDTH + 72,
+        height: GRID_HEIGHT + 72,
+        transform: "translate(-50%, -50%)",
+      }}
+    >
+      <div
+        className="absolute inset-0 rounded-[28px]"
+        style={{
+          background: [
+            "radial-gradient(circle at 50% 34%, rgb(var(--mars-pad-highlight) / 0.56) 0%, rgb(var(--mars-pad-highlight) / 0) 34%)",
+            "linear-gradient(180deg, rgb(var(--mars-pad-top) / 0.96) 0%, rgb(var(--mars-pad-bottom) / 0.94) 100%)",
+          ].join(", "),
+          border: "1px solid rgb(var(--mars-pad-border) / 0.28)",
+          boxShadow: [
+            "0 22px 40px rgb(var(--mars-shadow-core) / 0.28)",
+            "0 0 0 14px rgb(var(--mars-pad-ring) / 0.18)",
+            "inset 0 1px 0 rgb(var(--mars-pad-highlight) / 0.72)",
+            "inset 0 -10px 18px rgb(var(--mars-pad-border) / 0.1)",
+          ].join(", "),
+        }}
+      />
+      <div
+        className="absolute inset-[16px] rounded-[20px]"
+        style={{
+          border: "1px solid rgb(var(--mars-pad-inner) / 0.34)",
+        }}
+      />
+    </div>
+  );
+}
+
 export function GreenhouseGrid({
   introStage = "open",
 }: {
   introStage?: GreenhouseIntroStage;
 }) {
   const grid = useGreenhouseStore((s) => s.grid);
-  const missionSol = useGreenhouseStore((s) => s.missionSol);
   const dustStormActive = useGreenhouseStore((s) => s.dustStormActive);
   const focusedCrop = useGreenhouseStore((s) => s.focusedCrop);
   const [selected, setSelected] = useState<TileData | null>(null);
   const handleSelect = useCallback((tile: TileData) => setSelected(tile), []);
   const handleClose = useCallback(() => setSelected(null), []);
-  const interfaceVisible = introStage === "open";
   const interactive = introStage === "open";
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+      <MarsBackdrop dustStormActive={dustStormActive} />
 
       <TooltipProvider delay={120} closeDelay={0}>
         <div
-          className={interactive ? "pointer-events-auto" : "pointer-events-none"}
+          className={interactive ? "pointer-events-auto relative" : "pointer-events-none relative"}
           style={{ transform: "scaleY(0.58) rotate(-45deg)" }}
         >
-          <div className="relative rounded-lg border border-black/4 bg-black/0.5 p-2 shadow-[inset_0_0_80px_rgba(82,130,82,0.012)] dark:border-white/4 dark:bg-white/0.5">
+          <MarsGroundShadow dustStormActive={dustStormActive} />
+          <MarsPreparedPad />
+          <div
+            className="relative rounded-[18px] p-2"
+            style={{
+              border: "1px solid rgb(var(--mars-module-border) / 0.18)",
+              background: "rgb(var(--mars-module-surface) / 0.68)",
+              boxShadow: [
+                "0 18px 36px rgb(var(--mars-shadow-core) / 0.18)",
+                "0 0 0 1px rgb(var(--mars-module-inset) / 0.4) inset",
+                "inset 0 0 80px rgba(255, 255, 255, 0.12)",
+              ].join(", "),
+              backdropFilter: "blur(1.5px)",
+            }}
+          >
             <Corner position="top-left" />
             <Corner position="top-right" />
             <Corner position="bottom-left" />
@@ -381,8 +550,6 @@ export function GreenhouseGrid({
           </div>
         </div>
       </TooltipProvider>
-
-   
 
       {interactive && <CropDialog data={selected} onClose={handleClose} />}
     </div>
@@ -830,10 +997,10 @@ const GridTile = memo(function GridTile({
 }) {
   if (data.kind === "path") {
     return (
-      <div className="relative cursor-default rounded border border-black/2.5 bg-black/1 transition-colors duration-150 hover:bg-black/2 dark:border-white/4 dark:bg-white/2 dark:hover:bg-white/4">
+      <div className="relative cursor-default rounded border border-black/2.5 bg-black/1 transition-colors duration-150 hover:bg-black/2 dark:border-white/8 dark:bg-white/5 dark:hover:bg-white/7">
         {data.sensor && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-[7px] w-[7px] rounded-full border border-black/7 dark:border-white/10" />
+            <div className="h-[7px] w-[7px] rounded-full border border-black/7 dark:border-white/14" />
           </div>
         )}
       </div>
@@ -850,7 +1017,9 @@ const GridTile = memo(function GridTile({
       className={`crop-tile-button group/crop-tile relative h-full w-full rounded border transition-[background-color,border-color,transform,box-shadow] duration-200 ${
         focused && planted
           ? "grid-tile-focused border-yellow-500/40 bg-yellow-500/8 dark:border-yellow-400/35 dark:bg-yellow-400/6"
-          : "border-green-800/5.5 bg-green-800/4.5 hover:border-emerald-700/10 hover:bg-emerald-700/8 dark:border-green-400/6 dark:bg-green-400/4.5 dark:hover:border-green-400/10 dark:hover:bg-green-400/10"
+          : planted
+            ? "border-emerald-800/8 bg-emerald-700/7 hover:border-emerald-700/14 hover:bg-emerald-700/10 dark:border-emerald-300/14 dark:bg-emerald-300/8 dark:hover:border-emerald-300/18 dark:hover:bg-emerald-300/12"
+            : "border-green-800/5.5 bg-green-800/4.5 hover:border-emerald-700/10 hover:bg-emerald-700/8 dark:border-white/7 dark:bg-white/4 dark:hover:border-white/10 dark:hover:bg-white/7"
       } ${
         planted && cropInfo
           ? "cursor-pointer hover:z-30 hover:shadow-[0_12px_28px_rgba(122,168,141,0.08)] focus-visible:z-30"
@@ -888,9 +1057,9 @@ const GridTile = memo(function GridTile({
       )}
 
       {planted && (
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden rounded-b-sm bg-green-800/6 dark:bg-green-400/8">
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden rounded-b-sm bg-green-800/6 dark:bg-white/10">
           <div
-            className="h-full bg-green-800/18 dark:bg-green-400/25"
+            className="h-full bg-green-800/18 dark:bg-emerald-300/28"
             style={{ width: `${data.water}%` }}
           />
         </div>
@@ -1178,5 +1347,3 @@ const Corner = memo(function Corner({
     </>
   );
 });
-
-
