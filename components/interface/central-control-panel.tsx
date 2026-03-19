@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowCounterClockwise, FastForward, Copy, Check } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Copy, Check } from "@phosphor-icons/react";
 
 import { Button } from "@/components/ui/button";
 import { ControlPanelIcon } from "@/components/icons";
@@ -14,10 +14,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useGreenhouseStore, type SpeedKey, type ManualOverrides } from "@/lib/greenhouse-store";
 import { triggerHaptic } from "@/lib/haptics";
+import { SpeedSelector } from "@/components/interface/speed-selector";
 
 const MORPH_SPRING = { type: "spring" as const, bounce: 0.05, duration: 0.35 };
 
-const SPEED_LEVELS: SpeedKey[] = ["x1", "x2", "x5", "x10", "x20", "x50", "x100", "x1000", "x5000", "x10000"];
 
 interface CentralControlPanelProps {
   open: boolean;
@@ -116,13 +116,6 @@ export function CentralControlPanel({
     };
     applyOverrides(resetOverrides);
     triggerHaptic("light");
-  };
-
-  const handleSpeedCycle = () => {
-    const idx = SPEED_LEVELS.indexOf(speed);
-    const next = SPEED_LEVELS[(idx + 1) % SPEED_LEVELS.length];
-    setSpeed(next);
-    triggerHaptic("selection");
   };
 
   const handleCopyJson = () => {
@@ -228,16 +221,7 @@ export function CentralControlPanel({
                   <ArrowCounterClockwise size={14} weight="bold" />
                 </button>
 
-                <button
-                  type="button"
-                  className="cc-toolbar-speed"
-                  onClick={handleSpeedCycle}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  title={`Speed: ${speed} — click to cycle`}
-                >
-                  <FastForward size={14} weight="fill" />
-                  <span className="cc-toolbar-speed-label">{speed}</span>
-                </button>
+                <SpeedSelector className="flex-1" />
 
                 <button
                   type="button"

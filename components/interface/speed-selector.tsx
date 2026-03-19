@@ -32,28 +32,34 @@ export function SpeedSelector({
   const setSpeed = useGreenhouseStore((s) => s.setSpeed);
 
   const [internalOpen, setInternalOpen] = React.useState(false);
+  const [triggerWidth, setTriggerWidth] = React.useState<number | undefined>(undefined);
   const open = controlledOpen ?? internalOpen;
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+
   const setOpen = (next: boolean) => {
+    if (next && triggerRef.current) {
+      setTriggerWidth(triggerRef.current.getBoundingClientRect().width);
+    }
     if (controlledOpen === undefined) setInternalOpen(next);
     onOpenChange?.(next);
   };
-  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
 
   return (
-    <div className={cn("relative inline-flex", className)}>
+    <div className={cn("relative flex min-w-0", className)}>
       <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger
           aria-label="Choose speed"
           ref={triggerRef}
           className={cn(
-            "inline-flex h-10 min-w-12 select-none items-center justify-center rounded-full border-transparent bg-transparent px-4 font-[var(--font-ui)] text-[18px] leading-none font-medium text-[var(--dial-text-secondary)] shadow-none transition-[background-color,color] hover:bg-accent hover:text-[var(--dial-text-primary)]",
-            open && "bg-accent text-[var(--dial-text-primary)]"
+            "cc-toolbar-speed w-full select-none",
+            open && "bg-[var(--dial-surface-hover)] text-[var(--dial-text-primary)]"
           )}
           onMouseDown={(event) => {
             if (event.button === 2) {
               event.preventDefault();
               event.currentTarget.blur();
             }
+            event.stopPropagation();
           }}
           onContextMenu={(event) => {
             event.currentTarget.blur();
@@ -63,9 +69,10 @@ export function SpeedSelector({
         </DropdownMenuTrigger>
 
         <DropdownMenuContent
-          align="end"
-          sideOffset={8}
-          className="w-36"
+          align="start"
+          sideOffset={6}
+          className="min-w-0 p-1"
+          style={{ width: triggerWidth }}
           container={portalContainer}
         >
           <DropdownMenuRadioGroup
@@ -77,7 +84,7 @@ export function SpeedSelector({
             }}
           >
             {SPEED_OPTIONS.map((s) => (
-              <DropdownMenuRadioItem key={s} value={s}>
+              <DropdownMenuRadioItem key={s} value={s} className="min-h-0 py-1.5 px-3 text-xs cursor-pointer">
                 {s}
               </DropdownMenuRadioItem>
             ))}

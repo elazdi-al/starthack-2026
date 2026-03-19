@@ -29,19 +29,21 @@ function DropdownMenuContent({
   className,
   sideOffset = 8,
   align = "start",
+  side,
   container,
   ...props
 }: React.ComponentPropsWithoutRef<typeof Menu.Popup> & {
   sideOffset?: number;
   align?: React.ComponentPropsWithoutRef<typeof Menu.Positioner>["align"];
+  side?: React.ComponentPropsWithoutRef<typeof Menu.Positioner>["side"];
   container?: HTMLElement | null;
 }) {
   return (
     <Menu.Portal container={container}>
-      <Menu.Positioner align={align} sideOffset={sideOffset}>
+      <Menu.Positioner align={align} sideOffset={sideOffset} side={side} style={{ zIndex: 10000 }}>
         <Menu.Popup
           className={cn(
-            "min-w-44 overflow-hidden rounded-[var(--dial-panel-radius)] border border-[var(--dial-border)] bg-[var(--dial-glass-bg)] p-2.5 text-[var(--dial-text-primary)] shadow-[var(--dial-shadow)] outline-none backdrop-blur-[var(--dial-backdrop-blur)]",
+            "overflow-hidden rounded-[var(--dial-panel-radius)] border border-[var(--dial-border)] bg-[var(--dial-glass-bg)] p-2.5 text-[var(--dial-text-primary)] shadow-[var(--dial-shadow)] outline-none backdrop-blur-[var(--dial-backdrop-blur)]",
             className
           )}
           {...props}
