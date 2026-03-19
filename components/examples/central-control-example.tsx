@@ -87,8 +87,8 @@ export function CentralControlExample() {
     DialStore.registerPanel(PANEL.gh, "Greenhouse", {
       globalHeatingPower:   [gh.globalHeatingPower, 0, 10000, 100],
       co2InjectionRate:     [gh.co2InjectionRate, 0, 200, 1],
-      ventilationRate:      [gh.ventilationRate, 0, 100, 1],
-      lightingPower:        [gh.lightingPower, 0, 2000, 10],
+      ventilationRate:      [gh.ventilationRate, 0, 500, 1],
+      lightingPower:        [gh.lightingPower, 0, 10000, 100],
       maxSolarGenerationKW: [gh.maxSolarGenerationKW, 10, 200, 1],
       batteryCapacityKWh:   [gh.batteryCapacityKWh, 50, 1000, 10],
     });
@@ -164,6 +164,34 @@ export function CentralControlExample() {
       if (changed) applyOverrides(next);
     });
   }, [applyOverrides]);
+
+  // ── Push greenhouse param changes back to sliders (e.g. from agent) ──
+  React.useEffect(() => {
+    const gh = simState.greenhouse;
+    pushingFromSim = true;
+    const v = DialStore.getValues(PANEL.gh);
+    for (const p of GH_PARAMS) {
+      if (v[p] !== undefined && v[p] !== gh[p]) {
+        DialStore.updateValue(PANEL.gh, p, gh[p]);
+      }
+    }
+    pushingFromSim = false;
+  }, [simState]);
+
+  // ── Push crop param changes back to sliders (e.g. from agent) ───────
+  React.useEffect(() => {
+    const crop = selectedCropRef.current;
+    const c = simState.greenhouse.crops[crop];
+    if (!c) return;
+    pushingFromSim = true;
+    const v = DialStore.getValues(PANEL.crops);
+    for (const p of CROP_PARAMS) {
+      if (v[p] !== undefined && v[p] !== c[p]) {
+        DialStore.updateValue(PANEL.crops, p, c[p]);
+      }
+    }
+    pushingFromSim = false;
+  }, [simState]);
 
   // ── Greenhouse controls → simulation ────────────────────────────────────
   React.useEffect(() => {
