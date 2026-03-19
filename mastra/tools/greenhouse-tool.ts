@@ -1,53 +1,81 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { applyTransformations } from '../../greenhouse/implementations/multi-crop/transformation';
-import type { ConcreteState } from '../../greenhouse/implementations/multi-crop/types';
 
-export const greenhouseTransformationTool = createTool({
-  id: 'apply-greenhouse-transformations',
+const VALID_GLOBAL_PARAMS = [
+  'globalHeatingPower',
+  'co2InjectionRate',
+  'ventilationRate',
+  'lightingPower',
+] as const;
+
+const VALID_CROP_PARAMS = ['waterPumpRate', 'localHeatingPower'] as const;
+
+const CROP_NAMES = [
+  'lettuce', 'tomato', 'potato', 'soybean',
+  'spinach', 'wheat', 'radish', 'kale',
+] as const;
+
+export const greenhouseParameterTool = createTool({
+  id: 'set-greenhouse-parameters',
   description:
-    'Apply a sequence of parameter transformations to a greenhouse state. ' +
-    'Each transformation updates a greenhouse parameter or crop-specific parameter, applied in order.',
+    'Adjust greenhouse machine parameters. Changes propagate progressively through ' +
+    'the thermal/atmospheric simulation (not instantaneously). ' +
+    'Global params: globalHeatingPower (W, 0–10000), co2InjectionRate (ppm/h, 0–200), ' +
+    'ventilationRate (m³/h, 0–500), lightingPower (W, 0–10000). ' +
+    'Crop params (requires crop name): waterPumpRate (L/h, 0–30), localHeatingPower (W, 0–1000). ' +
+    'Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale.',
   inputSchema: z.object({
-    state: z.any().describe('The current greenhouse state object'),
-    time: z.number().describe('The time in minutes at which to apply transformations'),
-    transformations: z
+    changes: z
       .array(
         z.object({
-          type: z
-            .enum(['greenhouse', 'crop'])
-            .describe('greenhouse for global parameters, crop for crop-specific'),
-          param: z
-            .string()
-            .describe('Parameter name (e.g. globalHeatingPower, waterPumpRate)'),
-          value: z.number().describe('New numeric value for the parameter'),
+          type: z.enum(['greenhouse', 'crop']),
+          param: z.string().describe('Parameter name'),
+          value: z.number().describe('New value'),
           crop: z
-            .enum(['tomatoes', 'carrots'])
+            .enum(CROP_NAMES)
             .optional()
-            .describe('Required only for crop-type transformations'),
+            .describe('Required for crop-type changes'),
         }),
       )
-      .describe('Array of transformations to apply in sequence'),
+      .min(1)
+      .describe('Parameter changes to apply'),
+    reasoning: z
+      .string()
+      .describe('Brief explanation of why these changes are being made'),
   }),
-  execute: async (inputData) => {
-    const { state, time, transformations } = inputData;
+  execute: async ({ changes, reasoning }) => {
+    const validated: typeof changes = [];
 
-    try {
-      const finalState = applyTransformations(
-        state as ConcreteState,
-        time,
-        transformations,
-      );
-      return {
-        success: true,
-        finalState,
-        message: `Applied ${transformations.length} transformations successfully`,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: (error as Error).message,
-      };
+    for (const change of changes) {
+      if (change.type === 'greenhouse') {
+        if (!(VALID_GLOBAL_PARAMS as readonly string[]).includes(change.param)) {
+          return {
+            success: false,
+            error: `Invalid global parameter "${change.param}". Valid: ${VALID_GLOBAL_PARAMS.join(', ')}`,
+          };
+        }
+      } else if (change.type === 'crop') {
+        if (!(VALID_CROP_PARAMS as readonly string[]).includes(change.param)) {
+          return {
+            success: false,
+            error: `Invalid crop parameter "${change.param}". Valid: ${VALID_CROP_PARAMS.join(', ')}`,
+          };
+        }
+        if (!change.crop) {
+          return {
+            success: false,
+            error: `Crop name is required for crop-type parameter changes`,
+          };
+        }
+      }
+      validated.push(change);
     }
+
+    return {
+      success: true,
+      changes: validated,
+      reasoning,
+      message: `Queued ${validated.length} parameter change(s). Effects will manifest progressively following thermal dynamics.`,
+    };
   },
 });

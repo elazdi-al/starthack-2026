@@ -6,17 +6,20 @@ import {
 } from "@/greenhouse/implementations/multi-crop";
 import type {
   CropType,
+  CropEnvironment,
   ConcreteEnvironment,
   ConcreteGreenhouseState,
   ConcreteState,
+  CropControls,
 } from "@/greenhouse/implementations/multi-crop/types";
+import { updateGreenhouseParam, updateCropParam } from "@/greenhouse/implementations/multi-crop/transformation";
 
 export type { CropType };
 
 export type TileKind = "crop" | "path";
 export type Status = "ok" | "warn" | null;
 
-export type SpeedKey = "x1" | "x2" | "x5" | "x10";
+export type SpeedKey = "x1" | "x2" | "x5" | "x10" | "x20" | "x50" | "x100";
 
 export interface CropInfo {
   name: string;
@@ -188,6 +191,9 @@ const SPEED_MULTIPLIER: Record<SpeedKey, number> = {
   x2: 2,
   x5: 5,
   x10: 10,
+  x20: 20,
+  x50: 50,
+  x100: 100,
 };
 
 function makeInitialTimestamp(): number {
@@ -222,6 +228,23 @@ export interface GreenhouseState {
   tick: () => void;
   setGrid: (grid: TileData[][]) => void;
   getEnvironmentSnapshot: () => EnvironmentSnapshot;
+  applyParameterChanges: (
+    changes: Array<{
+      type: "greenhouse" | "crop";
+      param: string;
+      value: number;
+      crop?: string;
+    }>,
+  ) => void;
+}
+
+export interface CropSnapshot {
+  soilMoisture: number;
+  soilTemperature: number;
+  plantGrowth: number;
+  leafArea: number;
+  fruitCount: number;
+  controls: { waterPumpRate: number; localHeatingPower: number };
 }
 
 export interface EnvironmentSnapshot {
@@ -237,22 +260,7 @@ export interface EnvironmentSnapshot {
     ventilationRate: number;
     lightingPower: number;
   };
-  tomatoes: {
-    soilMoisture: number;
-    soilTemperature: number;
-    plantGrowth: number;
-    leafArea: number;
-    fruitCount: number;
-    controls: { waterPumpRate: number; localHeatingPower: number };
-  };
-  carrots: {
-    soilMoisture: number;
-    soilTemperature: number;
-    plantGrowth: number;
-    leafArea: number;
-    fruitCount: number;
-    controls: { waterPumpRate: number; localHeatingPower: number };
-  };
+  crops: Partial<Record<CropType, CropSnapshot>>;
 }
 
 function round1(n: number): number {
@@ -263,6 +271,18 @@ function buildSnapshot(
   env: ConcreteEnvironment,
   gh: ConcreteGreenhouseState,
 ): EnvironmentSnapshot {
+  const crops: EnvironmentSnapshot["crops"] = {};
+  for (const [key, cropEnv] of Object.entries(env.crops) as [CropType, CropEnvironment][]) {
+    crops[key] = {
+      soilMoisture: round1(cropEnv.soilMoisture),
+      soilTemperature: round1(cropEnv.soilTemperature),
+      plantGrowth: round1(cropEnv.plantGrowth),
+      leafArea: Math.round(cropEnv.leafArea * 100) / 100,
+      fruitCount: cropEnv.fruitCount,
+      controls: { ...gh.crops[key] },
+    };
+  }
+
   return {
     airTemperature: round1(env.airTemperature),
     humidity: round1(env.humidity),
@@ -276,22 +296,7 @@ function buildSnapshot(
       ventilationRate: gh.ventilationRate,
       lightingPower: gh.lightingPower,
     },
-    tomatoes: {
-      soilMoisture: round1(env.tomatoes.soilMoisture),
-      soilTemperature: round1(env.tomatoes.soilTemperature),
-      plantGrowth: round1(env.tomatoes.plantGrowth),
-      leafArea: Math.round(env.tomatoes.leafArea * 100) / 100,
-      fruitCount: env.tomatoes.fruitCount,
-      controls: { ...gh.tomatoes },
-    },
-    carrots: {
-      soilMoisture: round1(env.carrots.soilMoisture),
-      soilTemperature: round1(env.carrots.soilTemperature),
-      plantGrowth: round1(env.carrots.plantGrowth),
-      leafArea: Math.round(env.carrots.leafArea * 100) / 100,
-      fruitCount: env.carrots.fruitCount,
-      controls: { ...gh.carrots },
-    },
+    crops,
   };
 }
 
@@ -337,6 +342,39 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   getEnvironmentSnapshot: () => {
     const { environment, simState } = get();
     return buildSnapshot(environment, simState.greenhouse);
+  },
+
+  applyParameterChanges: (changes) => {
+    const { simState, elapsedMinutes } = get();
+    let currentState: ConcreteState = simState;
+
+    for (const change of changes) {
+      if (change.type === "greenhouse") {
+        currentState = updateGreenhouseParam(
+          change.param as keyof ConcreteGreenhouseState,
+          change.value as ConcreteGreenhouseState[keyof ConcreteGreenhouseState],
+          elapsedMinutes,
+        )(currentState) as ConcreteState;
+      } else if (change.type === "crop" && change.crop) {
+        currentState = updateCropParam(
+          change.crop as CropType,
+          change.param as keyof CropControls,
+          change.value,
+          elapsedMinutes,
+        )(currentState) as ConcreteState;
+      }
+    }
+
+    const env = currentState.simulation.getEnvironment(0);
+    set({
+      simState: currentState,
+      elapsedMinutes: 0,
+      environment: env,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+    });
   },
 }));
 

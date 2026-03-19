@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessageData } from "@/components/chat/chat-message";
+import type { ChatMessageData, ToolCallData } from "@/components/chat/chat-message";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
 
 export interface ChatState {
@@ -8,7 +8,7 @@ export interface ChatState {
   threadId: string;
 
   addMessage: (message: ChatMessageData) => void;
-  updateMessage: (id: string, content: string) => void;
+  updateMessage: (id: string, patch: Partial<ChatMessageData>) => void;
   setStreaming: (streaming: boolean) => void;
   clearMessages: () => void;
   sendMessage: (text: string) => Promise<void>;
@@ -29,10 +29,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
 
-  updateMessage: (id, content) =>
+  updateMessage: (id, patch) =>
     set((state) => ({
       messages: state.messages.map((m) =>
-        m.id === id ? { ...m, content } : m,
+        m.id === id ? { ...m, ...patch } : m,
       ),
     })),
 
@@ -83,23 +83,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       if (!res.ok) {
         const errText = await res.text().catch(() => "Unknown error");
-        updateMessage(
-          assistantId,
-          `Sorry, something went wrong (${res.status}). ${errText}`,
-        );
+        updateMessage(assistantId, {
+          content: `Sorry, something went wrong (${res.status}). ${errText}`,
+        });
         setStreaming(false);
         return;
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
-        updateMessage(assistantId, "No response stream available.");
+        updateMessage(assistantId, { content: "No response stream available." });
         setStreaming(false);
         return;
       }
 
       const decoder = new TextDecoder();
       let accumulated = "";
+      let toolCalls: ToolCallData[] = [];
       let buffer = "";
 
       while (true) {
@@ -118,11 +118,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           try {
             const parsed = JSON.parse(payload);
-            if (typeof parsed === "string") {
+
+            if (parsed.type === "text-delta" && typeof parsed.text === "string") {
+              accumulated += parsed.text;
+              updateMessage(assistantId, { content: accumulated });
+            } else if (parsed.type === "tool-call") {
+              const tc: ToolCallData = {
+                toolCallId: parsed.toolCallId,
+                toolName: parsed.toolName,
+                args: parsed.args ?? {},
+                status: "calling",
+              };
+              toolCalls = [...toolCalls, tc];
+              updateMessage(assistantId, { toolCalls: [...toolCalls] });
+            } else if (parsed.type === "tool-result") {
+              toolCalls = toolCalls.map((tc) =>
+                tc.toolCallId === parsed.toolCallId
+                  ? {
+                      ...tc,
+                      result: parsed.result,
+                      status: (parsed.result?.success === false ? "error" : "complete") as ToolCallData["status"],
+                    }
+                  : tc,
+              );
+              updateMessage(assistantId, { toolCalls: [...toolCalls] });
+
+              if (
+                parsed.toolName === "set-greenhouse-parameters" &&
+                parsed.result?.success &&
+                Array.isArray(parsed.result.changes)
+              ) {
+                useGreenhouseStore
+                  .getState()
+                  .applyParameterChanges(parsed.result.changes);
+              }
+            } else if (parsed.type === "error") {
+              updateMessage(assistantId, {
+                content: accumulated || `Error: ${parsed.error}`,
+              });
+            } else if (typeof parsed === "string") {
               accumulated += parsed;
-              updateMessage(assistantId, accumulated);
-            } else if (parsed?.error) {
-              updateMessage(assistantId, `Error: ${parsed.error}`);
+              updateMessage(assistantId, { content: accumulated });
             }
           } catch {
             // skip unparseable chunks
@@ -130,17 +166,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
-      if (!accumulated) {
-        updateMessage(
-          assistantId,
-          "I received your message but couldn't generate a response. Please try again.",
-        );
+      if (!accumulated && toolCalls.length === 0) {
+        updateMessage(assistantId, {
+          content:
+            "I received your message but couldn't generate a response. Please try again.",
+        });
       }
     } catch (err) {
-      updateMessage(
-        assistantId,
-        `Connection error: ${err instanceof Error ? err.message : "unknown"}`,
-      );
+      updateMessage(assistantId, {
+        content: `Connection error: ${err instanceof Error ? err.message : "unknown"}`,
+      });
     } finally {
       setStreaming(false);
     }

@@ -28,14 +28,46 @@ export async function POST(req: Request) {
   const readable = new ReadableStream({
     async start(controller) {
       try {
-        for await (const chunk of result.textStream) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        for await (const chunk of result.fullStream) {
+          switch (chunk.type) {
+            case 'text-delta': {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({
+                  type: 'text-delta',
+                  text: chunk.payload.text,
+                })}\n\n`),
+              );
+              break;
+            }
+            case 'tool-call': {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({
+                  type: 'tool-call',
+                  toolCallId: chunk.payload.toolCallId,
+                  toolName: chunk.payload.toolName,
+                  args: chunk.payload.args,
+                })}\n\n`),
+              );
+              break;
+            }
+            case 'tool-result': {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({
+                  type: 'tool-result',
+                  toolCallId: chunk.payload.toolCallId,
+                  toolName: chunk.payload.toolName,
+                  result: chunk.payload.result,
+                })}\n\n`),
+              );
+              break;
+            }
+          }
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       } catch (err) {
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Stream error' })}\n\n`,
+            `data: ${JSON.stringify({ type: 'error', error: err instanceof Error ? err.message : 'Stream error' })}\n\n`,
           ),
         );
       } finally {
