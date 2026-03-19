@@ -32,6 +32,25 @@ import {
 
 export type { CropType, GrowthStage, SeasonName, DustStormRisk, ManualOverrides };
 
+// ─── Agent Decision Log ──────────────────────────────────────────────────────────
+
+export interface AgentAction {
+  type: "greenhouse" | "crop" | "harvest" | "replant";
+  param?: string;
+  value?: number;
+  crop?: string;
+}
+
+export interface AgentDecision {
+  id: string;
+  sol: number;
+  elapsedMinutes: number;
+  summary: string;
+  reasoning: string;
+  actions: AgentAction[];
+  actionCount: number;
+}
+
 // ─── UI Types ───────────────────────────────────────────────────────────────────
 
 export type TileKind = "crop" | "path";
@@ -255,6 +274,12 @@ export interface GreenhouseState {
   events: SimEvent[];
   totalHarvestKg: number;
 
+  // Autonomous agent tick
+  lastTickSimMinutes: number;
+  tickInFlight: boolean;
+  autonomousEnabled: boolean;
+  agentDecisions: AgentDecision[];
+
   setSpeed: (speed: SpeedKey) => void;
   tick: () => void;
   skipToNextSol: () => void;
@@ -271,6 +296,8 @@ export interface GreenhouseState {
   applyOverrides: (overrides: ManualOverrides) => void;
   doHarvest: (crop: CropType) => void;
   doReplant: (crop: CropType) => void;
+  setAutonomousEnabled: (enabled: boolean) => void;
+  autonomousTick: () => Promise<void>;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -397,6 +424,11 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   events: [],
   totalHarvestKg: 0,
 
+  lastTickSimMinutes: 0,
+  tickInFlight: false,
+  autonomousEnabled: true,
+  agentDecisions: [],
+
   setSpeed: (speed) => set({ speed }),
 
   skipToNextSol: () => {
@@ -496,6 +528,12 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       dustStormActive: nowDust,
       events: newEvents,
     });
+
+    // Fire autonomous agent tick every 15 simulation minutes
+    const { lastTickSimMinutes, tickInFlight, autonomousEnabled } = get();
+    if (autonomousEnabled && !tickInFlight && nextMinutes - lastTickSimMinutes >= 15) {
+      get().autonomousTick();
+    }
   },
 
   setGrid: (grid) => set({ grid }),
@@ -607,6 +645,89 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       grid: syncGridFromEnv(get().grid, env),
       events: newEvents,
     });
+  },
+
+  setAutonomousEnabled: (enabled) => set({ autonomousEnabled: enabled }),
+
+  autonomousTick: async () => {
+    const { tickInFlight, elapsedMinutes, environment, simState, totalHarvestKg, events } = get();
+    if (tickInFlight) return;
+
+    set({ tickInFlight: true, lastTickSimMinutes: elapsedMinutes });
+
+    try {
+      const snapshot = buildSnapshot(environment, simState.greenhouse, totalHarvestKg);
+
+      const res = await fetch('/api/agent-tick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshot }),
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json() as {
+        ok: boolean;
+        summary?: string;
+        reasoning?: string;
+        actions?: Array<{
+          type: "greenhouse" | "crop" | "harvest" | "replant";
+          param?: string;
+          value?: number;
+          crop?: string;
+        }>;
+      };
+
+      if (!data.ok || !data.actions) return;
+
+      // Record decision and push to event log
+      const currentEnv = get().environment;
+      const decision: AgentDecision = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        sol: currentEnv.missionSol,
+        elapsedMinutes,
+        summary: data.summary ?? 'Autonomous tick completed',
+        reasoning: data.reasoning ?? '',
+        actions: data.actions as AgentAction[],
+        actionCount: data.actions.length,
+      };
+      const agentEvents: SimEvent[] = [...get().events, {
+        sol: currentEnv.missionSol,
+        type: "agent_action",
+        severity: "info",
+        message: `[Agent] ${decision.summary}`,
+      }];
+      set({
+        agentDecisions: [decision, ...get().agentDecisions].slice(0, 50),
+        events: agentEvents,
+      });
+
+      // Apply harvests and replants first, then parameter changes
+      for (const action of data.actions) {
+        if (action.type === "harvest" && action.crop) {
+          get().doHarvest(action.crop as CropType);
+        } else if (action.type === "replant" && action.crop) {
+          get().doReplant(action.crop as CropType);
+        }
+      }
+
+      const paramChanges = data.actions
+        .filter((a) => a.type === "greenhouse" || a.type === "crop")
+        .map((a) => ({
+          type: a.type as "greenhouse" | "crop",
+          param: a.param!,
+          value: a.value!,
+          crop: a.crop,
+        }));
+
+      if (paramChanges.length > 0) {
+        get().applyParameterChanges(paramChanges);
+      }
+    } catch (err) {
+      console.error('[autonomousTick] error:', err);
+    } finally {
+      set({ tickInFlight: false });
+    }
   },
 }));
 

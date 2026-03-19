@@ -130,7 +130,7 @@ export interface ConcreteState extends State {
 
 export interface SimEvent {
   sol: number;
-  type: 'harvest' | 'replant' | 'stress_alert' | 'dust_storm_start' | 'dust_storm_end' | 'resource_warning' | 'crop_death' | 'stage_change';
+  type: 'harvest' | 'replant' | 'stress_alert' | 'dust_storm_start' | 'dust_storm_end' | 'resource_warning' | 'crop_death' | 'stage_change' | 'agent_action';
   severity: 'info' | 'warning' | 'critical';
   message: string;
   crop?: CropType;

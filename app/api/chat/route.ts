@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     : messages;
 
   const result = await agent.stream(augmentedMessages, {
-    maxSteps: 5,
+    maxSteps: 10,
     memory: {
       thread: threadId ?? 'default-thread',
       resource: resourceId ?? 'default-user',

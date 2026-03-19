@@ -3,9 +3,10 @@ import { LibSQLStore } from '@mastra/libsql';
 import { PinoLogger } from '@mastra/loggers';
 import { CloudExporter, DefaultExporter, Observability, SensitiveDataFilter } from '@mastra/observability';
 import { greenhouseAgent } from './agents/greenhouse-agent';
+import { greenhouseControlWorkflow } from './workflows/greenhouse-control';
 
 export const mastra = new Mastra({
-  workflows: {},
+  workflows: { greenhouseControl: greenhouseControlWorkflow },
   agents: { greenhouseAgent },
   storage: new LibSQLStore({
     id: 'mastra-storage',
