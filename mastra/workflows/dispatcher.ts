@@ -645,6 +645,21 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
       return false;
     });
 
+    // ── ARBITER REASONING ─────────────────────────────────────────────────
+
+    const survivalSummary = survivalJustification && survivalJustification !== 'No proposal'
+      ? survivalJustification.slice(0, 150) : 'No input';
+    const wellbeingSummary = wellbeingJustification && wellbeingJustification !== 'No proposal'
+      ? wellbeingJustification.slice(0, 150) : 'No input';
+    const decisionOutcome = conflictType === 'hard_veto'
+      ? `Decision: Survival veto — safety threshold exceeded.`
+      : conflictType === 'soft_conflict'
+      ? `Decision: Conflict resolved via simulation — ${winningAgent} plan selected.`
+      : winningAgent === 'both'
+      ? `Decision: Agents agreed — merged both proposals.`
+      : `Decision: ${winningAgent} plan enacted.`;
+    const arbiterReasoning = `Survival: ${survivalSummary}\nWellbeing: ${wellbeingSummary}\n${decisionOutcome}`;
+
     // ── SECRETARY LOGGING ──────────────────────────────────────────────────
 
     const logTriggerType: TriggerType = isEmergencySev2 ? 'emergency_sev2'
@@ -663,14 +678,8 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
       actionsEnacted: resolvedActions,
       simulationP10,
       simulationP90,
-      reasoning: `${conflictType} — ${winningAgent} agent won. Risk: ${survivalRiskScore.toFixed(2)}, Wellbeing: ${wellbeingScore.toFixed(2)}`,
+      reasoning: arbiterReasoning,
     });
-
-    const summary = conflictType === 'hard_veto'
-      ? `⚠️ Hard veto (risk ${survivalRiskScore.toFixed(2)}) — survival plan enacted`
-      : conflictType === 'soft_conflict'
-      ? `Soft conflict resolved via simulation — ${winningAgent} plan selected (P10: ${simulationP10?.toFixed(1)} kg)`
-      : `${resolvedActions.length} action(s) enacted — ${conflictType}`;
 
     return {
       triggerType: logTriggerType,
@@ -686,8 +695,14 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
       crewResponse: crewResponseText || undefined,
       simulationP10,
       simulationP90,
-      reasoning: `Survival: ${survivalJustification.slice(0, 100)} | Wellbeing: ${wellbeingJustification.slice(0, 100)}`,
-      summary,
+      reasoning: arbiterReasoning,
+      summary: conflictType === 'hard_veto'
+        ? `Safety veto (risk ${survivalRiskScore.toFixed(2)}) — survival plan enacted`
+        : conflictType === 'soft_conflict'
+        ? `Conflict resolved — ${winningAgent} plan selected`
+        : isEmergencySev2
+        ? `Severity-2 emergency — ${resolvedActions.length} action(s) enacted`
+        : `${resolvedActions.length} action(s) enacted — agents agreed`,
       decisionId: decisionEntry.id,
     };
   },

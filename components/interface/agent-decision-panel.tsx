@@ -153,7 +153,7 @@ function DecisionCard({ decision, defaultOpen }: { decision: AgentDecision; defa
               <p className="type-caption text-[var(--dial-text-tertiary)] uppercase tracking-wider mb-1.5">
                 Reasoning
               </p>
-              <p className="type-caption text-[var(--dial-text-secondary)] leading-relaxed">
+              <p className="type-caption text-[var(--dial-text-secondary)] leading-relaxed whitespace-pre-line">
                 {decision.reasoning}
               </p>
             </div>
