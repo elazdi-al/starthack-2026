@@ -524,8 +524,8 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
       }
     }
 
-    // Parse wellbeing agent output (only if not sev2 emergency)
-    if (!isEmergencySev2 && wellbeingResult.status === 'fulfilled' && wellbeingResult.value) {
+    // Parse wellbeing agent output
+    if (wellbeingResult.status === 'fulfilled' && wellbeingResult.value) {
       const wText = wellbeingResult.value.text ?? '';
       const jsonMatch = wText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
