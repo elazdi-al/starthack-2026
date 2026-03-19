@@ -180,8 +180,8 @@ export interface MissionResources {
 }
 
 export const CREW_DAILY_TARGETS = {
-  calories: 10_000,
-  proteinG: 224,
+  calories: 12_000,   // ~3,000 kcal/day × 4 astronauts (KB: 2,500–3,800 kcal/day per astronaut)
+  proteinG: 360,      // ~90 g/day × 4 astronauts minimum (KB: 90–135 g/day per astronaut)
   vitaminC_mg: 360,
   vitaminA_mcg: 3_600,
   iron_mg: 48,

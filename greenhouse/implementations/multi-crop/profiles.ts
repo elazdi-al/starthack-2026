@@ -109,14 +109,16 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     },
   },
   soybean: {
-    optimalTemp: 25, optimalMoisture: 65, tempSigma: 5, moistureSigma: 15,
-    growthCycleSols: 97,
+    // KB: "Beans & Peas" (Phaseolus vulgaris / Pisum sativum) — 50–70 day cycle,
+    // 80–120 kcal/100g, 5–9 g protein/100g, harvest index 0.5–0.6
+    optimalTemp: 22, optimalMoisture: 65, tempSigma: 5, moistureSigma: 15,
+    growthCycleSols: 60,
     stageFractions: { ...STAGES_DEFAULT, vegetative: 0.25, fruiting: 0.30 },
-    maxYieldKgPerPlant: 0.5, plantsPerTile: 12, harvestIndex: 0.40,
-    caloriesPerKg: 1730, proteinPerKg: 166, vitaminC_mgPerKg: 60,
-    vitaminA_mcgPerKg: 9, iron_mgPerKg: 155, calcium_mgPerKg: 2770, fiber_gPerKg: 92,
+    maxYieldKgPerPlant: 0.4, plantsPerTile: 12, harvestIndex: 0.55,
+    caloriesPerKg: 1000, proteinPerKg: 70, vitaminC_mgPerKg: 40,
+    vitaminA_mcgPerKg: 35, iron_mgPerKg: 18, calcium_mgPerKg: 370, fiber_gPerKg: 65,
     waterLPerHourBase: 0.042, optimalLightHours: 15,
-    boltingTempThreshold: 34, boltingHoursToTrigger: 30,
+    boltingTempThreshold: 30, boltingHoursToTrigger: 30,
     nutrientSensitivity: 0.7, rootO2Sensitivity: 0.65, diseaseSusceptibility: 0.45,
     lightSaturationPoint: 55000,
     geneticVariance: {
@@ -163,7 +165,7 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     optimalTemp: 19, optimalMoisture: 60, tempSigma: 4, moistureSigma: 12,
     growthCycleSols: 29,
     stageFractions: { ...STAGES_DEFAULT, germination: 0.12, vegetative: 0.35, flowering: 0.10, fruiting: 0.28 },
-    maxYieldKgPerPlant: 0.15, plantsPerTile: 30, harvestIndex: 0.80,
+    maxYieldKgPerPlant: 0.15, plantsPerTile: 30, harvestIndex: 0.70, // KB: 0.6–0.8
     caloriesPerKg: 160, proteinPerKg: 7, vitaminC_mgPerKg: 148,
     vitaminA_mcgPerKg: 7, iron_mgPerKg: 3.4, calcium_mgPerKg: 250, fiber_gPerKg: 16,
     waterLPerHourBase: 0.025, optimalLightHours: 13,

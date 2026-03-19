@@ -17,7 +17,7 @@ const MARS_MEAN_TEMP = -63;        // °C mean surface temperature
 const MARS_YEAR_SOLS = 668.6;      // sols per Martian year
 const MARS_ECCENTRICITY = 0.0934;  // orbital eccentricity (much higher than Earth's 0.017)
 const MARS_LS_PERIHELION = 251;    // Ls° at perihelion (southern summer / global storm season)
-const MARS_MEAN_PRESSURE = 600;    // Pa mean surface pressure
+const MARS_MEAN_PRESSURE = 650;    // Pa mean surface pressure (KB: 6–7 mbar)
 
 // ─── Thermal / Atmospheric Constants ────────────────────────────────────────────
 const THERMAL_BASE   = 8;
