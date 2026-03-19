@@ -528,9 +528,13 @@ function MarsPreparedPad() {
 
 export function GreenhouseGrid({
   introStage = "open",
+  greenhouseVisible = false,
+  onGreenhouseVisibleChange,
   showBackdrop = true,
 }: {
   introStage?: GreenhouseIntroStage;
+  greenhouseVisible?: boolean;
+  onGreenhouseVisibleChange?: (next: boolean) => void;
   showBackdrop?: boolean;
 }) {
   const grid = useGreenhouseStore((s) => s.grid);
@@ -544,32 +548,22 @@ export function GreenhouseGrid({
   // ── Pan & Zoom ────────────────────────────────────────────────────────
   const [zoom, setZoom] = useState(1);
 
-  // ── Zoom-driven wall visibility with hysteresis ────────────────────────
-  // Walls hide at default zoom (1.0) and closer; show when zoomed out.
-  // Hysteresis prevents flickering at the boundary.
-  const ZOOM_HIDE_THRESHOLD = 1.0;  // zoom in past this → walls hide
-  const ZOOM_SHOW_THRESHOLD = 0.95; // zoom out past this → walls return
-  const [wallsVisible, setWallsVisible] = useState(false);
+  // Crossing this threshold while the greenhouse is off restores the shell
+  // and promotes that restored state into the explicit toggle.
+  const ZOOM_SHOW_THRESHOLD = 0.95;
+  const zoomRef = useRef(1);
+
+  const overlayVisible = introStage === "sealed" || greenhouseVisible;
+  const cropInteractionsEnabled = interactive && !overlayVisible;
 
   useEffect(() => {
-    if (zoom > ZOOM_HIDE_THRESHOLD && wallsVisible) {
-      setWallsVisible(false);
-    } else if (zoom < ZOOM_SHOW_THRESHOLD && !wallsVisible) {
-      setWallsVisible(true);
-    }
-  }, [zoom, wallsVisible]);
-
-  const cropInteractionsEnabled = interactive && !wallsVisible;
-  const overlayVisible = introStage === "sealed" || (interactive && wallsVisible);
-
-  useEffect(() => {
-    if (wallsVisible && selected !== null) {
+    if (overlayVisible && selected !== null) {
       const frameId = window.requestAnimationFrame(() => {
         setSelected(null);
       });
       return () => window.cancelAnimationFrame(frameId);
     }
-  }, [wallsVisible, selected]);
+  }, [overlayVisible, selected]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -577,8 +571,18 @@ export function GreenhouseGrid({
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    setZoom((z) => Math.min(3, Math.max(0.3, z - e.deltaY * 0.001)));
-  }, []);
+    const nextZoom = Math.min(3, Math.max(0.3, zoomRef.current - e.deltaY * 0.001));
+    const crossedRevealThreshold =
+      zoomRef.current >= ZOOM_SHOW_THRESHOLD &&
+      nextZoom < ZOOM_SHOW_THRESHOLD;
+
+    zoomRef.current = nextZoom;
+    setZoom(nextZoom);
+
+    if (!greenhouseVisible && crossedRevealThreshold) {
+      onGreenhouseVisibleChange?.(true);
+    }
+  }, [greenhouseVisible, onGreenhouseVisibleChange]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     // Don't pan when clicking on interactive elements (buttons, etc.)
@@ -681,7 +685,11 @@ export function GreenhouseGrid({
       {interactive && (zoom !== 1 || pan.x !== 0 || pan.y !== 0) && (
         <button
           type="button"
-          onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+          onClick={() => {
+            setZoom(1);
+            zoomRef.current = 1;
+            setPan({ x: 0, y: 0 });
+          }}
           className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
           style={{
             background: "var(--dial-glass-bg)",

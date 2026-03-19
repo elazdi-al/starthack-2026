@@ -75,6 +75,7 @@ export default function Home() {
   const [activeView, setActiveView]   = React.useState<MainView>("greenhouse");
   const [viewDirection, setViewDirection] = React.useState(1);
   const [introStage, setIntroStage] = React.useState<IntroStage>("sealed");
+  const [greenhouseVisible, setGreenhouseVisible] = React.useState(false);
   const setFocusedCrop = useGreenhouseStore((s) => s.setFocusedCrop);
 
   React.useEffect(() => {
@@ -172,6 +173,8 @@ export default function Home() {
               >
                 <GreenhouseView
                   introStage={introStage}
+                  greenhouseVisible={greenhouseVisible}
+                  onGreenhouseVisibleChange={setGreenhouseVisible}
                 />
               </motion.section>
             )}
@@ -242,6 +245,12 @@ export default function Home() {
                 className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2"
               >
                 <SettingsButton />
+                {activeView === "greenhouse" && (
+                  <GreenhouseToggleButton
+                    active={greenhouseVisible}
+                    onClick={() => setGreenhouseVisible((value) => !value)}
+                  />
+                )}
                 <HighlightTabs
                   items={navTabs}
                   value={activeTab}
@@ -287,13 +296,19 @@ export default function Home() {
 
 function GreenhouseView({
   introStage,
+  greenhouseVisible,
+  onGreenhouseVisibleChange,
 }: {
   introStage: IntroStage;
+  greenhouseVisible: boolean;
+  onGreenhouseVisibleChange: (next: boolean) => void;
 }) {
   return (
     <div className="absolute inset-0">
       <GreenhouseGrid
         introStage={introStage}
+        greenhouseVisible={greenhouseVisible}
+        onGreenhouseVisibleChange={onGreenhouseVisibleChange}
         showBackdrop={false}
       />
       <motion.div
@@ -303,6 +318,53 @@ function GreenhouseView({
         className="pointer-events-none absolute inset-0 bg-background"
       />
     </div>
+  );
+}
+
+function GreenhouseToggleButton({
+  active,
+  onClick,
+}: {
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={active ? "Hide greenhouse" : "Restore greenhouse"}
+      aria-label={active ? "Hide greenhouse" : "Restore greenhouse"}
+      aria-pressed={active}
+      className={[
+        "relative flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-transparent transition-[background-color,color,box-shadow] duration-200",
+        active
+          ? "bg-[var(--highlight-tabs-active)] text-[var(--highlight-tabs-active-foreground)]"
+          : "bg-[var(--highlight-tabs-bg)] text-[var(--highlight-tabs-text)] hover:text-[var(--dial-text-primary)]",
+      ].join(" ")}
+    >
+      <GreenhouseIcon active={active} />
+    </button>
+  );
+}
+
+function GreenhouseIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4.25 16.25V9.6L10 4.75L15.75 9.6V16.25" />
+      <path d="M6.65 16.25V10.9H13.35V16.25" opacity={active ? 1 : 0.76} />
+      <path d="M10 10.9V16.25" opacity={active ? 1 : 0.76} />
+      <path d="M6.65 13.55H13.35" opacity={active ? 1 : 0.76} />
+      {!active && <path d="M5.15 5.4L14.85 15.1" opacity="0.72" />}
+    </svg>
   );
 }
 
