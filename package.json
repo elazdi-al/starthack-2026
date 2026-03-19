@@ -36,6 +36,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "d3-array": "^3.2.4",
+    "d3-shape": "^3.2.0",
     "dialkit": "^1.1.0",
     "mastra": "^1.3.13",
     "motion": "^12.38.0",

@@ -57,6 +57,37 @@ const GREENHOUSE_PANEL_VARIANTS = {
   }),
 };
 
+/* ── Pre-computed animation tokens ──────────────────────────────────────────
+ * Module-scope constants so every render reuses the same object references.
+ * Only compositor-friendly props (opacity, translate, scale) — no
+ * `filter: blur()` which forces expensive per-frame repaint on the GPU.
+ * Reduced durations (0.42→0.36s) for snappier, more responsive feel.       */
+
+const UI_ENTER_TOP    = { opacity: 0, y: -10, scale: 0.98 };
+const UI_ENTER_BOTTOM = { opacity: 0, y: 10, scale: 0.98 };
+const UI_ENTER_RIGHT  = { opacity: 0, x: 12, scale: 0.98 };
+const UI_ANIMATE_Y    = { opacity: 1, y: 0, scale: 1 };
+const UI_ANIMATE_X    = { opacity: 1, x: 0, scale: 1 };
+const UI_EXIT_TOP     = { opacity: 0, y: -6 };
+const UI_EXIT_BOTTOM  = { opacity: 0, y: 6 };
+const UI_EXIT_RIGHT   = { opacity: 0, x: 8 };
+
+const UI_SPRING_A = { duration: 0.36, delay: 0.06, ease: [0.22, 1, 0.36, 1] };
+const UI_SPRING_B = { duration: 0.36, delay: 0.10, ease: [0.22, 1, 0.36, 1] };
+const UI_SPRING_C = { duration: 0.32, ease: [0.22, 1, 0.36, 1] };
+const UI_SPRING_D = { duration: 0.36, delay: 0.16, ease: [0.22, 1, 0.36, 1] };
+const UI_SPRING_E = { duration: 0.36, delay: 0.12, ease: [0.22, 1, 0.36, 1] };
+
+const ZERO_TRANSITION = { duration: 0 };
+const BACKDROP_ON     = { opacity: 1 };
+const BACKDROP_OFF    = { opacity: 0 };
+
+/** CSS containment styles for the dashboard view when active/hidden.
+ *  `visibility: hidden` tells the browser to skip paint entirely.
+ *  `contain: strict` prevents layout/paint from leaking across subtrees. */
+const DASHBOARD_ACTIVE: React.CSSProperties = { visibility: "visible", contain: "strict" };
+const DASHBOARD_HIDDEN: React.CSSProperties = { visibility: "hidden",  contain: "strict" };
+
 export default function Home() {
   const tickInFlight      = useGreenhouseStore((s) => s.tickInFlight);
   const autonomousEnabled = useGreenhouseStore((s) => s.autonomousEnabled);
@@ -97,7 +128,7 @@ export default function Home() {
     if (next) setControlOpen(false);
   }, []);
 
-  const handleControlOpenChange = (next: boolean) => {
+  const handleControlOpenChange = React.useCallback((next: boolean) => {
     setControlOpen(next);
     if (next) setSidebarOpen(false);
     triggerHaptic("selection");
@@ -110,7 +141,7 @@ export default function Home() {
         setFocusedCrop(selectedCrop);
       }
     }
-  };
+  }, [setFocusedCrop]);
 
   const interfaceVisible = introStage === "open";
 
@@ -126,6 +157,10 @@ export default function Home() {
   const handleAgentToggle = React.useCallback(() => {
     triggerHaptic("selection");
     setAgentOpen((v) => !v);
+  }, []);
+
+  const handleAgentClose = React.useCallback(() => {
+    setAgentOpen(false);
   }, []);
 
   const handleTabChange = React.useCallback((tab: string) => {
@@ -149,18 +184,23 @@ export default function Home() {
       <main
         aria-hidden={false}
         className="relative min-h-screen overflow-hidden transition-[margin-right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
-        style={{ marginRight: sidebarOpen ? 360 : 0 }}
+        style={{ marginRight: sidebarOpen ? 360 : 0, contain: "content" }}
       >
         <CentralControlExample />
         <SnapshotSync />
         <SimulationOverrides />
         <div className="absolute inset-0 isolate overflow-hidden">
-          <DashboardView />
+          <div
+            className="absolute inset-0"
+            style={activeView === "dashboard" ? DASHBOARD_ACTIVE : DASHBOARD_HIDDEN}
+          >
+            <DashboardView />
+          </div>
 
           <motion.div
             aria-hidden="true"
-            animate={{ opacity: activeView === "greenhouse" ? 1 : 0 }}
-            transition={shouldReduceMotion ? { duration: 0 } : VIEWPORT_TRANSITION}
+            animate={activeView === "greenhouse" ? BACKDROP_ON : BACKDROP_OFF}
+            transition={shouldReduceMotion ? ZERO_TRANSITION : VIEWPORT_TRANSITION}
             className="absolute inset-0 z-0"
           >
             <MarsBackdrop dustStormActive={dustStormActive} />
@@ -173,9 +213,9 @@ export default function Home() {
                 custom={viewDirection}
                 initial={shouldReduceMotion ? false : "enter"}
                 animate="center"
-                exit={shouldReduceMotion ? { opacity: 0 } : "exit"}
+                exit={shouldReduceMotion ? BACKDROP_OFF : "exit"}
                 variants={GREENHOUSE_PANEL_VARIANTS}
-                transition={shouldReduceMotion ? { duration: 0 } : GREENHOUSE_PANEL_TRANSITION}
+                transition={shouldReduceMotion ? ZERO_TRANSITION : GREENHOUSE_PANEL_TRANSITION}
                 className="absolute inset-0 z-10 will-change-transform"
               >
                 <GreenhouseView
@@ -205,10 +245,10 @@ export default function Home() {
           {interfaceVisible && (
             <>
               <motion.div
-                initial={shouldReduceMotion ? false : { opacity: 0, y: -10, filter: "blur(10px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={shouldReduceMotion ? undefined : { opacity: 0, y: -6, filter: "blur(8px)" }}
-                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+                initial={shouldReduceMotion ? false : UI_ENTER_TOP}
+                animate={UI_ANIMATE_Y}
+                exit={shouldReduceMotion ? undefined : UI_EXIT_TOP}
+                transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_A}
                 className="absolute left-6 top-6 flex items-center gap-2"
               >
                 <ClockWidget />
@@ -217,10 +257,10 @@ export default function Home() {
               </motion.div>
 
               <motion.div
-                initial={shouldReduceMotion ? false : { opacity: 0, y: -10, filter: "blur(10px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={shouldReduceMotion ? undefined : { opacity: 0, y: -6, filter: "blur(8px)" }}
-                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+                initial={shouldReduceMotion ? false : UI_ENTER_TOP}
+                animate={UI_ANIMATE_Y}
+                exit={shouldReduceMotion ? undefined : UI_EXIT_TOP}
+                transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_B}
                 className={`absolute right-6 top-6 flex items-center gap-3 ${controlOpen ? "z-50" : ""}`}
               >
                 <McpSetupButton />
@@ -231,23 +271,26 @@ export default function Home() {
                 <div className="size-10 shrink-0" />
               </motion.div>
 
-              {agentOpen && (
-                <motion.div
-                  initial={shouldReduceMotion ? false : { opacity: 0, y: 10, filter: "blur(10px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={shouldReduceMotion ? undefined : { opacity: 0, y: 6, filter: "blur(8px)" }}
-                  transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
-                  className="absolute top-20 left-6"
-                >
-                  <AgentDecisionPanel onClose={() => setAgentOpen(false)} />
-                </motion.div>
-              )}
+              <AnimatePresence>
+                {agentOpen && (
+                  <motion.div
+                    key="agent-panel"
+                    initial={shouldReduceMotion ? false : UI_ENTER_BOTTOM}
+                    animate={UI_ANIMATE_Y}
+                    exit={shouldReduceMotion ? undefined : UI_EXIT_BOTTOM}
+                    transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_C}
+                    className="absolute top-20 left-6"
+                  >
+                    <AgentDecisionPanel onClose={handleAgentClose} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <motion.div
-                initial={shouldReduceMotion ? false : { opacity: 0, y: 10, filter: "blur(10px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={shouldReduceMotion ? undefined : { opacity: 0, y: 6, filter: "blur(8px)" }}
-                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                initial={shouldReduceMotion ? false : UI_ENTER_BOTTOM}
+                animate={UI_ANIMATE_Y}
+                exit={shouldReduceMotion ? undefined : UI_EXIT_BOTTOM}
+                transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_D}
                 className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2"
               >
                 <SettingsButton />
@@ -280,10 +323,10 @@ export default function Home() {
         {interfaceVisible && (
           <>
             <motion.div
-              initial={shouldReduceMotion ? false : { opacity: 0, x: 12, filter: "blur(10px)" }}
-              animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-              exit={shouldReduceMotion ? undefined : { opacity: 0, x: 8, filter: "blur(8px)" }}
-              transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+              initial={shouldReduceMotion ? false : UI_ENTER_RIGHT}
+              animate={UI_ANIMATE_X}
+              exit={shouldReduceMotion ? undefined : UI_EXIT_RIGHT}
+              transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_E}
               className={`fixed right-6 top-6 ${controlOpen ? "z-40" : "z-60"}`}
             >
               <SidebarToggle
@@ -300,7 +343,7 @@ export default function Home() {
   );
 }
 
-function GreenhouseView({
+const GreenhouseView = React.memo(function GreenhouseView({
   introStage,
 }: {
   introStage: IntroStage;
@@ -310,7 +353,7 @@ function GreenhouseView({
       <GreenhouseGrid introStage={introStage} showBackdrop={false} />
     </div>
   );
-}
+});
 
 function GreenhouseToggleButton({
   active,

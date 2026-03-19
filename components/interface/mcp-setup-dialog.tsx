@@ -178,11 +178,6 @@ export function McpSetupDialog({ open, onOpenChange }: McpSetupDialogProps) {
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/6">
-                      <p className="type-caption text-[var(--dial-text-tertiary)] leading-relaxed">
-                        Powered by Amazon Bedrock AgentCore
-                      </p>
-                    </div>
                   </div>
                 </div>
               </Dialog.Popup>
