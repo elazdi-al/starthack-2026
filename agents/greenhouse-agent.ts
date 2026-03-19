@@ -3,19 +3,18 @@ import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { z } from 'zod';
 import { State } from '../greenhouse/state/types';
 import { updateGreenhouseParam, updateCropParam } from '../greenhouse/implementations/multi-crop/transformation';
-import { ConcreteState } from '../greenhouse/implementations/multi-crop/types';
-import { transformationTool } from './tools/transformation-tool';
+import { ConcreteState, ConcreteEnvironment, ConcreteGreenhouseState } from '../greenhouse/implementations/multi-crop/types';
 
-// Schema for the agent input
-const transformationInputSchema = z.object({
-  state: z.any().describe('The current greenhouse state'),
-  time: z.number().describe('The time in minutes'),
+// Schema for transformation output
+const transformationSchema = z.object({
   transformations: z.array(z.object({
     type: z.enum(['greenhouse', 'crop']),
     param: z.string(),
-    value: z.any(),
+    value: z.number(),
     crop: z.enum(['tomatoes', 'carrots']).optional(),
-  })).describe('Array of transformations to apply in sequence'),
+    reasoning: z.string().describe('Brief explanation for this adjustment'),
+  })),
+  summary: z.string().describe('Overall strategy summary'),
 });
 
 // Configure Bedrock with region
@@ -26,27 +25,33 @@ const bedrock = createAmazonBedrock({
 export const greenhouseAgent = new Agent({
   id: 'greenhouse-transformation-agent',
   name: 'Greenhouse Transformation Agent',
-  instructions: `You are a greenhouse control agent that applies parameter transformations to greenhouse states.
-  
-Given a state and time, you chain multiple updateGreenhouseParam or updateCropParam transformations to produce the next state.
+  instructions: `You are an expert Mars greenhouse control agent. Analyze environmental conditions and greenhouse parameters to determine optimal adjustments.
 
-Your role is to:
-1. Receive a greenhouse state and time
-2. Analyze the current conditions
-3. Determine optimal parameter adjustments
-4. Use the apply-greenhouse-transformations tool to apply the transformations
-5. Return the final transformed state
+Your goal: Maximize plant health and growth efficiency for tomatoes and carrots.
 
-Each transformation is applied in order, with the output of one becoming the input to the next.
+Optimal ranges:
+- Air Temperature: 20-25°C
+- Humidity: 60-80%
+- CO2: 800-1200 ppm
+- Tomato soil moisture: 65-75%
+- Carrot soil moisture: 60-70%
 
-Available parameters:
-- Greenhouse: globalHeatingPower, co2InjectionRate, ventilationRate, lightingPower
-- Crop (tomatoes/carrots): waterPumpRate, localHeatingPower`,
+Available parameters to adjust:
+Greenhouse (global):
+- globalHeatingPower (Watts)
+- co2InjectionRate (ppm/hour)
+- ventilationRate (m³/hour)
+- lightingPower (Watts)
+
+Crop-specific (tomatoes/carrots):
+- waterPumpRate (L/hour)
+- localHeatingPower (Watts)
+
+Return as many transformations as needed to optimize the system. Each transformation should have a clear reasoning.`,
   model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
-  tools: {
-    transformationTool,
-  },
 });
+
+export { transformationSchema };
 
 // Helper function to chain transformations
 export function applyTransformations(

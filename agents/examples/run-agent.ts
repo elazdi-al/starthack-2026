@@ -1,4 +1,4 @@
-import { greenhouseAgent, applyTransformations } from '../greenhouse-agent';
+import { greenhouseAgent, applyTransformations, transformationSchema } from '../greenhouse-agent';
 import { createInitialState } from '../../greenhouse/implementations/multi-crop/initial';
 import { ConcreteEnvironment, ConcreteGreenhouseState } from '../../greenhouse/implementations/multi-crop/types';
 
@@ -13,58 +13,67 @@ async function main() {
 
   console.log('📊 Initial Conditions:');
   console.log(`   Temp: ${env.airTemperature}°C | Humidity: ${env.humidity}% | CO2: ${env.co2Level}ppm`);
-  console.log(`   Tomato Soil: ${env.tomatoes.soilMoisture}% | Carrot Soil: ${env.carrots.soilMoisture}%\n`);
+  console.log(`   Tomato Soil: ${env.tomatoes.soilMoisture}% | Carrot Soil: ${env.carrots.soilMoisture}%`);
+  console.log(`   Heating: ${gh.globalHeatingPower}W | CO2 Injection: ${gh.co2InjectionRate}ppm/h\n`);
 
-  console.log('🤖 Asking agent for transformation recommendations...\n');
+  console.log('🤖 Agent analyzing conditions...\n');
 
   try {
     const result = await greenhouseAgent.generate(
-      `Analyze this Mars greenhouse and recommend 3-4 parameter transformations:
+      `Analyze this Mars greenhouse and determine optimal transformations:
 
-Current state:
-- Air Temperature: ${env.airTemperature}°C (optimal: 20-25°C)
-- Humidity: ${env.humidity}% (optimal: 60-80%)
-- CO2: ${env.co2Level}ppm (optimal: 800-1200ppm)
-- Tomato soil moisture: ${env.tomatoes.soilMoisture}% (optimal: 65-75%)
-- Carrot soil moisture: ${env.carrots.soilMoisture}% (optimal: 60-70%)
+Environment:
+- Air Temperature: ${env.airTemperature}°C
+- Humidity: ${env.humidity}%
+- CO2 Level: ${env.co2Level} ppm
+- Tomato Soil Moisture: ${env.tomatoes.soilMoisture}%
+- Tomato Soil Temp: ${env.tomatoes.soilTemperature}°C
+- Carrot Soil Moisture: ${env.carrots.soilMoisture}%
+- Carrot Soil Temp: ${env.carrots.soilTemperature}°C
 
-Current settings:
-- Global heating: ${gh.globalHeatingPower}W
-- CO2 injection: ${gh.co2InjectionRate}ppm/hour
-- Tomato water pump: ${gh.tomatoes.waterPumpRate}L/hour
-- Carrot water pump: ${gh.carrots.waterPumpRate}L/hour
+Current Settings:
+- Global Heating: ${gh.globalHeatingPower}W
+- CO2 Injection: ${gh.co2InjectionRate} ppm/hour
+- Ventilation: ${gh.ventilationRate} m³/hour
+- Lighting: ${gh.lightingPower}W
+- Tomato Water Pump: ${gh.tomatoes.waterPumpRate} L/hour
+- Carrot Water Pump: ${gh.carrots.waterPumpRate} L/hour
 
-Provide 3-4 specific transformations in this JSON format:
-[
-  {"type": "greenhouse", "param": "paramName", "value": number},
-  {"type": "crop", "param": "paramName", "value": number, "crop": "tomatoes"}
-]`
+Time: ${time} minutes
+
+Provide transformations to optimize plant health and growth.`,
+      {
+        structuredOutput: {
+          schema: transformationSchema,
+        },
+      }
     );
 
-    console.log('💬 Agent Recommendations:');
-    console.log(result.text);
-    console.log();
+    const output = result.object;
 
-    // Parse recommendations and apply them
-    console.log('🔄 Applying recommended transformations...\n');
-    
-    // Example transformations based on typical recommendations
-    const transformations = [
-      { type: 'greenhouse' as const, param: 'globalHeatingPower', value: 3500 },
-      { type: 'greenhouse' as const, param: 'co2InjectionRate', value: 80 },
-      { type: 'crop' as const, param: 'waterPumpRate', value: 12, crop: 'tomatoes' as const },
-    ];
+    console.log('📋 Strategy:', output.summary, '\n');
+    console.log(`🔧 Recommended Transformations (${output.transformations.length}):`);
+    output.transformations.forEach((t: any, i: number) => {
+      const desc = t.type === 'greenhouse' 
+        ? `${t.param} → ${t.value}`
+        : `${t.crop}.${t.param} → ${t.value}`;
+      console.log(`   ${i + 1}. ${desc}`);
+      console.log(`      ${t.reasoning}`);
+    });
 
-    const finalState = applyTransformations(initialState, time, transformations);
+    console.log('\n🔄 Applying transformations...\n');
+    const finalState = applyTransformations(initialState, time, output.transformations);
+
     const finalEnv = finalState.simulation.getEnvironment(time) as ConcreteEnvironment;
     const finalGh = finalState.greenhouse as ConcreteGreenhouseState;
 
     console.log('✅ Final State:');
     console.log(`   Temp: ${finalEnv.airTemperature.toFixed(1)}°C | Humidity: ${finalEnv.humidity.toFixed(1)}%`);
+    console.log(`   CO2: ${finalEnv.co2Level.toFixed(0)}ppm`);
     console.log(`   Tomato Soil: ${finalEnv.tomatoes.soilMoisture.toFixed(1)}% | Carrot Soil: ${finalEnv.carrots.soilMoisture.toFixed(1)}%`);
-    
+
   } catch (error) {
-    console.error('Error:', (error as Error).message);
+    console.error('❌ Error:', (error as Error).message);
   }
 }
 
