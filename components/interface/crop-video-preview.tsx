@@ -48,8 +48,8 @@ const VIDEO_DURATION = 8; // Veo generates 8-second videos
  * Shows a single frame from a crop's lifecycle video that corresponds
  * exactly to its current growth stage + progress within that stage.
  *
- * Falls back to `children` (the SVG preview) when the video is not
- * available or still loading.
+ * Shows a loading indicator while the media is pending and falls back
+ * to `children` only when the video is unavailable.
  */
 const CropVideoPreview = memo(function CropVideoPreview({
   crop,
@@ -114,7 +114,12 @@ const CropVideoPreview = memo(function CropVideoPreview({
       />
       {!ready && !error && (
         <div className="absolute inset-0 flex items-center justify-center">
-          {children}
+          <div className="flex flex-col items-center gap-3 text-black/28 dark:text-white/28">
+            <div className="h-7 w-7 animate-spin rounded-full border border-black/10 border-t-black/28 dark:border-white/10 dark:border-t-white/36" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em]">
+              Loading
+            </span>
+          </div>
         </div>
       )}
     </div>

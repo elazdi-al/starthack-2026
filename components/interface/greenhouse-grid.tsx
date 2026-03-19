@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, memo, useCallback, useMemo, useRef, useState } from "react";
+import { type ReactNode, memo, useCallback, useEffect, useRef, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion } from "motion/react";
 import { X, Crosshair } from "@phosphor-icons/react";
@@ -29,6 +29,14 @@ const ROWS = 9;
 const STEP = TILE + GAP;
 const GRID_WIDTH = COLS * TILE + (COLS - 1) * GAP;
 const GRID_HEIGHT = ROWS * TILE + (ROWS - 1) * GAP;
+const GREENHOUSE_EJECT_EASE = [0.42, 0, 1, 1] as const;
+const GREENHOUSE_PANEL_TRANSITIONS = {
+  north: { duration: 2.0, ease: GREENHOUSE_EJECT_EASE },
+  west: { duration: 2.0, ease: GREENHOUSE_EJECT_EASE, delay: 0.02 },
+  roof: { duration: 2.3, ease: GREENHOUSE_EJECT_EASE, delay: 0.04 },
+  east: { duration: 2.1, ease: GREENHOUSE_EJECT_EASE, delay: 0.01 },
+  south: { duration: 2.1, ease: GREENHOUSE_EJECT_EASE, delay: 0.03 },
+} as const;
 
 export type GreenhouseIntroStage = "sealed" | "opening" | "open";
 
@@ -486,9 +494,11 @@ function MarsPreparedPad() {
 
 export function GreenhouseGrid({
   introStage = "open",
+  greenhouseVisible = false,
   showBackdrop = true,
 }: {
   introStage?: GreenhouseIntroStage;
+  greenhouseVisible?: boolean;
   showBackdrop?: boolean;
 }) {
   const grid = useGreenhouseStore((s) => s.grid);
@@ -498,6 +508,20 @@ export function GreenhouseGrid({
   const handleSelect = useCallback((tile: TileData) => setSelected(tile), []);
   const handleClose = useCallback(() => setSelected(null), []);
   const interactive = introStage === "open";
+  const cropInteractionsEnabled = interactive && !greenhouseVisible;
+  const overlayVisible = introStage === "sealed" || (interactive && greenhouseVisible);
+
+  useEffect(() => {
+    if (!greenhouseVisible || selected === null) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      setSelected(null);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [greenhouseVisible, selected]);
 
   // ── Pan & Zoom ────────────────────────────────────────────────────────
   const [zoom, setZoom] = useState(1);
@@ -580,7 +604,7 @@ export function GreenhouseGrid({
               <Corner position="top-right" />
               <Corner position="bottom-left" />
               <Corner position="bottom-right" />
-              <GreenhouseOverlay introStage={introStage} />
+              <GreenhouseOverlay visible={overlayVisible} />
 
               <div
                 className="grid"
@@ -598,6 +622,7 @@ export function GreenhouseGrid({
                       row={r}
                       col={c}
                       focused={tile.kind === "crop" && tile.crop === focusedCrop}
+                      interactionsEnabled={cropInteractionsEnabled}
                       onSelect={handleSelect}
                     />
                   ))
@@ -625,17 +650,16 @@ export function GreenhouseGrid({
         </button>
       )}
 
-      {interactive && <CropDialog data={selected} onClose={handleClose} />}
+      {cropInteractionsEnabled && <CropDialog data={selected} onClose={handleClose} />}
     </div>
   );
 }
 
-function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage }) {
+function GreenhouseOverlay({ visible }: { visible: boolean }) {
+  const anim = useAnimationConfig();
   const inset = 6;
   const rise = 110;
   const roofPeak = 56;
-  const shadowOffsetX = 16;
-  const shadowOffsetY = 20;
   const startCol = 0;
   const startRow = 0;
   const colSpan = COLS;
@@ -661,7 +685,6 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
 
   const poly = (...points: [number, number][]) => points.map(([px, py]) => `${px},${py}`).join(" ");
   const rafterFractions = [0.18, 0.38, 0.58, 0.78];
-  const showShell = introStage !== "open";
   const floorGradientId = "greenhouse-floor-fill";
   const frontGradientId = "greenhouse-glass-front";
   const sideGradientId = "greenhouse-glass-side";
@@ -703,37 +726,15 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
         </filter>
       </defs>
 
-      {showShell && (
-        <>
-          {introStage === "sealed" && (
-            <g>
-              <polygon
-                points={poly(
-                  [baseTL[0] + shadowOffsetX, baseTL[1] + shadowOffsetY],
-                  [baseTR[0] + shadowOffsetX, baseTR[1] + shadowOffsetY],
-                  [baseBR[0] + shadowOffsetX, baseBR[1] + shadowOffsetY],
-                  [baseBL[0] + shadowOffsetX, baseBL[1] + shadowOffsetY],
-                )}
-                style={{ fill: "var(--greenhouse-shadow)" }}
-                filter="url(#greenhouse-shadow)"
-              />
-              <polygon
-                points={poly(baseTL, baseTR, baseBR, baseBL)}
-                fill={`url(#${floorGradientId})`}
-                style={{ stroke: "var(--greenhouse-line-soft)" }}
-                strokeWidth="0.95"
-              />
-            </g>
-          )}
-
+      <>
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              visible
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: 0, y: -3600, rotate: 0 }
             }
-            transition={{ duration: 2.0, ease: [0.42, 0, 1, 1] }}
+            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.north : anim.instant}
             style={{ transformBox: "fill-box", transformOrigin: "center" }}
           >
             <polygon
@@ -747,11 +748,11 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              visible
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: -3600, y: 0, rotate: 0 }
             }
-            transition={{ duration: 2.0, ease: [0.42, 0, 1, 1], delay: 0.02 }}
+            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.west : anim.instant}
             style={{ transformBox: "fill-box", transformOrigin: "center" }}
           >
             <polygon
@@ -774,11 +775,11 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              visible
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: rise * 32, y: -rise * 32, rotate: 0 }
             }
-            transition={{ duration: 2.3, ease: [0.42, 0, 1, 1], delay: 0.04 }}
+            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.roof : anim.instant}
             style={{ transformBox: "fill-box", transformOrigin: "center" }}
           >
             <polygon
@@ -795,18 +796,14 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
             />
             <polygon
               points={poly(eaveTL, eaveBL, ridgeL)}
-              style={{
-                fill: "var(--greenhouse-glass-side-end)",
-                stroke: "var(--greenhouse-line-soft)",
-              }}
+              fill={`url(#${sideGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="0.85"
             />
             <polygon
               points={poly(eaveTR, eaveBR, ridgeR)}
-              style={{
-                fill: "var(--greenhouse-glass-side-end)",
-                stroke: "var(--greenhouse-line-soft)",
-              }}
+              fill={`url(#${sideGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="0.8"
             />
             <line
@@ -891,11 +888,11 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              visible
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: 3600, y: 0, rotate: 0 }
             }
-            transition={{ duration: 2.1, ease: [0.42, 0, 1, 1], delay: 0.01 }}
+            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.east : anim.instant}
             style={{ transformBox: "fill-box", transformOrigin: "center" }}
           >
             <polygon
@@ -918,11 +915,11 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           <motion.g
             initial={false}
             animate={
-              introStage === "sealed"
+              visible
                 ? { x: 0, y: 0, rotate: 0 }
                 : { x: 0, y: 3600, rotate: 0 }
             }
-            transition={{ duration: 2.1, ease: [0.42, 0, 1, 1], delay: 0.03 }}
+            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.south : anim.instant}
             style={{ transformBox: "fill-box", transformOrigin: "center" }}
           >
             <polygon
@@ -961,7 +958,6 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
             />
           </motion.g>
         </>
-      )}
     </svg>
   );
 }
@@ -1062,12 +1058,14 @@ const GridTile = memo(function GridTile({
   row,
   col,
   focused,
+  interactionsEnabled,
   onSelect,
 }: {
   data: TileData;
   row: number;
   col: number;
   focused: boolean;
+  interactionsEnabled: boolean;
   onSelect: (tile: TileData) => void;
 }) {
   if (data.kind === "path") {
@@ -1084,22 +1082,30 @@ const GridTile = memo(function GridTile({
 
   const planted = data.stage !== undefined ? data.stage !== 'harvested' : data.growth > 0;
   const cropInfo = data.crop ? CROP_DB[data.crop] : null;
+  const canInteract = interactionsEnabled && planted && !!cropInfo;
 
   const tile = (
     <button
       type="button"
-      onClick={planted && cropInfo ? () => onSelect(data) : undefined}
+      onClick={canInteract ? () => onSelect(data) : undefined}
+      tabIndex={canInteract ? undefined : -1}
+      aria-disabled={!canInteract}
       className={`crop-tile-button group/crop-tile relative h-full w-full rounded border transition-[background-color,border-color,transform,box-shadow] duration-200 ${
         focused && planted
           ? "grid-tile-focused border-yellow-500/40 bg-yellow-500/8 dark:border-yellow-400/35 dark:bg-yellow-400/6"
           : planted
-            ? "border-emerald-800/8 bg-emerald-700/7 hover:border-emerald-700/14 hover:bg-emerald-700/10 dark:border-emerald-300/14 dark:bg-emerald-300/8 dark:hover:border-emerald-300/18 dark:hover:bg-emerald-300/12"
-            : "border-green-800/5.5 bg-green-800/4.5 hover:border-emerald-700/10 hover:bg-emerald-700/8 dark:border-white/7 dark:bg-white/4 dark:hover:border-white/10 dark:hover:bg-white/7"
+            ? interactionsEnabled
+              ? "border-emerald-800/8 bg-emerald-700/7 hover:border-emerald-700/14 hover:bg-emerald-700/10 dark:border-emerald-300/14 dark:bg-emerald-300/8 dark:hover:border-emerald-300/18 dark:hover:bg-emerald-300/12"
+              : "border-emerald-800/8 bg-emerald-700/7 dark:border-emerald-300/14 dark:bg-emerald-300/8"
+            : interactionsEnabled
+              ? "border-green-800/5.5 bg-green-800/4.5 hover:border-emerald-700/10 hover:bg-emerald-700/8 dark:border-white/7 dark:bg-white/4 dark:hover:border-white/10 dark:hover:bg-white/7"
+              : "border-green-800/5.5 bg-green-800/4.5 dark:border-white/7 dark:bg-white/4"
       } ${
-        planted && cropInfo
+        canInteract
           ? "cursor-pointer hover:z-30 hover:shadow-[0_12px_28px_rgba(122,168,141,0.08)] focus-visible:z-30"
           : "cursor-default"
       }`}
+      style={{ pointerEvents: interactionsEnabled ? undefined : "none" }}
     >
       {data.status && planted && (
         <div
@@ -1146,6 +1152,10 @@ const GridTile = memo(function GridTile({
     return tile;
   }
 
+  if (!interactionsEnabled) {
+    return tile;
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger render={tile} />
@@ -1163,6 +1173,7 @@ const GridTile = memo(function GridTile({
   prev.row === next.row &&
   prev.col === next.col &&
   prev.focused === next.focused &&
+  prev.interactionsEnabled === next.interactionsEnabled &&
   prev.onSelect === next.onSelect &&
   prev.data.kind === next.data.kind &&
   prev.data.crop === next.data.crop &&
