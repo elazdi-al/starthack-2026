@@ -2,6 +2,7 @@ import type { SimulationState } from '../../state/types';
 import type {
   ConcreteEnvironment, ConcreteGreenhouseState,
   CropEnvironment, CropControls, CropType, GrowthStage,
+  SeasonName, DustStormRisk,
 } from './types';
 import { ALL_CROP_TYPES, GROWTH_STAGES } from './types';
 import { CROP_PROFILES, type CropProfile } from './profiles';
@@ -10,16 +11,12 @@ export { CROP_PROFILES } from './profiles';
 
 // ─── Mars Constants ─────────────────────────────────────────────────────────────
 export const SOL_HOURS = 24.6167;
-const MARS_SOLAR_CONSTANT = 590;
-const MARS_MEAN_TEMP = -63;
-
-const DUST_STORMS: Array<{ start: number; duration: number; severity: number }> = [
-  { start: 45,  duration: 8,  severity: 0.25 },
-  { start: 130, duration: 15, severity: 0.15 },
-  { start: 210, duration: 5,  severity: 0.35 },
-  { start: 290, duration: 20, severity: 0.10 },
-  { start: 380, duration: 10, severity: 0.20 },
-];
+const MARS_SOLAR_CONSTANT = 590;   // W/m² (mean value over full orbit)
+const MARS_MEAN_TEMP = -63;        // °C mean surface temperature
+const MARS_YEAR_SOLS = 668.6;      // sols per Martian year
+const MARS_ECCENTRICITY = 0.0934;  // orbital eccentricity (much higher than Earth's 0.017)
+const MARS_LS_PERIHELION = 251;    // Ls° at perihelion (southern summer / global storm season)
+const MARS_MEAN_PRESSURE = 600;    // Pa mean surface pressure
 
 // ─── Thermal / Atmospheric Constants ────────────────────────────────────────────
 const THERMAL_BASE   = 8;
@@ -45,12 +42,176 @@ const MOISTURE_EVAP_RATE   = 0.055;
 
 const O2_PRODUCTION_FACTOR = 0.00008;
 
+// ─── Dust Storm Types ────────────────────────────────────────────────────────────
+
+interface LsDustStorm {
+  yearIndex: number;  // which Martian year (0 = year mission starts in, 1 = next year)
+  startLs: number;    // solar longitude at storm start (0–360°)
+  durationLs: number; // duration in degrees of Ls (5–90°)
+  severity: number;   // opacity factor 0–1 (1 = completely opaque)
+}
+
+// ─── Seasonal Helpers ────────────────────────────────────────────────────────────
+
+function toRad(deg: number): number {
+  return (deg * Math.PI) / 180;
+}
+
+/**
+ * Convert mission-elapsed sols to Ls (solar longitude, 0–360°).
+ * Uses a linear approximation — good to within ~5° for seasonal planning.
+ */
+function solToLs(missionSol: number, missionStartLs: number): number {
+  return ((missionStartLs + (missionSol / MARS_YEAR_SOLS) * 360) % 360 + 360) % 360;
+}
+
+/**
+ * Seasonal solar flux at Mars due to orbital eccentricity.
+ * At perihelion (Ls 251°): ~718 W/m².  At aphelion (Ls 71°): ~493 W/m².
+ * Formula: S = S_mean × ((1 + e·cos(ν)) / (1 − e²))²
+ * where ν = Ls − Ls_perihelion is the true anomaly from perihelion.
+ */
+function computeSeasonalSolarFlux(ls: number): number {
+  const nu = toRad(ls - MARS_LS_PERIHELION);
+  const e = MARS_ECCENTRICITY;
+  const distanceFactor = (1 + e * Math.cos(nu)) / (1 - e * e);
+  return MARS_SOLAR_CONSTANT * distanceFactor * distanceFactor;
+}
+
+/**
+ * Seasonal temperature offset driven by orbital eccentricity.
+ * Mars is ~20°C warmer globally at perihelion (Ls 251°) than at aphelion (Ls 71°).
+ * At equatorial latitudes the swing is ±15°C.
+ */
+function computeSeasonalTempOffset(ls: number): number {
+  const nu = toRad(ls - MARS_LS_PERIHELION);
+  return 15 * Math.cos(nu);
+}
+
+/**
+ * Atmospheric pressure variation due to CO₂ condensation/sublimation at poles.
+ * Pressure is ~12% below mean at Ls ~150° (south polar cap at maximum)
+ * and ~12% above mean at Ls ~330° (north polar cap at maximum).
+ */
+function computeAtmosphericPressure(ls: number): number {
+  return MARS_MEAN_PRESSURE * (1 + 0.12 * Math.cos(toRad(ls - 330)));
+}
+
+/**
+ * Qualitative dust storm risk based on Ls.
+ * Real peak: Ls 250–310° (perihelion season, southern spring/summer).
+ */
+function computeDustStormRisk(ls: number): DustStormRisk {
+  if (ls >= 250 && ls <= 310) return 'extreme';
+  if ((ls >= 180 && ls < 250) || (ls > 310 && ls <= 360)) return 'high';
+  if (ls >= 140 && ls < 180) return 'moderate';
+  return 'low';
+}
+
+/**
+ * Map Ls to season name (northern hemisphere convention).
+ * Ls 0–90°: Northern Spring, 90–180°: Northern Summer,
+ * 180–270°: Northern Autumn, 270–360°: Northern Winter.
+ */
+function computeSeasonName(ls: number): SeasonName {
+  if (ls < 90)  return 'northern_spring';
+  if (ls < 180) return 'northern_summer';
+  if (ls < 270) return 'northern_autumn';
+  return 'northern_winter';
+}
+
+// ─── Dust Storm Generation ───────────────────────────────────────────────────────
+
+/**
+ * Minimal linear congruential generator for deterministic pseudo-randomness.
+ * Returns a factory function so each call advances state independently.
+ */
+function makeLCG(seed: number): () => number {
+  let s = (seed >>> 0) || 1;
+  return () => {
+    s = Math.imul(s, 1664525) + 1013904223;
+    s = s >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+/**
+ * Generate dust storms for the full mission span (2 Martian years).
+ * Storms are concentrated in the perihelion season (Ls 180–360°).
+ * Seeded on missionStartLs so each starting configuration produces a
+ * distinct but reproducible storm calendar.
+ *
+ * Regional storms: 2–3 per year, Ls 180–360°, duration 5–30° Ls.
+ * Global storm:   ~15% chance per year, Ls 250–310°, duration 60–90° Ls.
+ */
+function generateMissionDustStorms(missionStartLs: number): LsDustStorm[] {
+  const storms: LsDustStorm[] = [];
+
+  for (let yearIdx = 0; yearIdx <= 1; yearIdx++) {
+    const rng = makeLCG(yearIdx * 7919 + Math.round(missionStartLs) * 31);
+
+    // Regional storms
+    const numRegional = 2 + Math.floor(rng() * 2); // 2 or 3
+    for (let i = 0; i < numRegional; i++) {
+      // Weight toward Ls 250°–300° using rejection-like bias
+      const rawLs = rng() * 180; // 0–180
+      // Square the distribution to bias toward higher Ls values within range
+      const startLs = 180 + rawLs * rawLs / 180;
+      const durationLs = 5 + rng() * 25;
+      const severity = 0.1 + rng() * 0.35;
+      storms.push({ yearIndex: yearIdx, startLs: startLs % 360, durationLs, severity });
+    }
+
+    // Global storm (rare)
+    if (rng() < 0.15) {
+      const startLs = 250 + rng() * 60;
+      const durationLs = 60 + rng() * 30;
+      const severity = 0.5 + rng() * 0.4;
+      storms.push({ yearIndex: yearIdx, startLs, durationLs, severity });
+    }
+  }
+
+  return storms;
+}
+
+/**
+ * Compute dust storm attenuation factor (1.0 = clear, 0.0 = fully opaque).
+ * Looks up which Martian year we're in (based on missionSol and missionStartLs)
+ * and checks each storm for the storm's current Ls position.
+ */
+function getDustStormFactor(
+  currentLs: number,
+  missionSol: number,
+  missionStartLs: number,
+  storms: LsDustStorm[],
+): number {
+  // Which Martian year are we in (0-indexed from mission start)?
+  const absoluteSol = (missionStartLs / 360) * MARS_YEAR_SOLS + missionSol;
+  const yearIndex = Math.floor(absoluteSol / MARS_YEAR_SOLS);
+  // Ls within the current Martian year
+  const yearLs = currentLs;
+
+  let factor = 1.0;
+  for (const storm of storms) {
+    if (storm.yearIndex !== yearIndex) continue;
+    const endLs = storm.startLs + storm.durationLs;
+    if (yearLs >= storm.startLs && yearLs < endLs) {
+      const t = (yearLs - storm.startLs) / storm.durationLs;
+      const ramp = t < 0.2 ? t / 0.2 : t > 0.8 ? (1 - t) / 0.2 : 1;
+      const stormFactor = storm.severity + (1 - storm.severity) * (1 - ramp);
+      factor = Math.min(factor, stormFactor);
+    }
+  }
+  return factor;
+}
+
 // ─── Main Simulation ────────────────────────────────────────────────────────────
 
-export function simulate(
+function simulate(
   initialEnv: ConcreteEnvironment,
   greenhouse: ConcreteGreenhouseState,
   time: number,
+  dustStorms: LsDustStorm[],
 ): ConcreteEnvironment {
   const deltaHours = time / 60;
 
@@ -59,14 +220,47 @@ export function simulate(
   const missionSol = Math.floor(missionElapsedHours / SOL_HOURS);
   const solFraction = (missionElapsedHours % SOL_HOURS) / SOL_HOURS;
 
-  const solarFactor = Math.max(0, Math.sin(solFraction * 2 * Math.PI));
-  const dustStormFactor = getDustStormFactor(missionSol);
+  // ─── Seasonal calculations ───
+  const missionStartLs = initialEnv.missionStartLs;
+  const currentLs = solToLs(missionSol, missionStartLs);
+  const seasonName = computeSeasonName(currentLs);
+  const seasonalSolarFlux = computeSeasonalSolarFlux(currentLs);
+  const seasonalTempOffset = computeSeasonalTempOffset(currentLs);
+  const atmosphericPressure = computeAtmosphericPressure(currentLs);
+  const dustStormRisk = computeDustStormRisk(currentLs);
 
-  const externalTemp = MARS_MEAN_TEMP + 30 * solarFactor + deterministicNoise(simulationMs, 3);
-  const solarRadiation = Math.max(0,
-    MARS_SOLAR_CONSTANT * solarFactor * dustStormFactor
-    + deterministicNoise(simulationMs + 1000, 30),
-  );
+  // ─── Daily cycle + dust ───
+  const ov = greenhouse.overrides;
+
+  // Time-of-day: manual lock overrides the computed sol fraction
+  const effectiveSolFraction = ov.timeOfDayLocked ? ov.timeOfDayFraction : solFraction;
+
+  // Shift by 0.25 so the peak (sin=1) falls at solFraction=0.5 (noon),
+  // dawn at 0.25, dusk at 0.75, and darkness either side.
+  const solarFactor = Math.max(0, Math.sin((effectiveSolFraction - 0.25) * 2 * Math.PI));
+
+  // Dust storm: manual override bypasses the seasonal calendar
+  const dustStormFactor = ov.dustStormEnabled
+    ? Math.max(0, 1 - ov.dustStormSeverity)
+    : getDustStormFactor(currentLs, missionSol, missionStartLs, dustStorms);
+
+  // Atmospheric pressure: manual override bypasses seasonal CO₂ cycle
+  const effectiveAtmosphericPressure = ov.atmosphericPressureEnabled
+    ? ov.atmosphericPressure
+    : atmosphericPressure;
+
+  // External temperature: manual override bypasses physics
+  const externalTemp = ov.externalTempEnabled
+    ? ov.externalTemp
+    : MARS_MEAN_TEMP + seasonalTempOffset + 30 * solarFactor + deterministicNoise(simulationMs, 3);
+
+  // Solar radiation: manual override bypasses physics (raw value, ignores dust/day-night)
+  const solarRadiation = ov.solarRadiationEnabled
+    ? ov.solarRadiation
+    : Math.max(0,
+        seasonalSolarFlux * solarFactor * dustStormFactor
+        + deterministicNoise(simulationMs + 1000, 30),
+      );
 
   // ─── Air temperature ───
   const T_eq = THERMAL_BASE
@@ -86,10 +280,12 @@ export function simulate(
     exponentialApproach(initialEnv.humidity, H_eq, deltaHours, H_TAU),
   );
 
-  // ─── CO₂ ───
+  // ─── CO₂ — modulated slightly by atmospheric pressure ───
+  // Higher pressure = slightly higher CO₂ partial pressure for same ppm
+  const pressureModifier = effectiveAtmosphericPressure / MARS_MEAN_PRESSURE;
   const C_eq = Math.max(CO2_BASE,
     CO2_BASE
-    + greenhouse.co2InjectionRate * K_CO2_INJECT
+    + greenhouse.co2InjectionRate * K_CO2_INJECT * pressureModifier
     - greenhouse.lightingPower * K_CO2_PHOTO
     - greenhouse.ventilationRate * K_CO2_VENT,
   );
@@ -132,7 +328,13 @@ export function simulate(
     missionStartMs: initialEnv.missionStartMs,
     missionElapsedHours,
     missionSol,
-    solFraction,
+    solFraction: effectiveSolFraction,
+    missionStartLs,
+    currentLs,
+    seasonName,
+    seasonalSolarFlux,
+    atmosphericPressure: effectiveAtmosphericPressure,
+    dustStormRisk,
     airTemperature: airTemp,
     humidity,
     co2Level,
@@ -152,8 +354,9 @@ export function createSimulation(
   initialEnv: ConcreteEnvironment,
   greenhouse: ConcreteGreenhouseState,
 ): SimulationState<ConcreteEnvironment> {
+  const dustStorms = generateMissionDustStorms(initialEnv.missionStartLs);
   return {
-    getEnvironment: (time: number) => simulate(initialEnv, greenhouse, time),
+    getEnvironment: (time: number) => simulate(initialEnv, greenhouse, time, dustStorms),
   };
 }
 
@@ -326,19 +529,6 @@ function getTotalProgress(stage: GrowthStage, stageProgress: number, profile: Cr
     total += profile.stageFractions[s] || 0;
   }
   return Math.min(1, total);
-}
-
-// ─── Dust Storms ────────────────────────────────────────────────────────────────
-
-function getDustStormFactor(sol: number): number {
-  for (const storm of DUST_STORMS) {
-    if (sol >= storm.start && sol < storm.start + storm.duration) {
-      const t = (sol - storm.start) / storm.duration;
-      const ramp = t < 0.2 ? t / 0.2 : t > 0.8 ? (1 - t) / 0.2 : 1;
-      return storm.severity + (1 - storm.severity) * (1 - ramp);
-    }
-  }
-  return 1.0;
 }
 
 // ─── Utilities ──────────────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useGreenhouseStore, type SpeedKey } from "@/lib/greenhouse-store";
 
-const SPEED_OPTIONS: SpeedKey[] = ["x1", "x2", "x5", "x10", "x20", "x50", "x100"];
+const SPEED_OPTIONS: SpeedKey[] = ["x1", "x2", "x5", "x10", "x20", "x50", "x100", "x1000", "x5000", "x10000"];
 
 interface SpeedSelectorProps {
   open?: boolean;

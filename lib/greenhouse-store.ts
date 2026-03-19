@@ -15,6 +15,9 @@ import type {
   ConcreteState,
   CropControls,
   GrowthStage,
+  SeasonName,
+  DustStormRisk,
+  ManualOverrides,
   SimEvent,
   NutritionalOutput,
   MissionResources,
@@ -22,17 +25,19 @@ import type {
 import {
   updateGreenhouseParam,
   updateCropParam,
+  updateOverrides as updateOverridesTransform,
   harvestCrop as harvestCropTransform,
   replantCrop as replantCropTransform,
 } from "@/greenhouse/implementations/multi-crop/transformation";
 
-export type { CropType, GrowthStage };
+export type { CropType, GrowthStage, SeasonName, DustStormRisk, ManualOverrides };
 
 // ─── UI Types ───────────────────────────────────────────────────────────────────
 
 export type TileKind = "crop" | "path";
 export type Status = "ok" | "warn" | null;
-export type SpeedKey = "x1" | "x2" | "x5" | "x10" | "x20" | "x50" | "x100";
+export type SpeedKey = "x1" | "x2" | "x5" | "x10" | "x20" | "x50" | "x100" | "x1000" | "x5000" | "x10000";
+export const TICK_INTERVAL_MS = 16; // ~60fps
 export const TOTAL_MISSION_SOLS = 450;
 
 export interface CropInfo {
@@ -161,7 +166,7 @@ const INITIAL_GRID: TileData[][] = [
 ];
 
 const SPEED_MULTIPLIER: Record<SpeedKey, number> = {
-  x1: 1, x2: 2, x5: 5, x10: 10, x20: 20, x50: 50, x100: 100,
+  x1: 1, x2: 2, x5: 5, x10: 10, x20: 20, x50: 50, x100: 100, x1000: 1000, x5000: 5000, x10000: 10000,
 };
 
 // ─── Snapshot Types ─────────────────────────────────────────────────────────────
@@ -184,6 +189,11 @@ export interface CropSnapshot {
 export interface EnvironmentSnapshot {
   missionSol: number;
   totalMissionSols: number;
+  currentLs: number;
+  seasonName: SeasonName;
+  seasonalSolarFlux: number;
+  atmosphericPressure: number;
+  dustStormRisk: DustStormRisk;
   airTemperature: number;
   humidity: number;
   co2Level: number;
@@ -225,12 +235,16 @@ export interface GreenhouseState {
   lightLevel: number;
 
   missionSol: number;
+  currentLs: number;
+  seasonName: SeasonName;
+  dustStormRisk: DustStormRisk;
   dustStormActive: boolean;
   events: SimEvent[];
   totalHarvestKg: number;
 
   setSpeed: (speed: SpeedKey) => void;
   tick: () => void;
+  skipToNextSol: () => void;
   setGrid: (grid: TileData[][]) => void;
   getEnvironmentSnapshot: () => EnvironmentSnapshot;
   applyParameterChanges: (
@@ -241,6 +255,7 @@ export interface GreenhouseState {
       crop?: string;
     }>,
   ) => void;
+  applyOverrides: (overrides: ManualOverrides) => void;
   doHarvest: (crop: CropType) => void;
   doReplant: (crop: CropType) => void;
 }
@@ -292,6 +307,11 @@ function buildSnapshot(
   return {
     missionSol: env.missionSol,
     totalMissionSols: TOTAL_MISSION_SOLS,
+    currentLs: Math.round(env.currentLs * 10) / 10,
+    seasonName: env.seasonName,
+    seasonalSolarFlux: Math.round(env.seasonalSolarFlux),
+    atmosphericPressure: Math.round(env.atmosphericPressure),
+    dustStormRisk: env.dustStormRisk,
     airTemperature: round1(env.airTemperature),
     humidity: round1(env.humidity),
     co2Level: Math.round(env.co2Level),
@@ -345,16 +365,59 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   lightLevel: initialEnvironment.lightLevel,
 
   missionSol: initialEnvironment.missionSol,
+  currentLs: initialEnvironment.currentLs,
+  seasonName: initialEnvironment.seasonName,
+  dustStormRisk: initialEnvironment.dustStormRisk,
   dustStormActive: initialEnvironment.dustStormFactor < 0.9,
   events: [],
   totalHarvestKg: 0,
 
   setSpeed: (speed) => set({ speed }),
 
+  skipToNextSol: () => {
+    const { elapsedMinutes, simState, grid, events } = get();
+    const env = simState.simulation.getEnvironment(elapsedMinutes);
+    const nextSolMinutes = (env.missionSol + 1) * SOL_HOURS * 60;
+    const nextEnv = simState.simulation.getEnvironment(nextSolMinutes);
+    const simTime = new Date(nextEnv.timestamp);
+
+    const newEvents = [...events];
+    const nowDust = nextEnv.dustStormFactor < 0.9;
+    const wasDust = env.dustStormFactor < 0.9;
+    if (nowDust && !wasDust) {
+      newEvents.push({
+        sol: nextEnv.missionSol, type: "dust_storm_start", severity: "warning",
+        message: `Dust storm detected — solar output reduced to ${Math.round(nextEnv.dustStormFactor * 100)}%`,
+      });
+    } else if (!nowDust && wasDust) {
+      newEvents.push({
+        sol: nextEnv.missionSol, type: "dust_storm_end", severity: "info",
+        message: "Dust storm has cleared — solar output returning to normal",
+      });
+    }
+
+    set({
+      elapsedMinutes: nextSolMinutes,
+      environment: nextEnv,
+      simulationTime: simTime,
+      grid: syncGridFromEnv(grid, nextEnv),
+      temperature: nextEnv.airTemperature,
+      humidity: nextEnv.humidity,
+      co2Level: nextEnv.co2Level,
+      lightLevel: nextEnv.lightLevel,
+      missionSol: nextEnv.missionSol,
+      currentLs: nextEnv.currentLs,
+      seasonName: nextEnv.seasonName,
+      dustStormRisk: nextEnv.dustStormRisk,
+      dustStormActive: nowDust,
+      events: newEvents,
+    });
+  },
+
   tick: () => {
     const { elapsedMinutes, speed, simState, grid, events, missionSol: prevSol } = get();
     const mult = SPEED_MULTIPLIER[speed];
-    const nextMinutes = elapsedMinutes + mult / 60;
+    const nextMinutes = elapsedMinutes + mult * TICK_INTERVAL_MS / 60000;
     const env = simState.simulation.getEnvironment(nextMinutes);
     const simTime = new Date(env.timestamp);
     const newGrid = syncGridFromEnv(grid, env);
@@ -384,6 +447,9 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       co2Level: env.co2Level,
       lightLevel: env.lightLevel,
       missionSol: env.missionSol,
+      currentLs: env.currentLs,
+      seasonName: env.seasonName,
+      dustStormRisk: env.dustStormRisk,
       dustStormActive: nowDust,
       events: newEvents,
     });
@@ -426,6 +492,27 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       humidity: env.humidity,
       co2Level: env.co2Level,
       lightLevel: env.lightLevel,
+      grid: syncGridFromEnv(get().grid, env),
+    });
+  },
+
+  applyOverrides: (overrides) => {
+    const { simState, elapsedMinutes } = get();
+    const newState = updateOverridesTransform(overrides, elapsedMinutes)(simState) as ConcreteState;
+    const env = newState.simulation.getEnvironment(0);
+    set({
+      simState: newState,
+      elapsedMinutes: 0,
+      environment: env,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+      missionSol: env.missionSol,
+      currentLs: env.currentLs,
+      seasonName: env.seasonName,
+      dustStormRisk: env.dustStormRisk,
+      dustStormActive: env.dustStormFactor < 0.9,
       grid: syncGridFromEnv(get().grid, env),
     });
   },

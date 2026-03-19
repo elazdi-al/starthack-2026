@@ -2,6 +2,22 @@ import type { Environment, GreenhouseState, SimulationState, State } from '../..
 
 export type CropType = "lettuce" | "tomato" | "potato" | "soybean" | "spinach" | "wheat" | "radish" | "kale";
 
+export type SeasonName = 'northern_spring' | 'northern_summer' | 'northern_autumn' | 'northern_winter';
+export type DustStormRisk = 'low' | 'moderate' | 'high' | 'extreme';
+
+export interface ManualOverrides {
+  externalTempEnabled:        boolean;
+  externalTemp:               number;   // °C, range −120 → +20
+  solarRadiationEnabled:      boolean;
+  solarRadiation:             number;   // W/m², range 0 → 800
+  dustStormEnabled:           boolean;
+  dustStormSeverity:          number;   // 0 (clear) → 1 (fully opaque)
+  atmosphericPressureEnabled: boolean;
+  atmosphericPressure:        number;   // Pa, range 400 → 800
+  timeOfDayLocked:            boolean;
+  timeOfDayFraction:          number;   // 0 (midnight) → 1, 0.5 = noon
+}
+
 export const ALL_CROP_TYPES: CropType[] = [
   "lettuce", "tomato", "potato", "soybean", "spinach", "wheat", "radish", "kale",
 ];
@@ -53,6 +69,14 @@ export interface ConcreteEnvironment extends Environment {
   missionSol: number;
   solFraction: number;
 
+  // Martian seasons
+  missionStartLs: number;
+  currentLs: number;
+  seasonName: SeasonName;
+  seasonalSolarFlux: number;
+  atmosphericPressure: number;
+  dustStormRisk: DustStormRisk;
+
   airTemperature: number;
   humidity: number;
   co2Level: number;
@@ -75,6 +99,7 @@ export interface ConcreteGreenhouseState extends GreenhouseState {
   co2InjectionRate: number;
   ventilationRate: number;
   crops: Record<CropType, CropControls>;
+  overrides: ManualOverrides;
 }
 
 export interface ConcreteState extends State {

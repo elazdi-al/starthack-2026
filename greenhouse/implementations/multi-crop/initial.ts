@@ -76,6 +76,13 @@ function buildCropAtProgress(ct: CropType, fraction: number): CropEnvironment {
   };
 }
 
+/**
+ * Ls (solar longitude) at mission start.
+ * 0° = Northern Spring Equinox (start of Martian year).
+ * The mission begins during northern spring, before the dust storm season.
+ */
+export const MISSION_START_LS = 0;
+
 export function createInitialEnvironment(): ConcreteEnvironment {
   const crops = {} as Record<CropType, CropEnvironment>;
   for (const ct of ALL_CROP_TYPES) {
@@ -90,6 +97,12 @@ export function createInitialEnvironment(): ConcreteEnvironment {
     missionElapsedHours: 0,
     missionSol: 0,
     solFraction: 0,
+    missionStartLs: MISSION_START_LS,
+    currentLs: MISSION_START_LS,
+    seasonName: 'northern_spring',
+    seasonalSolarFlux: 564,  // W/m² at Ls 0° (spring equinox; aphelion is at Ls 71°)
+    atmosphericPressure: 600,
+    dustStormRisk: 'low',
     airTemperature: 20,
     humidity: 60,
     co2Level: 800,
@@ -117,6 +130,18 @@ export function createInitialGreenhouseState(): ConcreteGreenhouseState {
     co2InjectionRate: 50,
     ventilationRate: 100,
     crops,
+    overrides: {
+      externalTempEnabled:        false,
+      externalTemp:               -63,
+      solarRadiationEnabled:      false,
+      solarRadiation:             590,
+      dustStormEnabled:           false,
+      dustStormSeverity:          0,
+      atmosphericPressureEnabled: false,
+      atmosphericPressure:        600,
+      timeOfDayLocked:            false,
+      timeOfDayFraction:          0.5,
+    },
   };
 }
 

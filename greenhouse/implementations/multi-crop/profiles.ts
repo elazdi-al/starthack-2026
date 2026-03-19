@@ -37,7 +37,7 @@ const STAGES_DEFAULT: Record<GrowthStage, number> = {
 
 export const CROP_PROFILES: Record<CropType, CropProfile> = {
   lettuce: {
-    optimalTemp: 21, optimalMoisture: 70, tempSigma: 5, moistureSigma: 15,
+    optimalTemp: 18, optimalMoisture: 60, tempSigma: 5, moistureSigma: 15,
     growthCycleSols: 44,
     stageFractions: { ...STAGES_DEFAULT, vegetative: 0.35, flowering: 0.15 },
     maxYieldKgPerPlant: 0.3, plantsPerTile: 20, harvestIndex: 0.85,
@@ -48,7 +48,7 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
   tomato: {
     optimalTemp: 24, optimalMoisture: 70, tempSigma: 5, moistureSigma: 15,
     growthCycleSols: 78,
-    stageFractions: { ...STAGES_DEFAULT, vegetative: 0.25, flowering: 0.22, fruiting: 0.30 },
+    stageFractions: { ...STAGES_DEFAULT, vegetative: 0.25, flowering: 0.20, fruiting: 0.30 },
     maxYieldKgPerPlant: 3.0, plantsPerTile: 4, harvestIndex: 0.60,
     caloriesPerKg: 180, proteinPerKg: 9, vitaminC_mgPerKg: 140,
     vitaminA_mcgPerKg: 833, iron_mgPerKg: 2.7, calcium_mgPerKg: 110, fiber_gPerKg: 12,

@@ -1,6 +1,6 @@
 import type { StateTransformation } from '../../state/types';
 import type {
-  ConcreteState, ConcreteGreenhouseState, CropControls, CropType, CropEnvironment,
+  ConcreteState, ConcreteGreenhouseState, CropControls, CropType, CropEnvironment, ManualOverrides,
 } from './types';
 import { ALL_CROP_TYPES } from './types';
 import { CROP_PROFILES, createSimulation } from './simulation';
@@ -10,7 +10,7 @@ function cloneGreenhouse(gh: ConcreteGreenhouseState): ConcreteGreenhouseState {
   for (const ct of ALL_CROP_TYPES) {
     crops[ct] = { ...gh.crops[ct] };
   }
-  return { ...gh, crops };
+  return { ...gh, crops, overrides: { ...gh.overrides } };
 }
 
 export const updateGreenhouseParam = <K extends keyof ConcreteGreenhouseState>(
@@ -109,6 +109,20 @@ export function applyTransformations(
 
   return state;
 }
+
+/** Apply a full set of manual overrides, rebuilding the simulation from the current snapshot. */
+export const updateOverrides = (
+  overrides: ManualOverrides,
+  time: number,
+): StateTransformation => {
+  return (currentState) => {
+    const state = currentState as ConcreteState;
+    const env = state.simulation.getEnvironment(time);
+    const newGreenhouse = { ...cloneGreenhouse(state.greenhouse), overrides };
+    const simulation = createSimulation(env, newGreenhouse);
+    return { simulation, greenhouse: newGreenhouse };
+  };
+};
 
 /** Harvest a crop and return updated state + yield information. */
 export function harvestCrop(
