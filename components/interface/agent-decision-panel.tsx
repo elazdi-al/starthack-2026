@@ -21,7 +21,7 @@ export function AgentDecisionPanel({ onClose }: Props) {
   const elapsedMinutes = useGreenhouseStore((s) => s.elapsedMinutes);
 
   const minutesSinceTick = Math.floor(elapsedMinutes - lastTickSimMinutes);
-  const nextTickIn = Math.max(0, 15 - minutesSinceTick);
+  const nextTickIn = Math.max(0, 120 - minutesSinceTick);
 
   return (
     <div
@@ -265,7 +265,7 @@ function EmptyState({ autonomousEnabled }: { autonomousEnabled: boolean }) {
         <p className="type-ui text-[var(--dial-text-secondary)] font-medium mb-1">No decisions yet</p>
         <p className="type-caption text-[var(--dial-text-tertiary)] leading-relaxed">
           {autonomousEnabled
-            ? "The agent will analyse the greenhouse every 15 simulation minutes and log its decisions here."
+            ? "The agent will analyse the greenhouse every 2 simulation hours and log its decisions here."
             : "Enable autonomous mode to let the agent monitor and adjust the greenhouse automatically."}
         </p>
       </div>
