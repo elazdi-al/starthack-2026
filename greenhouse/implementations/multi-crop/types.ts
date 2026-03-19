@@ -16,6 +16,13 @@ export interface ManualOverrides {
   atmosphericPressure:        number;   // Pa, range 400 → 800
   timeOfDayLocked:            boolean;
   timeOfDayFraction:          number;   // 0 (midnight) → 1, 0.5 = noon
+  // Resource overrides
+  waterRecyclingEnabled:      boolean;
+  waterRecyclingEfficiency:   number;   // 0–1 (normally starts 0.95, degrades over sols)
+  batteryStorageEnabled:      boolean;
+  batteryStorageKWh:          number;   // kWh, current charge level
+  foodReservesEnabled:        boolean;
+  foodReservesSols:           number;   // sols of pre-packaged food remaining
 }
 
 export const ALL_CROP_TYPES: CropType[] = [

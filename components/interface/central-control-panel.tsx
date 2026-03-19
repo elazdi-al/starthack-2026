@@ -12,13 +12,17 @@ import {
   type PanelConfig,
 } from "@/components/ui/central-control/store/DialStore";
 import { cn } from "@/lib/utils";
-import { useGreenhouseStore, type SpeedKey, type ManualOverrides } from "@/lib/greenhouse-store";
+import { useGreenhouseStore, type ManualOverrides } from "@/lib/greenhouse-store";
 import { triggerHaptic } from "@/lib/haptics";
 import { SpeedSelector } from "@/components/interface/speed-selector";
 import { useAnimationConfig } from "@/lib/use-animation-config";
 
-const MORPH_SPRING = { type: "spring" as const, bounce: 0.05, duration: 0.35 };
+/* ── Compositable morph via clip-path (no layout recalc) ───────────────── */
+const OPEN_TRANSITION  = { type: "spring" as const, bounce: 0.05, duration: 0.35 };
+const CLOSE_TRANSITION = { duration: 0.25, ease: "easeOut" as const };
 
+const CLIP_OPEN   = "inset(0 0 0 0 round 14px)";
+const CLIP_CLOSED = "inset(0 0 calc(100% - 40px) 260px round 20px)";
 
 interface CentralControlPanelProps {
   open: boolean;
@@ -31,8 +35,10 @@ export function CentralControlPanel({
 }: CentralControlPanelProps) {
   const [panels, setPanels] = React.useState<PanelConfig[]>([]);
   const [mounted, setMounted] = React.useState(false);
-  const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
   const [copied, setCopied] = React.useState(false);
+
+  /* ── Drag via refs — no React state on mousemove ─────────────────────── */
+  const dragOffsetRef = React.useRef({ x: 0, y: 0 });
   const dragRef = React.useRef<{
     startX: number; startY: number;
     offsetX: number; offsetY: number;
@@ -40,7 +46,6 @@ export function CentralControlPanel({
     baseWidth: number; baseHeight: number;
   } | null>(null);
 
-  const speed = useGreenhouseStore((s) => s.speed);
   const setSpeed = useGreenhouseStore((s) => s.setSpeed);
   const applyOverrides = useGreenhouseStore((s) => s.applyOverrides);
 
@@ -68,7 +73,10 @@ export function CentralControlPanel({
       newX = Math.max(-baseLeft, Math.min(window.innerWidth - baseLeft - baseWidth, newX));
       newY = Math.max(-baseTop, Math.min(window.innerHeight - baseTop - baseHeight, newY));
 
-      setDragOffset({ x: newX, y: newY });
+      dragOffsetRef.current = { x: newX, y: newY };
+      if (wrapperRef.current) {
+        wrapperRef.current.style.transform = `translate(${newX}px, ${newY}px)`;
+      }
     };
     const onMouseUp = () => { dragRef.current = null; };
     window.addEventListener('mousemove', onMouseMove);
@@ -86,10 +94,10 @@ export function CentralControlPanel({
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      offsetX: dragOffset.x,
-      offsetY: dragOffset.y,
-      baseLeft: rect.left - dragOffset.x,
-      baseTop: rect.top - dragOffset.y,
+      offsetX: dragOffsetRef.current.x,
+      offsetY: dragOffsetRef.current.y,
+      baseLeft: rect.left - dragOffsetRef.current.x,
+      baseTop: rect.top - dragOffsetRef.current.y,
       baseWidth: rect.width,
       baseHeight: rect.height,
     };
@@ -97,12 +105,16 @@ export function CentralControlPanel({
   };
 
   React.useEffect(() => {
-    if (!open) setDragOffset({ x: 0, y: 0 });
+    if (!open) {
+      dragOffsetRef.current = { x: 0, y: 0 };
+      if (wrapperRef.current) {
+        wrapperRef.current.style.transform = '';
+      }
+    }
   }, [open]);
 
   const handleReset = () => {
     setSpeed("x1");
-    // Reset all manual overrides to disabled (returns to natural sim behavior)
     const resetOverrides: ManualOverrides = {
       externalTempEnabled: false,
       externalTemp: -63,
@@ -114,6 +126,12 @@ export function CentralControlPanel({
       atmosphericPressure: 600,
       timeOfDayLocked: false,
       timeOfDayFraction: 0.5,
+      waterRecyclingEnabled: false,
+      waterRecyclingEfficiency: 0.95,
+      batteryStorageEnabled: false,
+      batteryStorageKWh: 200,
+      foodReservesEnabled: false,
+      foodReservesSols: 450,
     };
     applyOverrides(resetOverrides);
     triggerHaptic("light");
@@ -146,40 +164,51 @@ export function CentralControlPanel({
     return () => window.removeEventListener("pointerdown", handler);
   }, [showPanel, onOpenChange]);
 
+  /* ── Icon swap transition (CSS-only, no mount/unmount) ───────────────── */
+  const iconTransition = anim.enabled
+    ? "opacity 0.15s ease-out, transform 0.15s ease-out"
+    : "none";
+
   return (
     <div
       ref={wrapperRef}
       className="relative inline-flex flex-col items-end"
-      style={showPanel ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined}
     >
       <div className="size-10 shrink-0" />
 
+      {/* Morph container — animates clip-path (GPU compositable) instead of width/height */}
       <motion.div
         ref={morphRef}
         className={cn("absolute right-0 top-0", showPanel && "z-9999")}
         initial={false}
-        animate={{
-          width: showPanel ? 300 : 40,
-          height: showPanel ? "auto" : 40,
-          borderRadius: showPanel ? 14 : 20,
+        animate={{ clipPath: showPanel ? CLIP_OPEN : CLIP_CLOSED }}
+        transition={
+          anim.enabled
+            ? showPanel ? OPEN_TRANSITION : CLOSE_TRANSITION
+            : anim.instant
+        }
+        style={{
+          width: 300,
+          maxHeight: "calc(100vh - 80px)",
+          overflow: "hidden",
+          pointerEvents: showPanel ? "auto" : "none",
+          willChange: anim.enabled ? "clip-path" : undefined,
         }}
-        transition={anim.enabled ? MORPH_SPRING : anim.instant}
-        style={{ overflow: "hidden", maxHeight: showPanel ? "calc(100vh - 80px)" : 40 }}
       >
+        {/* Glass background — opacity only, clip handles reveal */}
         <motion.div
           className="pointer-events-none absolute inset-0"
           style={{
-            borderRadius: "inherit",
+            borderRadius: 14,
             background: "var(--dial-glass-bg)",
             backdropFilter: "blur(14px)",
             WebkitBackdropFilter: "blur(14px)",
             boxShadow:
               "inset 0 0 0 1px var(--dial-border), 0 8px 24px rgb(0 0 0 / 0.04)",
-            willChange: anim.enabled ? "opacity" : undefined,
           }}
           initial={false}
           animate={{ opacity: showPanel ? 1 : 0 }}
-          transition={anim.enabled ? { duration: 0.25 } : anim.instant}
+          transition={anim.enabled ? { duration: 0.15 } : anim.instant}
         />
 
         <div
@@ -201,6 +230,7 @@ export function CentralControlPanel({
                 ? "text-(--dial-text-primary)"
                 : "text-(--dial-text-secondary) hover:text-(--dial-text-primary)"
             )}
+            style={{ pointerEvents: "auto" }}
             onContextMenu={(e) => e.currentTarget.blur()}
             onClick={() => onOpenChange(!open)}
             onMouseDown={(e) => e.stopPropagation()}
@@ -238,6 +268,7 @@ export function CentralControlPanel({
 
                 <SpeedSelector className="flex-1" />
 
+                {/* Copy icon — CSS grid crossfade (no AnimatePresence overhead) */}
                 <button
                   type="button"
                   className="cc-toolbar-btn cc-toolbar-copy"
@@ -245,31 +276,31 @@ export function CentralControlPanel({
                   onMouseDown={(e) => e.stopPropagation()}
                   title="Copy simulation state as JSON"
                 >
-                  <AnimatePresence initial={false} mode="popLayout">
-                    {copied ? (
-                      <motion.span
-                        key="check"
-                        className="cc-toolbar-icon"
-                        initial={anim.enabled ? { scale: 0.5, opacity: 0 } : false}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={anim.enabled ? { scale: 0.5, opacity: 0 } : undefined}
-                        transition={anim.enabled ? { type: "spring", visualDuration: 0.2, bounce: 0.2 } : anim.instant}
-                      >
-                        <Check size={14} weight="bold" />
-                      </motion.span>
-                    ) : (
-                      <motion.span
-                        key="copy"
-                        className="cc-toolbar-icon"
-                        initial={anim.enabled ? { scale: 0.5, opacity: 0 } : false}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={anim.enabled ? { scale: 0.5, opacity: 0 } : undefined}
-                        transition={anim.enabled ? { type: "spring", visualDuration: 0.2, bounce: 0.2 } : anim.instant}
-                      >
-                        <Copy size={14} weight="bold" />
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
+                  <span
+                    className="cc-toolbar-icon"
+                    style={{ display: "grid", placeItems: "center" }}
+                  >
+                    <span
+                      style={{
+                        gridArea: "1/1",
+                        opacity: copied ? 0 : 1,
+                        transform: copied ? "scale(0.5)" : "scale(1)",
+                        transition: iconTransition,
+                      }}
+                    >
+                      <Copy size={14} weight="bold" />
+                    </span>
+                    <span
+                      style={{
+                        gridArea: "1/1",
+                        opacity: copied ? 1 : 0,
+                        transform: copied ? "scale(1)" : "scale(0.5)",
+                        transition: iconTransition,
+                      }}
+                    >
+                      <Check size={14} weight="bold" />
+                    </span>
+                  </span>
                 </button>
               </div>
 
@@ -278,6 +309,7 @@ export function CentralControlPanel({
                   panel.id === "sim-ext" ? "External" :
                   panel.id === "sim-gh" ? "Greenhouse" :
                   panel.id === "sim-crops" ? "Crop" :
+                  panel.id === "sim-resources" ? "Resources" :
                   panel.name;
                 const isCrop = panel.id === "sim-crops";
 

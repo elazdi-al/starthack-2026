@@ -434,7 +434,30 @@ const ACTION_COLORS: Record<string, string> = {
   crop:       "text-emerald-500 bg-emerald-500/10 border-emerald-500/25",
   harvest:    "text-amber-500 bg-amber-500/10 border-amber-500/25",
   replant:    "text-violet-500 bg-violet-500/10 border-violet-500/25",
+  "plant-tile": "text-violet-500 bg-violet-500/10 border-violet-500/25",
 };
+
+type DisplayAction = AgentAction & { count?: number };
+
+/** Group plant-tile actions by crop so we show "Plant tomato ×5" instead of 5 rows */
+function groupActions(actions: AgentAction[]): DisplayAction[] {
+  const result: DisplayAction[] = [];
+  const plantCounts = new Map<string, number>();
+
+  for (const a of actions) {
+    if (a.type === "plant-tile" && a.crop) {
+      plantCounts.set(a.crop, (plantCounts.get(a.crop) ?? 0) + 1);
+    } else {
+      result.push(a);
+    }
+  }
+
+  for (const [crop, count] of plantCounts) {
+    result.push({ type: "plant-tile", crop, count });
+  }
+
+  return result;
+}
 
 /** Collapse raw actions into human-readable summary rows. */
 function summarizeActionList(actions: AgentAction[]): Array<{ label: string; icon: React.ReactNode; color: string }> {

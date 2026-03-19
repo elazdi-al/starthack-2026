@@ -136,7 +136,7 @@ export function ReportsView() {
 
   return (
     <>
-      <section className="absolute inset-0 flex flex-col bg-background overflow-hidden">
+      <section className="absolute inset-0 flex flex-col overflow-hidden">
         {/* Header bar */}
         <div className="shrink-0 px-6 pt-20 pb-4 flex flex-col gap-4">
           {/* Title row */}

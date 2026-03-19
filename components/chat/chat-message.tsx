@@ -48,12 +48,34 @@ const PARAM_UNITS: Record<string, string> = {
 };
 
 function ToolCallCard({ toolCall }: { toolCall: ToolCallData }) {
-  const changes = (toolCall.args?.changes as Array<{
+  const rawChanges = (toolCall.args?.changes as Array<{
     type: string;
     param: string;
     value: number;
     crop?: string;
+    tileId?: string;
   }>) ?? [];
+
+  // Group plant-tile changes by crop so we show "Plant tomato ×5" instead of 5 lines
+  const displayChanges: Array<{
+    type: string;
+    param: string;
+    value: number;
+    crop?: string;
+    count?: number;
+  }> = [];
+  const plantCounts = new Map<string, number>();
+
+  for (const c of rawChanges) {
+    if (c.type === "plant-tile" && c.crop) {
+      plantCounts.set(c.crop, (plantCounts.get(c.crop) ?? 0) + 1);
+    } else {
+      displayChanges.push(c);
+    }
+  }
+  for (const [crop, count] of plantCounts) {
+    displayChanges.push({ type: "plant-tile", param: "", value: 0, crop, count });
+  }
 
   const isCalling = toolCall.status === "calling";
   const isError = toolCall.status === "error";
@@ -79,14 +101,15 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallData }) {
         </span>
       </div>
 
-      {changes.length > 0 && (
+      {displayChanges.length > 0 && (
         <div className="mt-1 flex flex-col gap-0.5 text-[var(--dial-text-tertiary)]">
-          {changes.map((c, i) => (
-            <div key={`${c.param ?? c.type}-${i}`} className="flex items-center gap-1">
+          {displayChanges.map((c, i) => (
+            <div key={`${c.param ?? c.type}-${c.crop ?? ""}-${i}`} className="flex items-center gap-1">
               <span className="opacity-50">→</span>
-              {c.type === "harvest" || c.type === "replant" ? (
+              {c.type === "harvest" || c.type === "replant" || c.type === "plant-tile" ? (
                 <span>
-                  {c.type === "harvest" ? "Harvest" : "Replant"} {c.crop}
+                  {c.type === "harvest" ? "Harvest" : c.type === "replant" ? "Replant" : "Plant"}{" "}
+                  {c.crop}{c.count && c.count > 1 ? ` ×${c.count}` : ""}
                 </span>
               ) : (
                 <>

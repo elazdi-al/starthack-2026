@@ -394,6 +394,7 @@ export interface GreenhouseState {
   doBatchTile: (ops: { harvests: string[]; plants: Array<{ tileId: string; crop: string }>; clears: string[] }) => void;
   setAutonomousEnabled: (enabled: boolean) => void;
   autonomousTick: () => Promise<void>;
+  hydrateFromStorage: () => void;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -545,6 +546,47 @@ function buildTileCounts(env: ConcreteEnvironment): EnvironmentSnapshot['tileCou
   return counts;
 }
 
+// ─── Persistence ────────────────────────────────────────────────────────────────
+
+interface PersistedGreenhouseData {
+  v: 1;
+  environment: ConcreteEnvironment;
+  greenhouse: ConcreteGreenhouseState;
+  speed: SpeedKey;
+  events: SimEvent[];
+  totalHarvestKg: number;
+  focusedCrop: CropType | null;
+  agentDecisions: AgentDecision[];
+  autonomousEnabled: boolean;
+  grid: TileData[][];
+  simulationTime: number; // Date.getTime()
+}
+
+function saveGreenhouseState(state: GreenhouseState): void {
+  // Snapshot the current environment so we can reconstruct from it
+  const currentEnv = state.simState.simulation.getEnvironment(state.elapsedMinutes);
+  const data: PersistedGreenhouseData = {
+    v: 1,
+    environment: currentEnv,
+    greenhouse: state.simState.greenhouse,
+    speed: state.speed,
+    events: state.events.slice(-500), // cap to avoid bloating storage
+    totalHarvestKg: state.totalHarvestKg,
+    focusedCrop: state.focusedCrop,
+    agentDecisions: state.agentDecisions,
+    autonomousEnabled: state.autonomousEnabled,
+    grid: state.grid,
+    simulationTime: state.simulationTime.getTime(),
+  };
+  saveJSON(STORAGE_KEYS.greenhouse, data);
+}
+
+function loadPersistedGreenhouseData(): PersistedGreenhouseData | null {
+  const data = loadJSON<PersistedGreenhouseData>(STORAGE_KEYS.greenhouse);
+  if (!data || data.v !== 1 || !data.environment || !data.greenhouse) return null;
+  return data;
+}
+
 // ─── Store ──────────────────────────────────────────────────────────────────────
 
 // Module-level lock for autonomousTick to prevent TOCTOU race conditions.
@@ -560,37 +602,67 @@ function buildInitialSimulation() {
   return { simulation, greenhouse, initialEnv: env };
 }
 
-const { simulation, greenhouse, initialEnv } = buildInitialSimulation();
-const initialEnvironment = simulation.getEnvironment(0);
-const initialGrid = syncGridFromEnv(INITIAL_GRID, initialEnvironment);
+/**
+ * Always build fresh initial state — localStorage hydration is deferred to
+ * after first render via `hydrateFromStorage()` to avoid SSR/client mismatch.
+ */
+function buildInitialState(): {
+  simState: ConcreteState;
+  environment: ConcreteEnvironment;
+  grid: TileData[][];
+  simulationTime: Date;
+  speed: SpeedKey;
+  events: SimEvent[];
+  totalHarvestKg: number;
+  focusedCrop: CropType | null;
+  agentDecisions: AgentDecision[];
+  autonomousEnabled: boolean;
+} {
+  const { simulation, greenhouse } = buildInitialSimulation();
+  const initialEnvironment = simulation.getEnvironment(0);
+  return {
+    simState: { simulation, greenhouse },
+    environment: initialEnvironment,
+    grid: syncGridFromEnv(INITIAL_GRID, initialEnvironment),
+    simulationTime: new Date(initialEnvironment.timestamp),
+    speed: "x1",
+    events: [],
+    totalHarvestKg: 0,
+    focusedCrop: null,
+    agentDecisions: [],
+    autonomousEnabled: true,
+  };
+}
+
+const init = buildInitialState();
 
 export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
-  grid: initialGrid,
-  simulationTime: new Date(initialEnvironment.timestamp),
-  speed: "x1",
+  grid: init.grid,
+  simulationTime: init.simulationTime,
+  speed: init.speed,
 
-  simState: { simulation, greenhouse },
-  environment: initialEnvironment,
+  simState: init.simState,
+  environment: init.environment,
   elapsedMinutes: 0,
 
-  temperature: initialEnvironment.airTemperature,
-  humidity: initialEnvironment.humidity,
-  co2Level: initialEnvironment.co2Level,
-  lightLevel: initialEnvironment.lightLevel,
+  temperature: init.environment.airTemperature,
+  humidity: init.environment.humidity,
+  co2Level: init.environment.co2Level,
+  lightLevel: init.environment.lightLevel,
 
-  missionSol: initialEnvironment.missionSol,
-  currentLs: initialEnvironment.currentLs,
-  seasonName: initialEnvironment.seasonName,
-  dustStormRisk: initialEnvironment.dustStormRisk,
-  dustStormActive: initialEnvironment.dustStormFactor < 0.9,
-  events: [],
-  totalHarvestKg: 0,
-  focusedCrop: null,
+  missionSol: init.environment.missionSol,
+  currentLs: init.environment.currentLs,
+  seasonName: init.environment.seasonName,
+  dustStormRisk: init.environment.dustStormRisk,
+  dustStormActive: init.environment.dustStormFactor < 0.9,
+  events: init.events,
+  totalHarvestKg: init.totalHarvestKg,
+  focusedCrop: init.focusedCrop,
 
   lastTickSimMinutes: 0,
   tickInFlight: false,
-  autonomousEnabled: true,
-  agentDecisions: [],
+  autonomousEnabled: init.autonomousEnabled,
+  agentDecisions: init.agentDecisions,
 
   setSpeed: (speed) => set({ speed }),
   setFocusedCrop: (crop) => set({ focusedCrop: crop }),
@@ -1111,6 +1183,35 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       _autonomousTickLock = false;
     }
   },
+
+  hydrateFromStorage: () => {
+    const persisted = loadPersistedGreenhouseData();
+    if (!persisted) return;
+
+    const simulation = createSimulation(persisted.environment, persisted.greenhouse);
+    const env = persisted.environment;
+    set({
+      simState: { simulation, greenhouse: persisted.greenhouse },
+      environment: env,
+      grid: syncGridFromEnv(persisted.grid, env),
+      simulationTime: new Date(persisted.simulationTime),
+      speed: persisted.speed,
+      events: persisted.events,
+      totalHarvestKg: persisted.totalHarvestKg,
+      focusedCrop: persisted.focusedCrop,
+      agentDecisions: persisted.agentDecisions,
+      autonomousEnabled: persisted.autonomousEnabled,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+      missionSol: env.missionSol,
+      currentLs: env.currentLs,
+      seasonName: env.seasonName,
+      dustStormRisk: env.dustStormRisk,
+      dustStormActive: env.dustStormFactor < 0.9,
+    });
+  },
 }));
 
 // ─── Display Helpers ────────────────────────────────────────────────────────────
@@ -1165,4 +1266,24 @@ function parseHex(hex: string): [number, number, number] {
     Number.parseInt(h.substring(2, 4), 16),
     Number.parseInt(h.substring(4, 6), 16),
   ];
+}
+
+// ─── Auto-persist to localStorage ───────────────────────────────────────────────
+
+if (typeof window !== "undefined") {
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  useGreenhouseStore.subscribe((state) => {
+    if (isResetInProgress()) return;
+    // Debounce: save at most every 2 seconds to avoid perf issues from 200ms tick
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveGreenhouseState(state), 2000);
+  });
+
+  // Flush on page unload for maximum data safety
+  window.addEventListener("beforeunload", () => {
+    if (isResetInProgress()) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveGreenhouseState(useGreenhouseStore.getState());
+  });
 }

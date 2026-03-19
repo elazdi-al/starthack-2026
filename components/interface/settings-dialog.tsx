@@ -11,6 +11,9 @@ import {
   X,
   Palette,
   Monitor,
+  Database,
+  Trash,
+  Warning,
   type IconWeight,
 } from "@phosphor-icons/react"
 
@@ -28,8 +31,9 @@ import {
 } from "@/lib/settings-store"
 import { useAnimationConfig } from "@/lib/use-animation-config"
 import { Switch } from "@/components/ui/switch"
+import { resetAllData } from "@/lib/persistence"
 
-type Section = "appearance" | "display"
+type Section = "appearance" | "display" | "data"
 
 interface SettingsDialogProps {
   open: boolean
@@ -46,6 +50,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   }, [onOpenChange])
   const handleSetAppearance = React.useCallback(() => setActiveSection("appearance"), [])
   const handleSetDisplay = React.useCallback(() => setActiveSection("display"), [])
+  const handleSetData = React.useCallback(() => setActiveSection("data"), [])
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -108,6 +113,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             active={activeSection === "display"}
                             onClick={handleSetDisplay}
                           />
+                          <NavItem
+                            icon={Database}
+                            label="Data"
+                            active={activeSection === "data"}
+                            onClick={handleSetData}
+                          />
                         </nav>
                       </div>
                     </div>
@@ -126,11 +137,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                               <DisplaySectionContent />
                             </SectionShell>
                           )}
+                          {activeSection === "data" && (
+                            <SectionShell key="data">
+                              <DataSectionContent />
+                            </SectionShell>
+                          )}
                         </AnimatePresence>
                       ) : (
                         <div className="p-6">
                           {activeSection === "appearance" && <AppearanceSectionContent />}
                           {activeSection === "display" && <DisplaySectionContent />}
+                          {activeSection === "data" && <DataSectionContent />}
                         </div>
                       )}
                     </div>
@@ -434,6 +451,85 @@ function DisplaySectionContent() {
             onToggle={handleAnimToggle}
           />
         </SettingRow>
+      </div>
+    </>
+  )
+}
+
+/* ─── Data Section ────────────────────────────────────────────────────────────── */
+
+function DataSectionContent() {
+  const [confirmReset, setConfirmReset] = React.useState(false)
+  const anim = useAnimationConfig()
+
+  const handleReset = React.useCallback(() => {
+    if (!confirmReset) {
+      setConfirmReset(true)
+      triggerHaptic("warning")
+      return
+    }
+    triggerHaptic("impact")
+    resetAllData()
+  }, [confirmReset])
+
+  // Auto-cancel confirmation after 4 seconds
+  React.useEffect(() => {
+    if (!confirmReset) return
+    const timer = setTimeout(() => setConfirmReset(false), 4000)
+    return () => clearTimeout(timer)
+  }, [confirmReset])
+
+  return (
+    <>
+      <SectionHeader
+        title="Data"
+        description="Manage simulation data and local storage"
+      />
+
+      <div className="space-y-4">
+        <div className="rounded-xl border border-black/6 dark:border-white/8 bg-black/[0.015] dark:bg-white/[0.02] p-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 shrink-0">
+              <Database size={16} weight="duotone" className="text-[var(--dial-text-label)]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="type-label text-foreground">Persistent storage</p>
+              <p className="type-caption text-[var(--dial-text-tertiary)] mt-0.5">
+                Simulation state, chat history, and settings are saved locally.
+                Refreshing the page will resume where you left off.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-red-500/15 dark:border-red-400/15 bg-red-500/[0.03] dark:bg-red-400/[0.03] p-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 shrink-0">
+              <Warning size={16} weight="fill" className="text-red-500/70 dark:text-red-400/70" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="type-label text-foreground">Reset all data</p>
+              <p className="type-caption text-[var(--dial-text-tertiary)] mt-1">
+                Clear all saved simulation data, chat history, and settings.
+                The simulation will restart from Sol 0.
+              </p>
+              <motion.button
+                type="button"
+                onClick={handleReset}
+                className={cn(
+                  "mt-3 flex items-center gap-2 px-4 py-2 rounded-lg type-label transition-colors cursor-pointer",
+                  confirmReset
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : "bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20"
+                )}
+                whileTap={anim.enabled ? { scale: 0.97 } : undefined}
+              >
+                <Trash size={14} weight="bold" />
+                <span>{confirmReset ? "Confirm reset" : "Reset all data"}</span>
+              </motion.button>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   )

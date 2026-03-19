@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, memo, useCallback, useRef } from "react";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
 import { useLiveParam } from "@/lib/use-live-param";
+import { useIsVisible } from "@/lib/use-is-visible";
 import { LiveLineChart } from "@/components/charts/live-line-chart";
 import { LiveLine } from "@/components/charts/live-line";
 import { LiveXAxis } from "@/components/charts/live-x-axis";
@@ -26,6 +27,18 @@ const C = {
   nutrition: "#BF5AF2",
 } as const;
 
+/* ── Hoisted stable refs (no closure → referentially stable) ──── */
+
+const fmt1 = (v: number) => v.toFixed(1);
+const fmt0 = (v: number) => v.toFixed(0);
+const fmtDeg = (v: number) => `${v.toFixed(0)}\u00b0`;
+const fmtPct = (v: number) => `${v.toFixed(0)}%`;
+
+const PARAM_MARGIN = { top: 8, right: 40, bottom: 20, left: 40 } as const;
+const PARAM_STYLE: React.CSSProperties = { height: "100%" };
+const CROP_MARGIN = { top: 4, right: 4, bottom: 4, left: 4 } as const;
+const CROP_STYLE: React.CSSProperties = { height: 56 };
+
 /* ── Live parameter chart (squared) ────────────────────────────── */
 
 interface LiveParamCardProps {
@@ -36,9 +49,11 @@ interface LiveParamCardProps {
   fmtVal: (v: number) => string;
   fmtAxis: (v: number) => string;
   window?: number;
+  /** When false, data collection and chart animation are paused. */
+  active?: boolean;
 }
 
-function LiveParamCard({
+const LiveParamCard = memo(function LiveParamCard({
   label,
   unit,
   color,
@@ -46,11 +61,23 @@ function LiveParamCard({
   fmtVal,
   fmtAxis,
   window: windowSecs = 60,
+  active: cardActive = true,
 }: LiveParamCardProps) {
-  const [data] = useLiveParam(value);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const isVisible = useIsVisible(cardRef);
+  const enabled = cardActive && isVisible;
+  const [data] = useLiveParam(value, enabled);
+
+  const tooltipRows = useCallback(
+    (point: Record<string, unknown>) => {
+      const v = point.value as number;
+      return [{ color, label, value: `${fmtVal(v)} ${unit}` }];
+    },
+    [color, label, unit, fmtVal],
+  );
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-2.5 h-full min-h-0">
+    <div ref={cardRef} className="flex flex-col gap-1.5 rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-2.5 h-full min-h-0">
       <div className="flex items-baseline justify-between px-0.5 shrink-0">
         <span className="text-[9px] font-medium tracking-wide uppercase text-muted-foreground">
           {label}
@@ -68,8 +95,9 @@ function LiveParamCard({
           numXTicks={3}
           nowOffsetUnits={1}
           lerpSpeed={0.12}
-          style={{ height: '100%' }}
-          margin={{ top: 8, right: 40, bottom: 20, left: 40 }}
+          paused={!enabled}
+          style={PARAM_STYLE}
+          margin={PARAM_MARGIN}
         >
           <Grid horizontal />
           <LiveLine
@@ -82,18 +110,12 @@ function LiveParamCard({
           />
           <LiveXAxis />
           <LiveYAxis position="left" formatValue={fmtAxis} />
-          <ChartTooltip
-            showDatePill={false}
-            rows={(point) => {
-              const v = point.value as number;
-              return [{ color, label, value: `${fmtVal(v)} ${unit}` }];
-            }}
-          />
+          <ChartTooltip showDatePill={false} rows={tooltipRows} />
         </LiveLineChart>
       </div>
     </div>
   );
-}
+});
 
 /* ── Crew data ─────────────────────────────────────────────────── */
 
@@ -160,7 +182,7 @@ const STATUS_DOT: Record<HealthStatus, string> = {
   critical: "bg-red-500",
 };
 
-function CrewRadarCard({ member }: { member: CrewMember }) {
+const CrewRadarCard = memo(function CrewRadarCard({ member }: { member: CrewMember }) {
   const radarData = useMemo(() => [crewToRadar(member)], [member]);
   return (
     <div className="flex flex-col rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-2 h-full min-h-0">
@@ -416,13 +438,15 @@ interface CropCardProps {
   biomassKg: number;
 }
 
-function CropCard({ name, growth, health, stage, yieldKg }: CropCardProps) {
+const CropCard = memo(function CropCard({ name, growth, health, stage, yieldKg }: CropCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const isVisible = useIsVisible(cardRef);
   const color = CROP_COLORS[name.toLowerCase()] ?? "#888";
   const healthPct = Math.round(health * 100);
-  const [growthData] = useLiveParam(growth);
+  const [growthData] = useLiveParam(growth, isVisible);
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-2.5 flex flex-col gap-1.5">
+    <div ref={cardRef} className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-2.5 flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="size-2 rounded-full shrink-0" style={{ background: color }} />
@@ -440,8 +464,9 @@ function CropCard({ name, growth, health, stage, yieldKg }: CropCardProps) {
         numXTicks={2}
         nowOffsetUnits={1}
         lerpSpeed={0.1}
-        style={{ height: 56 }}
-        margin={{ top: 4, right: 4, bottom: 4, left: 4 }}
+        paused={!isVisible}
+        style={CROP_STYLE}
+        margin={CROP_MARGIN}
       >
         <LiveLine dataKey="value" stroke={color} strokeWidth={1} dotSize={1.5} pulse={false} badge={false} fill={true} />
       </LiveLineChart>
@@ -462,11 +487,11 @@ function CropCard({ name, growth, health, stage, yieldKg }: CropCardProps) {
       </div>
     </div>
   );
-}
+});
 
 /* ── Dashboard ─────────────────────────────────────────────────── */
 
-export function DashboardView() {
+export const DashboardView = memo(function DashboardView({ active = true }: { active?: boolean }) {
   const temperature = useGreenhouseStore((s) => s.temperature);
   const humidity = useGreenhouseStore((s) => s.humidity);
   const pressure = useGreenhouseStore((s) => s.environment.atmosphericPressure);
@@ -500,7 +525,7 @@ export function DashboardView() {
   return (
     <section
       aria-label="Dashboard view"
-      className="absolute inset-0 bg-background overflow-hidden"
+      className="absolute inset-0 overflow-hidden"
     >
       <div className="px-10 pt-[80px] pb-[88px] h-full flex flex-col gap-3">
         {/* Row 1: Environment — 3 columns, large */}
@@ -510,25 +535,28 @@ export function DashboardView() {
             unit={"\u00b0C"}
             color={C.temperature}
             value={temperature}
-            fmtVal={(v) => v.toFixed(1)}
-            fmtAxis={(v) => `${v.toFixed(0)}\u00b0`}
+            fmtVal={fmt1}
+            fmtAxis={fmtDeg}
+            active={active}
           />
           <LiveParamCard
             label="Humidity"
             unit="%"
             color={C.humidity}
             value={humidity}
-            fmtVal={(v) => v.toFixed(1)}
-            fmtAxis={(v) => `${v.toFixed(0)}%`}
+            fmtVal={fmt1}
+            fmtAxis={fmtPct}
+            active={active}
           />
           <LiveParamCard
             label="Pressure"
             unit="Pa"
             color={C.pressure}
             value={pressure}
-            fmtVal={(v) => v.toFixed(0)}
-            fmtAxis={(v) => `${v.toFixed(0)}`}
+            fmtVal={fmt0}
+            fmtAxis={fmt0}
             window={90}
+            active={active}
           />
         </div>
 
@@ -560,4 +588,4 @@ export function DashboardView() {
       </div>
     </section>
   );
-}
+});

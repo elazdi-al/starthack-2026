@@ -7,7 +7,7 @@ import { useSettingsStore, formatTemperature } from "@/lib/settings-store";
 import { useHydrated } from "@/lib/use-hydrated";
 
 export function TemperatureWidget() {
-  const temperature = useGreenhouseStore((s) => s.temperature);
+  const temperature = useGreenhouseStore((s) => s.environment.externalTemp);
   const tempUnit = useSettingsStore((s) => s.tempUnit);
   const isHydrated = useHydrated();
 

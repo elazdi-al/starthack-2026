@@ -777,6 +777,7 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
     let simulationP10: number | undefined;
     let simulationP90: number | undefined;
     let arbiterReasoning = '';
+    let arbiterSummary = '';
 
     if (survivalVeto || survivalRiskScore > 0.85) {
       conflictType = 'hard_veto';

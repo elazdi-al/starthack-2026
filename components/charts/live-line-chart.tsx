@@ -260,6 +260,19 @@ function LiveLineChartInner({
   dataRef.current = data;
   dataKeyRef.current = dataKey;
 
+  // ---- Visibility gate — skip rAF-driven state updates when off-screen ----
+  const isVisibleRef = useRef(true);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { isVisibleRef.current = entry?.isIntersecting ?? true; },
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [containerRef]);
+
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
@@ -290,6 +303,12 @@ function LiveLineChartInner({
         pausedRef.current
       );
       animRef.current = next;
+
+      // Keep animation math running but skip React state updates when off-screen
+      if (!isVisibleRef.current || pausedRef.current) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
 
       const domainEndMsNext = next.now + leadingMs;
       const cursorX = cursorXRef.current;
