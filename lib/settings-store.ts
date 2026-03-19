@@ -1,41 +1,30 @@
 "use client"
 
 import { create } from "zustand"
+import { readThemePreferenceSnapshot, setThemePreference, type ThemePreference } from "@/lib/theme"
 
-export type Theme = "light" | "dark"
 export type TempUnit = "celsius" | "fahrenheit"
 export type TimeFormat = "12h" | "24h"
 
 export interface SettingsState {
-  theme: Theme
+  themePreference: ThemePreference
   tempUnit: TempUnit
   timeFormat: TimeFormat
 
-  setTheme: (theme: Theme) => void
+  setThemePreference: (preference: ThemePreference) => void
   setTempUnit: (unit: TempUnit) => void
   setTimeFormat: (format: TimeFormat) => void
 }
 
-function applyTheme(theme: Theme) {
-  if (typeof document === "undefined") return
-  const root = document.documentElement
-  if (theme === "dark") {
-    root.classList.add("dark")
-  } else {
-    root.classList.remove("dark")
-  }
-}
-
 export const useSettingsStore = create<SettingsState>((set) => ({
-  theme: "light",
+  themePreference: readThemePreferenceSnapshot(),
   tempUnit: "celsius",
   timeFormat: "24h",
 
-  setTheme: (theme) => {
-    applyTheme(theme)
-    set({ theme })
+  setThemePreference: (themePreference) => {
+    setThemePreference(themePreference)
+    set({ themePreference })
   },
-
   setTempUnit: (tempUnit) => set({ tempUnit }),
   setTimeFormat: (timeFormat) => set({ timeFormat }),
 }))

@@ -795,6 +795,66 @@
       drop-shadow(0 3px 4px rgb(255 255 255 / 0.12));
   }
 
+  .gh-shadow {
+    fill: var(--greenhouse-shadow);
+  }
+
+  .gh-floor-start {
+    stop-color: var(--greenhouse-floor-start);
+  }
+
+  .gh-floor-end {
+    stop-color: var(--greenhouse-floor-end);
+  }
+
+  .gh-front-start {
+    stop-color: var(--greenhouse-glass-front-start);
+  }
+
+  .gh-front-end {
+    stop-color: var(--greenhouse-glass-front-end);
+  }
+
+  .gh-side-start {
+    stop-color: var(--greenhouse-glass-side-start);
+  }
+
+  .gh-side-end {
+    stop-color: var(--greenhouse-glass-side-end);
+  }
+
+  .gh-roof-back-start {
+    stop-color: var(--greenhouse-roof-back-start);
+  }
+
+  .gh-roof-back-end {
+    stop-color: var(--greenhouse-roof-back-end);
+  }
+
+  .gh-roof-front-start {
+    stop-color: var(--greenhouse-roof-front-start);
+  }
+
+  .gh-roof-front-end {
+    stop-color: var(--greenhouse-roof-front-end);
+  }
+
+  .gh-line-soft {
+    stroke: var(--greenhouse-line-soft);
+  }
+
+  .gh-line-mid {
+    stroke: var(--greenhouse-line-mid);
+  }
+
+  .gh-line-strong {
+    stroke: var(--greenhouse-line-strong);
+  }
+
+  .gh-side-fill {
+    fill: var(--greenhouse-glass-side-end);
+  }
+
   .crop-preview-leaf-1 {
     fill: #446f4b;
   }

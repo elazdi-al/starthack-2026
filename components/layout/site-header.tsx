@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-import { readThemeSnapshot, setTheme, subscribeToTheme } from "@/lib/theme";
+import { readThemeSnapshot, subscribeToTheme } from "@/lib/theme";
 
 type SiteHeaderLink = {
   href: string;
@@ -27,17 +27,11 @@ function SiteHeader({
   const theme = useSyncExternalStore(
     subscribeToTheme,
     readThemeSnapshot,
-    () => "dark"
+    () => "light"
   );
-  const nextTheme = theme === "dark" ? "light" : "dark";
 
   function handleNavigationPress() {
     triggerHaptic("selection");
-  }
-
-  function handleThemeToggle() {
-    setTheme(nextTheme);
-    triggerHaptic("soft");
   }
 
   return (
@@ -68,12 +62,10 @@ function SiteHeader({
               </a>
             </li>
             <li>
-              <button
-                type="button"
-                aria-label={`Switch to ${nextTheme} theme`}
-                title={`Switch to ${nextTheme} theme`}
-                onClick={handleThemeToggle}
-                className="inline-flex h-8 w-8 appearance-none items-center justify-center rounded-[8px] bg-transparent p-0 text-[var(--dial-text-label)] transition-[color,background-color] duration-200 ease-in-out select-none hover:bg-accent/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              <div
+                aria-label={`System theme: ${theme}`}
+                title={`System theme: ${theme}`}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] bg-transparent p-0 text-[var(--dial-text-label)]"
               >
                 <div className="flex items-center justify-center opacity-100 transition-[opacity,filter,transform] duration-200 [filter:blur(0px)] [transform:none]">
                   {theme === "dark" ? (
@@ -82,7 +74,7 @@ function SiteHeader({
                     <ThemeSunIcon size={16} tone="strong" />
                   )}
                 </div>
-              </button>
+              </div>
             </li>
           </ul>
         </nav>

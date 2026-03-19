@@ -464,41 +464,6 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
       fill="none"
     >
       <defs>
-        <style>{`
-          .gh-shadow { fill: rgba(105, 138, 118, 0.065); }
-          .gh-floor-start { stop-color: rgba(236, 247, 241, 0.4); }
-          .gh-floor-end { stop-color: rgba(214, 234, 224, 0.14); }
-          .gh-front-start { stop-color: rgba(255, 255, 255, 0.29); }
-          .gh-front-end { stop-color: rgba(223, 242, 233, 0.12); }
-          .gh-side-start { stop-color: rgba(248, 255, 252, 0.23); }
-          .gh-side-end { stop-color: rgba(213, 236, 226, 0.09); }
-          .gh-roof-back-start { stop-color: rgba(255, 255, 255, 0.34); }
-          .gh-roof-back-end { stop-color: rgba(226, 244, 236, 0.12); }
-          .gh-roof-front-start { stop-color: rgba(251, 255, 253, 0.24); }
-          .gh-roof-front-end { stop-color: rgba(218, 241, 231, 0.1); }
-          .gh-line-soft { stroke: rgba(160, 195, 176, 0.22); }
-          .gh-line-mid { stroke: rgba(140, 179, 158, 0.35); }
-          .gh-line-strong { stroke: rgba(120, 162, 140, 0.48); }
-          .gh-side-fill { fill: rgba(213, 236, 226, 0.09); }
-
-          @media (prefers-color-scheme: dark) {
-            .gh-shadow { fill: rgba(128, 156, 140, 0.035); }
-            .gh-floor-start { stop-color: rgba(248, 255, 252, 0.07); }
-            .gh-floor-end { stop-color: rgba(220, 249, 236, 0.025); }
-            .gh-front-start { stop-color: rgba(250, 255, 252, 0.11); }
-            .gh-front-end { stop-color: rgba(216, 247, 236, 0.05); }
-            .gh-side-start { stop-color: rgba(255, 255, 255, 0.09); }
-            .gh-side-end { stop-color: rgba(219, 245, 236, 0.035); }
-            .gh-roof-back-start { stop-color: rgba(255, 255, 255, 0.13); }
-            .gh-roof-back-end { stop-color: rgba(229, 252, 242, 0.055); }
-            .gh-roof-front-start { stop-color: rgba(246, 255, 250, 0.1); }
-            .gh-roof-front-end { stop-color: rgba(217, 247, 235, 0.05); }
-            .gh-line-soft { stroke: rgba(247, 255, 252, 0.12); }
-            .gh-line-mid { stroke: rgba(249, 255, 252, 0.2); }
-            .gh-line-strong { stroke: rgba(252, 255, 253, 0.55); }
-            .gh-side-fill { fill: rgba(219, 245, 236, 0.035); }
-          }
-        `}</style>
         <linearGradient id="greenhouse-floor-fill" x1={x} y1={y} x2={x + width} y2={y + height}>
           <stop offset="0%" className="gh-floor-start" />
           <stop offset="100%" className="gh-floor-end" />

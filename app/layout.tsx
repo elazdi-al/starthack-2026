@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "Design System",
@@ -13,10 +12,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const themeScript = `try {
-    const storedTheme = localStorage.getItem("${THEME_STORAGE_KEY}");
-    document.documentElement.classList.toggle("dark", storedTheme !== "light");
+    const storedPreference = localStorage.getItem("theme-preference");
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const shouldUseDark =
+      storedPreference === "dark" ||
+      (storedPreference !== "light" && storedPreference !== "system" && mediaQuery.matches) ||
+      (storedPreference === "system" && mediaQuery.matches);
+    document.documentElement.classList.toggle("dark", shouldUseDark);
   } catch (error) {
-    document.documentElement.classList.add("dark");
+    document.documentElement.classList.remove("dark");
   }`;
 
   return (
