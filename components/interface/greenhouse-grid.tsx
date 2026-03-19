@@ -569,6 +569,156 @@ export function GreenhouseGrid({
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ── Touch gesture refs ──────────────────────────────────────────────
+  const touchState = useRef<{
+    type: "none" | "pan" | "pinch";
+    startTouches: { x: number; y: number }[];
+    startZoom: number;
+    startPan: { x: number; y: number };
+    startDist: number;
+    startMid: { x: number; y: number };
+  }>({
+    type: "none",
+    startTouches: [],
+    startZoom: 1,
+    startPan: { x: 0, y: 0 },
+    startDist: 0,
+    startMid: { x: 0, y: 0 },
+  });
+
+  const panRef = useRef({ x: 0, y: 0 });
+
+  // Keep panRef in sync with pan state
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+
+  // ── Touch event handlers (native, for passive: false) ──────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+    function mid(a: { x: number; y: number }, b: { x: number; y: number }) {
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+    function touchPt(t: Touch) {
+      return { x: t.clientX, y: t.clientY };
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      // Don't intercept touches on interactive elements
+      const target = e.target as HTMLElement;
+      if (target.closest('button, a, [role="button"]')) return;
+
+      const touches = e.touches;
+      if (touches.length === 1) {
+        // Single finger → pan
+        e.preventDefault();
+        touchState.current = {
+          type: "pan",
+          startTouches: [touchPt(touches[0])],
+          startZoom: zoomRef.current,
+          startPan: { ...panRef.current },
+          startDist: 0,
+          startMid: touchPt(touches[0]),
+        };
+      } else if (touches.length === 2) {
+        // Two fingers → pinch-zoom + pan
+        e.preventDefault();
+        const p0 = touchPt(touches[0]);
+        const p1 = touchPt(touches[1]);
+        touchState.current = {
+          type: "pinch",
+          startTouches: [p0, p1],
+          startZoom: zoomRef.current,
+          startPan: { ...panRef.current },
+          startDist: dist(p0, p1),
+          startMid: mid(p0, p1),
+        };
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      const ts = touchState.current;
+      if (ts.type === "none") return;
+      e.preventDefault();
+
+      const touches = e.touches;
+
+      if (ts.type === "pan" && touches.length === 1) {
+        const dx = touches[0].clientX - ts.startMid.x;
+        const dy = touches[0].clientY - ts.startMid.y;
+        setPan({ x: ts.startPan.x + dx, y: ts.startPan.y + dy });
+      }
+
+      if (touches.length === 2) {
+        // Upgrade from pan to pinch if a second finger was added
+        if (ts.type === "pan") {
+          const p0 = touchPt(touches[0]);
+          const p1 = touchPt(touches[1]);
+          touchState.current = {
+            type: "pinch",
+            startTouches: [p0, p1],
+            startZoom: zoomRef.current,
+            startPan: { ...panRef.current },
+            startDist: dist(p0, p1),
+            startMid: mid(p0, p1),
+          };
+          return;
+        }
+
+        const p0 = touchPt(touches[0]);
+        const p1 = touchPt(touches[1]);
+        const curDist = dist(p0, p1);
+        const curMid = mid(p0, p1);
+
+        // Scale
+        const scale = curDist / ts.startDist;
+        const nextZoom = Math.min(3, Math.max(0.3, ts.startZoom * scale));
+        zoomRef.current = nextZoom;
+        setZoom(nextZoom);
+
+        // Pan follows midpoint
+        const dx = curMid.x - ts.startMid.x;
+        const dy = curMid.y - ts.startMid.y;
+        setPan({ x: ts.startPan.x + dx, y: ts.startPan.y + dy });
+      }
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      const remaining = e.touches.length;
+      if (remaining === 0) {
+        touchState.current.type = "none";
+      } else if (remaining === 1) {
+        // Downgrade from pinch back to pan with the remaining finger
+        const p = touchPt(e.touches[0]);
+        touchState.current = {
+          type: "pan",
+          startTouches: [p],
+          startZoom: zoomRef.current,
+          startPan: { ...panRef.current },
+          startDist: 0,
+          startMid: p,
+        };
+      }
+    }
+
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
+
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     const nextZoom = Math.min(3, Math.max(0.3, zoomRef.current - e.deltaY * 0.001));
@@ -585,6 +735,8 @@ export function GreenhouseGrid({
   }, [greenhouseVisible, onGreenhouseVisibleChange]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    // Skip for touch — handled by native touch events above
+    if (e.pointerType === "touch") return;
     // Don't pan when clicking on interactive elements (buttons, etc.)
     const target = e.target as HTMLElement;
     if (target.closest('button, a, [role="button"]')) return;
@@ -613,7 +765,7 @@ export function GreenhouseGrid({
     <div
       ref={containerRef}
       className="greenhouse-pan-area absolute inset-0 flex flex-col items-center justify-center select-none"
-      style={{ cursor: "default" }}
+      style={{ cursor: "default", touchAction: "none" }}
       onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
