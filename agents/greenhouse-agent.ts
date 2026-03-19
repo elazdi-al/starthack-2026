@@ -57,6 +57,6 @@ Crop-specific (per crop):
 - localHeatingPower (Watts)
 
 Return as many transformations as needed to optimize the system. Each transformation should have a clear reasoning.`,
-  model: bedrock('us.amazon.nova-lite-v1:0'),
+  model: bedrock('us.anthropic.claude-haiku-4-5-20250922-v1:0'),
   tools: { transformationTool },
 });
