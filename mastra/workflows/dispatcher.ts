@@ -251,7 +251,7 @@ Mission sol: ${missionSol}
     // ── CREW QUESTION: Wellbeing only, direct answer from snapshot ─────────
     if (triggerType === 'crew' && crewMessage) {
       // First classify intent using wellbeing agent
-      const intentClassificationPrompt = `
+      const intentClassificationPrompt = `[ARBITER_MODE]
 ${contextBlock}
 
 Current greenhouse sensor readings:
@@ -500,7 +500,7 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
         { maxSteps: isEmergencySev2 ? 2 : 5 },
       ),
       wellbeingAgent?.generate(
-        [{ role: 'user', content: `${basePrompt}\n\nProvide your wellbeing assessment and crew-centred action proposal.` }],
+        [{ role: 'user', content: `[ARBITER_MODE]\n${basePrompt}\n\nProvide your wellbeing assessment and crew-centred action proposal.` }],
         { maxSteps: isEmergencySev2 ? 2 : 5 },
         // Memory only for crew-facing interactions
       ),
