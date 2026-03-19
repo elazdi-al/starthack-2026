@@ -574,6 +574,272 @@
     opacity: 0.45;
   }
 
+  /* ── Isometric greenhouse grid ── */
+
+  .iso-tile {
+    width: 100%;
+    height: 100%;
+    background: rgb(0 0 0 / 0.025);
+    border: 1px solid rgb(0 0 0 / 0.04);
+    border-radius: 3px;
+    cursor: default;
+    transform: translateZ(0);
+    transition:
+      transform 200ms ease-out,
+      background-color 200ms ease-out,
+      box-shadow 200ms ease-out;
+  }
+
+  .iso-tile:hover {
+    background: rgb(0 0 0 / 0.045);
+    transform: translateZ(4px);
+    box-shadow: 0 4px 8px rgb(0 0 0 / 0.06);
+  }
+
+  .iso-tile--crop {
+    background: rgb(0 0 0 / 0.06);
+    border-color: rgb(0 0 0 / 0.05);
+  }
+
+  .iso-tile--crop:hover {
+    background: rgb(0 0 0 / 0.085);
+    transform: translateZ(4px);
+    box-shadow: 0 4px 8px rgb(0 0 0 / 0.08);
+  }
+
+  .crop-tooltip-popup {
+    max-width: none;
+    color: rgb(244 244 240 / 0.96);
+    border-color: rgb(255 255 255 / 0.08);
+    background:
+      linear-gradient(180deg, rgb(52 52 48 / 0.98), rgb(35 35 33 / 0.98));
+    box-shadow:
+      0 14px 34px rgb(0 0 0 / 0.28),
+      0 1px 3px rgb(0 0 0 / 0.24);
+    backdrop-filter: blur(14px);
+  }
+
+  .crop-tooltip-card {
+    display: grid;
+    gap: 0.85rem;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0.75rem;
+  }
+
+  .crop-tooltip-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+  }
+
+  .crop-tooltip-copy {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+    padding-top: 0.1rem;
+  }
+
+  .crop-tooltip-heading {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .crop-tooltip-title {
+    color: rgb(248 248 244 / 0.98);
+    line-height: 1.05rem;
+  }
+
+  .crop-tooltip-meta {
+    color: rgb(198 198 190 / 0.8);
+    line-height: 0.95rem;
+  }
+
+  .crop-tooltip-summary {
+    color: rgb(225 225 218 / 0.84);
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+    font-size: 0.8125rem;
+    line-height: 1.05rem;
+  }
+
+  .crop-tooltip-model {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 84px;
+    height: 84px;
+    flex-shrink: 0;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    border-radius: 14px;
+    background:
+      radial-gradient(circle at top, rgb(255 255 255 / 0.1), rgb(0 0 0 / 0.18));
+  }
+
+  .crop-tooltip-stats {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    margin: 0;
+  }
+
+  .crop-tooltip-stat {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: start;
+    gap: 0.55rem;
+    min-width: 0;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+    border-top: 1px solid rgb(255 255 255 / 0.06);
+  }
+
+  .crop-tooltip-stat-label,
+  .crop-tooltip-stat-value {
+    margin: 0;
+  }
+
+  .crop-tooltip-stat-label {
+    color: rgb(176 176 169 / 0.72);
+    line-height: 1rem;
+  }
+
+  .crop-tooltip-stat-value {
+    color: rgb(245 245 239 / 0.96);
+    white-space: normal;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+    line-height: 1rem;
+  }
+
+  .crop-preview-svg {
+    width: 62px;
+    height: 62px;
+    overflow: visible;
+    filter: drop-shadow(0 8px 12px rgb(0 0 0 / 0.08));
+  }
+
+  .crop-preview-leaf-1 {
+    fill: #446f4b;
+  }
+
+  .crop-preview-leaf-2 {
+    fill: #5f8e67;
+  }
+
+  .crop-preview-leaf-3 {
+    fill: #739e79;
+  }
+
+  .crop-preview-leaf-4 {
+    fill: #3f6445;
+  }
+
+  .crop-preview-stem {
+    fill: #6d8e5f;
+  }
+
+  .crop-preview-fruit-1 {
+    fill: #ca5447;
+  }
+
+  .crop-preview-fruit-2 {
+    fill: #e26b58;
+  }
+
+  .crop-preview-fruit-3 {
+    fill: #b8473e;
+  }
+
+  .crop-preview-potato-1 {
+    fill: #8f6a47;
+  }
+
+  .crop-preview-potato-2 {
+    fill: #a98057;
+  }
+
+  .crop-preview-potato-3 {
+    fill: #755334;
+  }
+
+  .crop-preview-root-1 {
+    fill: #d26a2f;
+  }
+
+  .crop-preview-root-2 {
+    fill: #e18a44;
+  }
+
+  .crop-preview-root-3 {
+    fill: #b65423;
+  }
+
+  .crop-preview-radish-1 {
+    fill: #c44a68;
+  }
+
+  .crop-preview-radish-2 {
+    fill: #e46e90;
+  }
+
+  .crop-preview-radish-3 {
+    fill: #a83d59;
+  }
+
+  .crop-preview-grain-1 {
+    fill: #d5bc6b;
+  }
+
+  .crop-preview-grain-2 {
+    fill: #bea458;
+  }
+
+  .crop-preview-pod-1 {
+    fill: #6e8f4f;
+  }
+
+  .crop-preview-pod-2 {
+    fill: #82a85d;
+  }
+
+  .crop-preview-pod-3 {
+    fill: #58743f;
+  }
+
+  .crop-preview-lettuce-1 {
+    fill: #83ad6f;
+  }
+
+  .crop-preview-lettuce-2 {
+    fill: #6f9560;
+  }
+
+  .crop-preview-kale-1 {
+    fill: #557d5b;
+  }
+
+  .crop-preview-kale-2 {
+    fill: #486b4d;
+  }
+
+  .crop-preview-kale-3 {
+    fill: #39573e;
+  }
+
+  .crop-dialog-preview {
+    display: flex;
+    width: 132px;
+    height: 132px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgb(0 0 0 / 0.05);
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at top, rgb(255 255 255 / 0.92), rgb(0 0 0 / 0.03));
+  }
+
   .hold-to-delete-button {
     position: relative;
     display: flex;
@@ -645,6 +911,26 @@
 }
 
 @media (max-width: 640px) {
+  .crop-tooltip-card {
+    min-width: 0;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .crop-tooltip-model {
+    width: 76px;
+    height: 76px;
+  }
+
+  .crop-tooltip-top {
+    gap: 0.6rem;
+  }
+
+  .crop-tooltip-stat {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
   .mobile-full-width {
     margin-left: -25px;
     margin-right: -25px;

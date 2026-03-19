@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "@phosphor-icons/react";
+
 import {
   Tooltip,
   TooltipContent,
@@ -13,6 +14,8 @@ import {
 import {
   useGreenhouseStore,
   CROP_DB,
+  type CropInfo,
+  type CropType,
   type TileData,
 } from "@/lib/greenhouse-store";
 
@@ -21,13 +24,62 @@ const GAP = 3;
 const COLS = 8;
 const ROWS = 5;
 
+interface CropHoverMeta {
+  label: string;
+  detail: string;
+  summary: string;
+}
+
+const CROP_HOVER_META: Record<CropType, CropHoverMeta> = {
+  lettuce: {
+    label: "Leaf crop",
+    detail: "Fast cycle",
+    summary: "Compact leafy canopy for quick harvest turnover.",
+  },
+  tomato: {
+    label: "Fruit crop",
+    detail: "Warm zone",
+    summary: "Dense vine structure with steady flowering and fruit set.",
+  },
+  potato: {
+    label: "Root crop",
+    detail: "Dense tuber bed",
+    summary: "Low canopy root crop with heavier water demand through growth.",
+  },
+  soybean: {
+    label: "Protein crop",
+    detail: "Mid cycle",
+    summary: "Dense foliage with compact pods and strong protein yield.",
+  },
+  spinach: {
+    label: "Leaf crop",
+    detail: "Cool zone",
+    summary: "Short leafy growth with dense, low-profile coverage.",
+  },
+  wheat: {
+    label: "Grain crop",
+    detail: "Tall stand",
+    summary: "Vertical stalk structure with an even, high-density canopy.",
+  },
+  radish: {
+    label: "Root crop",
+    detail: "Rapid cycle",
+    summary: "Fast-growing root bed with a small leafy canopy above grade.",
+  },
+  kale: {
+    label: "Leaf crop",
+    detail: "Hardy bed",
+    summary: "Broad leaf mass with steady, nutrient-dense growth.",
+  },
+};
+
 const GROWTH_LABEL: Record<number, string> = {
-  0: "Not Planted",
+  0: "Not planted",
   1: "Seedling",
   2: "Vegetative",
   3: "Flowering",
   4: "Fruiting",
-  5: "Harvest Ready",
+  5: "Harvest ready",
 };
 
 const DOT_SIZE: Record<number, string> = {
@@ -46,18 +98,238 @@ const DOT_OPACITY: Record<number, string> = {
   5: "opacity-80",
 };
 
+const PREVIEW_COLORS = {
+  leaf1: "#5c865c",
+  leaf2: "#79a26f",
+  leaf3: "#93b686",
+  leaf4: "#496f4d",
+  stem: "#789160",
+  fruit1: "#ca5447",
+  fruit2: "#e26b58",
+  fruit3: "#b8473e",
+  potato1: "#a17a56",
+  potato2: "#bb9567",
+  potato3: "#896343",
+  root1: "#d26a2f",
+  root2: "#e18a44",
+  root3: "#b65423",
+  radish1: "#cf5f7b",
+  radish2: "#ea86a1",
+  radish3: "#af4c66",
+  grain1: "#dcc77d",
+  grain2: "#c5ab61",
+  pod1: "#759755",
+  pod2: "#8db367",
+  pod3: "#628149",
+  lettuce1: "#8db77a",
+  lettuce2: "#769f68",
+  kale1: "#62896a",
+  kale2: "#547559",
+  kale3: "#456048",
+} as const;
+
+function Poly({ points, fill }: { points: string; fill: string }) {
+  return <polygon points={points} fill={fill} />;
+}
+
+function CropPreview({ crop }: { crop: CropType }) {
+  if (crop === "radish") {
+    return (
+      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+        <Poly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} />
+        <Poly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} />
+        <Poly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} />
+        <Poly points="44,28 59,41 29,41" fill={PREVIEW_COLORS.leaf4} />
+        <Poly points="44,31 64,39 51,69" fill={PREVIEW_COLORS.radish1} />
+        <Poly points="44,31 38,73 24,40" fill={PREVIEW_COLORS.radish2} />
+        <Poly points="39,56 44,76 30,65" fill={PREVIEW_COLORS.radish3} />
+      </svg>
+    );
+  }
+
+  if (crop === "potato") {
+    return (
+      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+        <Poly points="44,14 54,30 34,30" fill={PREVIEW_COLORS.leaf1} />
+        <Poly points="28,28 44,38 24,46" fill={PREVIEW_COLORS.leaf2} />
+        <Poly points="60,28 64,46 44,38" fill={PREVIEW_COLORS.leaf3} />
+        <Poly points="41,28 47,54 37,54" fill={PREVIEW_COLORS.stem} />
+        <Poly points="28,46 42,42 44,60 31,66 22,58" fill={PREVIEW_COLORS.potato1} />
+        <Poly points="45,43 58,45 62,58 51,66 40,60" fill={PREVIEW_COLORS.potato2} />
+        <Poly points="38,54 49,56 50,67 40,73 31,67" fill={PREVIEW_COLORS.potato3} />
+      </svg>
+    );
+  }
+
+  if (crop === "wheat") {
+    return (
+      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+        <Poly points="37,18 43,72 34,72" fill={PREVIEW_COLORS.stem} />
+        <Poly points="49,14 55,70 46,70" fill={PREVIEW_COLORS.stem} />
+        <Poly points="43,9 54,17 42,24" fill={PREVIEW_COLORS.grain1} />
+        <Poly points="51,18 63,26 50,34" fill={PREVIEW_COLORS.grain2} />
+        <Poly points="39,18 29,26 40,34" fill={PREVIEW_COLORS.grain2} />
+        <Poly points="44,26 55,34 43,42" fill={PREVIEW_COLORS.grain1} />
+        <Poly points="50,34 61,42 49,50" fill={PREVIEW_COLORS.grain2} />
+        <Poly points="38,35 28,43 39,49" fill={PREVIEW_COLORS.grain1} />
+      </svg>
+    );
+  }
+
+  if (crop === "tomato") {
+    return (
+      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+        <Poly points="44,10 53,26 35,26" fill={PREVIEW_COLORS.leaf1} />
+        <Poly points="28,24 47,39 20,43" fill={PREVIEW_COLORS.leaf2} />
+        <Poly points="60,24 68,43 41,39" fill={PREVIEW_COLORS.leaf3} />
+        <Poly points="44,26 50,64 38,64" fill={PREVIEW_COLORS.stem} />
+        <Poly points="44,39 61,51 48,70" fill={PREVIEW_COLORS.fruit1} />
+        <Poly points="29,50 44,39 40,68" fill={PREVIEW_COLORS.fruit2} />
+        <Poly points="43,50 58,59 45,77" fill={PREVIEW_COLORS.fruit3} />
+      </svg>
+    );
+  }
+
+  if (crop === "soybean") {
+    return (
+      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+        <Poly points="44,12 55,29 33,29" fill={PREVIEW_COLORS.leaf1} />
+        <Poly points="28,24 49,39 24,46" fill={PREVIEW_COLORS.leaf2} />
+        <Poly points="60,24 64,46 40,39" fill={PREVIEW_COLORS.leaf3} />
+        <Poly points="44,27 50,63 38,63" fill={PREVIEW_COLORS.stem} />
+        <Poly points="28,45 41,41 48,49 37,58 25,54" fill={PREVIEW_COLORS.pod1} />
+        <Poly points="42,49 55,45 63,53 52,62 40,58" fill={PREVIEW_COLORS.pod2} />
+        <Poly points="35,56 45,54 50,61 42,68 33,65" fill={PREVIEW_COLORS.pod3} />
+      </svg>
+    );
+  }
+
+  if (crop === "spinach") {
+    return (
+      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+        <Poly points="44,14 57,34 31,34" fill={PREVIEW_COLORS.leaf1} />
+        <Poly points="26,30 46,41 23,56" fill={PREVIEW_COLORS.leaf2} />
+        <Poly points="62,30 65,55 42,41" fill={PREVIEW_COLORS.leaf3} />
+        <Poly points="43,29 60,57 29,57" fill={PREVIEW_COLORS.leaf4} />
+        <Poly points="44,42 51,71 37,71" fill={PREVIEW_COLORS.stem} />
+      </svg>
+    );
+  }
+
+  if (crop === "kale") {
+    return (
+      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+        <Poly points="44,12 57,28 31,28" fill={PREVIEW_COLORS.leaf1} />
+        <Poly points="23,30 46,40 22,55" fill={PREVIEW_COLORS.leaf2} />
+        <Poly points="65,30 66,55 42,40" fill={PREVIEW_COLORS.leaf3} />
+        <Poly points="44,24 61,54 27,54" fill={PREVIEW_COLORS.leaf4} />
+        <Poly points="31,41 45,63 23,66" fill={PREVIEW_COLORS.kale1} />
+        <Poly points="57,41 65,67 43,63" fill={PREVIEW_COLORS.kale2} />
+        <Poly points="44,39 54,73 34,73" fill={PREVIEW_COLORS.kale3} />
+      </svg>
+    );
+  }
+
+  if (crop === "lettuce") {
+    return (
+      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+        <Poly points="44,16 56,34 32,34" fill={PREVIEW_COLORS.leaf1} />
+        <Poly points="23,31 47,44 21,54" fill={PREVIEW_COLORS.leaf2} />
+        <Poly points="65,31 67,54 41,44" fill={PREVIEW_COLORS.leaf3} />
+        <Poly points="44,30 58,57 30,57" fill={PREVIEW_COLORS.leaf4} />
+        <Poly points="32,42 48,62 24,64" fill={PREVIEW_COLORS.lettuce1} />
+        <Poly points="56,42 64,63 41,61" fill={PREVIEW_COLORS.lettuce2} />
+        <Poly points="44,42 52,71 36,71" fill={PREVIEW_COLORS.stem} />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
+      <Poly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} />
+      <Poly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} />
+      <Poly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} />
+      <Poly points="44,28 59,41 29,41" fill={PREVIEW_COLORS.leaf4} />
+      <Poly points="44,31 63,39 50,73" fill={PREVIEW_COLORS.root1} />
+      <Poly points="44,31 38,75 25,39" fill={PREVIEW_COLORS.root2} />
+      <Poly points="37,55 44,75 31,64" fill={PREVIEW_COLORS.root3} />
+    </svg>
+  );
+}
+
+function CropTooltip({
+  data,
+  info,
+}: {
+  data: TileData;
+  info: CropInfo;
+}) {
+  const meta = data.crop ? CROP_HOVER_META[data.crop] : null;
+
+  if (!meta || !data.crop) return null;
+
+  return (
+    <div className="crop-tooltip-card">
+      <div className="crop-tooltip-top">
+        <div className="crop-tooltip-model">
+          <CropPreview crop={data.crop} />
+        </div>
+        <div className="crop-tooltip-copy">
+          <div className="crop-tooltip-heading">
+            <p className="type-label crop-tooltip-title">{info.name}</p>
+            <p className="type-caption crop-tooltip-meta">
+              {meta.label} · {meta.detail}
+            </p>
+          </div>
+          <p className="type-small crop-tooltip-summary">{meta.summary}</p>
+        </div>
+      </div>
+      <dl className="crop-tooltip-stats">
+        <div className="crop-tooltip-stat">
+          <dt className="type-caption crop-tooltip-stat-label">Water</dt>
+          <dd className="type-label crop-tooltip-stat-value">{info.waterPerDay}</dd>
+        </div>
+        <div className="crop-tooltip-stat">
+          <dt className="type-caption crop-tooltip-stat-label">Stage</dt>
+          <dd className="type-label crop-tooltip-stat-value">
+            {GROWTH_LABEL[data.growth]}
+          </dd>
+        </div>
+        <div className="crop-tooltip-stat">
+          <dt className="type-caption crop-tooltip-stat-label">Light</dt>
+          <dd className="type-label crop-tooltip-stat-value">{info.lightHours}</dd>
+        </div>
+        <div className="crop-tooltip-stat">
+          <dt className="type-caption crop-tooltip-stat-label">Status</dt>
+          <dd className="type-label crop-tooltip-stat-value">
+            {data.status === "warn" ? "Attention" : "Healthy"}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 export function GreenhouseGrid() {
   const grid = useGreenhouseStore((s) => s.grid);
   const [selected, setSelected] = useState<TileData | null>(null);
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-      <TooltipProvider delay={200} closeDelay={0}>
+      <div className="mb-6 flex items-center gap-2">
+        <span className="text-[13px] font-medium tracking-wide text-black/40">
+          Greenhouse Module
+        </span>
+        <span className="text-sm text-black/15">·</span>
+        <span className="font-mono text-xs text-black/25">Sol 1 / 450</span>
+      </div>
+
+      <TooltipProvider delay={120} closeDelay={0}>
         <div
           className="pointer-events-auto"
           style={{ transform: "scaleY(0.58) rotate(-45deg)" }}
         >
-          <div className="relative p-2 border border-black/4 rounded-lg bg-black/0.5 shadow-[inset_0_0_80px_rgba(82,130,82,0.012)]">
+          <div className="relative rounded-lg border border-black/4 bg-black/0.5 p-2 shadow-[inset_0_0_80px_rgba(82,130,82,0.012)]">
             <Corner position="top-left" />
             <Corner position="top-right" />
             <Corner position="bottom-left" />
@@ -72,21 +344,30 @@ export function GreenhouseGrid() {
               }}
             >
               {grid.map((row, r) =>
-                row.map((tile, c) => {
-                  const id = `${r}-${c}`;
-                  return (
-                    <GridTile
-                      key={id}
-                      data={tile}
-                      onSelect={() => setSelected(tile)}
-                    />
-                  );
-                })
+                row.map((tile, c) => (
+                  <GridTile
+                    key={`${r}-${c}`}
+                    data={tile}
+                    onSelect={() => setSelected(tile)}
+                  />
+                ))
               )}
             </div>
           </div>
         </div>
       </TooltipProvider>
+
+      <div className="mt-8 flex items-center gap-4">
+        <EnvReading label="Temp" value="22°C" />
+        <EnvDivider />
+        <EnvReading label="Humidity" value="65%" />
+        <EnvDivider />
+        <EnvReading label="CO2" value="800 ppm" />
+        <EnvDivider />
+        <EnvReading label="Light" value="420 umol" />
+        <EnvDivider />
+        <EnvReading label="H2O Reserve" value="94%" />
+      </div>
 
       <CropDialog data={selected} onClose={() => setSelected(null)} />
     </div>
@@ -102,10 +383,10 @@ function GridTile({
 }) {
   if (data.kind === "path") {
     return (
-      <div className="relative rounded cursor-default transition-colors duration-150 bg-black/1 border border-black/2.5 hover:bg-black/2">
+      <div className="relative cursor-default rounded border border-black/2.5 bg-black/1 transition-colors duration-150 hover:bg-black/2">
         {data.sensor && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-[7px] h-[7px] rounded-full border border-black/7" />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="h-[7px] w-[7px] rounded-full border border-black/7" />
           </div>
         )}
       </div>
@@ -119,20 +400,20 @@ function GridTile({
     <button
       type="button"
       onClick={planted && cropInfo ? onSelect : undefined}
-      className={`relative w-full h-full rounded transition-colors duration-150 bg-green-800/4.5 border border-green-800/5.5 hover:bg-green-800/8 ${
+      className={`relative h-full w-full rounded border border-green-800/5.5 bg-green-800/4.5 transition-colors duration-150 hover:bg-green-800/8 ${
         planted && cropInfo ? "cursor-pointer" : "cursor-default"
       }`}
     >
       {data.status && planted && (
         <div
-          className={`absolute top-2.5 right-2.5 w-[5px] h-[5px] rounded-full ${
+          className={`absolute right-2.5 top-2.5 h-[5px] w-[5px] rounded-full ${
             data.status === "ok" ? "bg-green-700/35" : "bg-amber-500/50"
           }`}
         />
       )}
 
       {planted && (
-        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 place-items-center p-8 pointer-events-none">
+        <div className="pointer-events-none absolute inset-0 grid grid-cols-2 grid-rows-2 place-items-center p-8">
           {["a", "b", "c", "d"].map((id) => (
             <span
               key={id}
@@ -143,7 +424,7 @@ function GridTile({
       )}
 
       {planted && (
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] rounded-b-sm overflow-hidden bg-green-800/6">
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden rounded-b-sm bg-green-800/6">
           <div
             className="h-full bg-green-800/18"
             style={{ width: `${data.water}%` }}
@@ -153,13 +434,20 @@ function GridTile({
     </button>
   );
 
-  if (!cropInfo) return tile;
+  if (!cropInfo || !planted) {
+    return tile;
+  }
 
   return (
     <Tooltip>
       <TooltipTrigger render={tile} />
-      <TooltipContent side="top" sideOffset={12}>
-        {cropInfo.name}
+      <TooltipContent
+        variant="card"
+        side="top"
+        sideOffset={12}
+        className="crop-tooltip-popup !w-[292px] !max-w-[292px] !border-white/10 !bg-[rgb(38,38,35)] !text-[rgb(244,244,240)] p-0 shadow-[0_14px_34px_rgba(0,0,0,0.32),0_1px_3px_rgba(0,0,0,0.22)] sm:!w-[304px] sm:!max-w-[304px]"
+      >
+        <CropTooltip data={data} info={cropInfo} />
       </TooltipContent>
     </Tooltip>
   );
@@ -174,6 +462,7 @@ function CropDialog({
 }) {
   const open = data !== null && data.crop !== undefined && data.growth > 0;
   const info = data?.crop ? CROP_DB[data.crop] : null;
+  const hoverMeta = data?.crop ? CROP_HOVER_META[data.crop] : null;
 
   return (
     <Dialog.Root
@@ -213,7 +502,7 @@ function CropDialog({
                 }
                 className="fixed inset-0 z-9999 flex items-center justify-center p-8 pointer-events-none outline-none"
               >
-                <div className="pointer-events-auto relative w-full max-w-[960px] h-[540px] rounded-2xl border border-black/6 bg-white shadow-[0_32px_80px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+                <div className="relative h-[540px] w-full max-w-[960px] overflow-hidden rounded-2xl border border-black/6 bg-white shadow-[0_32px_80px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04)]">
                   <Dialog.Title className="sr-only">
                     {info?.name ?? "Crop"} Details
                   </Dialog.Title>
@@ -221,53 +510,48 @@ function CropDialog({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="absolute top-5 right-5 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-black/4 hover:bg-black/8 transition-colors cursor-pointer"
+                    className="absolute right-5 top-5 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-black/4 transition-colors hover:bg-black/8"
                     aria-label="Close"
                   >
                     <X size={14} weight="bold" className="text-black/40" />
                   </button>
 
                   <div className="flex h-full">
-                    {/* Left — reserved for 3D plant visualization */}
-                    <div className="flex-1 flex items-center justify-center border-r border-black/4">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-20 h-20 rounded-full bg-green-800/4 flex items-center justify-center">
-                          <div className="w-6 h-6 rounded-full bg-green-800/12" />
+                    <div className="flex flex-1 items-center justify-center border-r border-black/4">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="crop-dialog-preview">
+                          {hoverMeta ? (
+                            <CropPreview crop={data.crop!} />
+                          ) : (
+                            <div className="h-6 w-6 rounded-full bg-green-800/12" />
+                          )}
                         </div>
-                        <span className="text-[11px] font-medium tracking-wide text-black/20 uppercase">
-                          3D Preview
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-black/20">
+                          Plant Preview
                         </span>
                       </div>
                     </div>
 
-                    {/* Right — crop data */}
-                    <div className="flex-1 flex flex-col p-8 overflow-y-auto">
+                    <div className="flex flex-1 flex-col overflow-y-auto p-8">
                       {info && data && (
                         <>
-                          {/* Header */}
                           <div className="mb-8">
-                            <h2 className="type-title text-black/90">
-                              {info.name}
-                            </h2>
-                            <p className="type-small text-black/35 mt-0.5 italic">
+                            <h2 className="type-title text-black/90">{info.name}</h2>
+                            <p className="mt-0.5 type-small italic text-black/35">
                               {info.scientificName}
                             </p>
                           </div>
 
-                          {/* Growth Status */}
                           <section className="mb-7">
                             <SectionLabel>Growth</SectionLabel>
                             <div className="mt-3 flex flex-col gap-3">
-                              <DataRow
-                                label="Stage"
-                                value={GROWTH_LABEL[data.growth]}
-                              />
+                              <DataRow label="Stage" value={GROWTH_LABEL[data.growth]} />
                               <DataRow label="Water Level">
                                 <div className="flex items-center gap-2.5">
                                   <span className="font-mono text-xs text-black/60">
                                     {data.water}%
                                   </span>
-                                  <div className="w-20 h-[3px] rounded-full bg-black/6 overflow-hidden">
+                                  <div className="h-[3px] w-20 overflow-hidden rounded-full bg-black/6">
                                     <div
                                       className="h-full rounded-full bg-green-700/40"
                                       style={{ width: `${data.water}%` }}
@@ -282,7 +566,7 @@ function CropDialog({
                                     ? "Healthy"
                                     : data.status === "warn"
                                       ? "Needs Attention"
-                                      : "—"
+                                      : "-"
                                 }
                                 valueClassName={
                                   data.status === "warn"
@@ -297,26 +581,18 @@ function CropDialog({
                             </div>
                           </section>
 
-                          {/* Environment */}
                           <section className="mb-7">
                             <SectionLabel>Environment</SectionLabel>
                             <div className="mt-3 flex flex-col gap-3">
                               <DataRow
                                 label="Temperature"
-                                value={`${info.optimalTemp[0]}–${info.optimalTemp[1]}°C`}
+                                value={`${info.optimalTemp[0]}-${info.optimalTemp[1]}°C`}
                               />
-                              <DataRow
-                                label="Light"
-                                value={info.lightHours}
-                              />
-                              <DataRow
-                                label="Water"
-                                value={info.waterPerDay}
-                              />
+                              <DataRow label="Light" value={info.lightHours} />
+                              <DataRow label="Water" value={info.waterPerDay} />
                             </div>
                           </section>
 
-                          {/* Nutrition */}
                           <section>
                             <SectionLabel>Nutrition</SectionLabel>
                             <div className="mt-3 flex flex-col gap-3">
@@ -371,9 +647,7 @@ function DataRow({
     <div className="flex items-center justify-between">
       <span className="type-caption text-black/40">{label}</span>
       {children ?? (
-        <span
-          className={`font-mono text-xs ${valueClassName ?? "text-black/60"}`}
-        >
+        <span className={`font-mono text-xs ${valueClassName ?? "text-black/60"}`}>
           {value}
         </span>
       )}
@@ -395,8 +669,8 @@ function Corner({
 
   return (
     <>
-      <div className={`absolute ${pos} w-3 h-px bg-black/8`} />
-      <div className={`absolute ${pos} w-px h-3 bg-black/8`} />
+      <div className={`absolute ${pos} h-px w-3 bg-black/8`} />
+      <div className={`absolute ${pos} h-3 w-px bg-black/8`} />
     </>
   );
 }
@@ -413,5 +687,5 @@ function EnvReading({ label, value }: { label: string; value: string }) {
 }
 
 function EnvDivider() {
-  return <div className="w-px h-3 bg-black/6" />;
+  return <div className="h-3 w-px bg-black/6" />;
 }
