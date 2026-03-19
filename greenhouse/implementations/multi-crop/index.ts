@@ -1,22 +1,17 @@
 // Multi-crop greenhouse implementation (tomatoes and carrots)
-export {
-  ConcreteEnvironment,
-  ConcreteGreenhouseState,
-  ConcreteSimulationState,
-  ConcreteState,
-} from './types';
+export type { CropEnvironment, CropControls, ConcreteEnvironment, ConcreteGreenhouseState, ConcreteState } from './types';
 
-export type { CropEnvironment, CropControls } from './types';
+export { simulate, createSimulation } from './simulation';
 
 export {
   createInitialEnvironment,
   createInitialGreenhouseState,
-  createInitialSimulationState,
   createInitialState,
 } from './initial';
 
-export { 
+export {
   simpleTransformation,
   updateGreenhouseParam,
   updateCropParam,
+  applyTransformations,
 } from './transformation';

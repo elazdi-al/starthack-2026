@@ -1,7 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { applyTransformations } from '../greenhouse-agent';
-import { State } from '../../greenhouse/state/types';
+import { applyTransformations } from '../../greenhouse/implementations/multi-crop/transformation';
+import type { ConcreteState } from '../../greenhouse/implementations/multi-crop/types';
 
 export const transformationTool = createTool({
   id: 'apply-greenhouse-transformations',
@@ -12,16 +12,15 @@ export const transformationTool = createTool({
     transformations: z.array(z.object({
       type: z.enum(['greenhouse', 'crop']).describe('Type of transformation: greenhouse for global parameters, crop for crop-specific parameters'),
       param: z.string().describe('Parameter name to update (e.g., globalHeatingPower, co2InjectionRate, waterPumpRate)'),
-      value: z.union([z.number(), z.string(), z.boolean()]).describe('New value for the parameter'),
+      value: z.number().describe('New numeric value for the parameter'),
       crop: z.enum(['tomatoes', 'carrots']).optional().describe('Crop name (required only for crop type transformations)'),
     })).describe('Array of transformations to apply in sequence'),
   }),
-  execute: async (inputData, context) => {
+  execute: async (inputData) => {
     const { state, time, transformations } = inputData;
-    
+
     try {
-      const finalState = applyTransformations(state as State, time, transformations);
-      
+      const finalState = applyTransformations(state as ConcreteState, time, transformations);
       return {
         success: true,
         finalState,

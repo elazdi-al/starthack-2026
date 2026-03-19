@@ -1,15 +1,15 @@
-import { ConcreteEnvironment, ConcreteGreenhouseState, ConcreteSimulationState, ConcreteState } from './types';
+import type { ConcreteEnvironment, ConcreteGreenhouseState, ConcreteState } from './types';
+import { createSimulation } from './simulation';
 
-// Create initial environment with default values
 export function createInitialEnvironment(): ConcreteEnvironment {
-  return new ConcreteEnvironment({
+  return {
     timestamp: Date.now(),
-    airTemperature: 20, // Celsius
-    humidity: 60, // percentage
-    co2Level: 800, // ppm
-    lightLevel: 5000, // lux
-    externalTemp: -63, // Mars outside
-    solarRadiation: 590, // W/m²
+    airTemperature: 20,
+    humidity: 60,
+    co2Level: 800,
+    lightLevel: 5000,
+    externalTemp: -63,
+    solarRadiation: 590,
     tomatoes: {
       soilMoisture: 70,
       soilTemperature: 22,
@@ -24,37 +24,29 @@ export function createInitialEnvironment(): ConcreteEnvironment {
       leafArea: 0,
       fruitCount: 0,
     },
-  });
+  };
 }
 
-// Create initial greenhouse state with default values
 export function createInitialGreenhouseState(): ConcreteGreenhouseState {
-  return new ConcreteGreenhouseState({
-    lightingPower: 5000, // Watts
-    globalHeatingPower: 3000, // Watts
-    co2InjectionRate: 50, // ppm/hour
-    ventilationRate: 100, // m³/hour
+  return {
+    lightingPower: 5000,
+    globalHeatingPower: 3000,
+    co2InjectionRate: 50,
+    ventilationRate: 100,
     tomatoes: {
-      waterPumpRate: 10, // L/hour
-      localHeatingPower: 500, // Watts
+      waterPumpRate: 10,
+      localHeatingPower: 500,
     },
     carrots: {
-      waterPumpRate: 8, // L/hour
-      localHeatingPower: 300, // Watts
+      waterPumpRate: 8,
+      localHeatingPower: 300,
     },
-  });
+  };
 }
 
-// Create initial simulation state
-export function createInitialSimulationState(): ConcreteSimulationState {
+export function createInitialState(): ConcreteState {
   const env = createInitialEnvironment();
   const greenhouse = createInitialGreenhouseState();
-  return new ConcreteSimulationState(env, greenhouse);
-}
-
-// Create initial complete state
-export function createInitialState(): ConcreteState {
-  const simulation = createInitialSimulationState();
-  const greenhouse = createInitialGreenhouseState();
-  return new ConcreteState(simulation, greenhouse);
+  const simulation = createSimulation(env, greenhouse);
+  return { simulation, greenhouse };
 }

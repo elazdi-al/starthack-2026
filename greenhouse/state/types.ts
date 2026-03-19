@@ -1,21 +1,20 @@
 // Sensor readings - everything measured about the greenhouse
-export abstract class Environment {}
+export interface Environment {}
 
 // Machine outputs (what we control)
-export abstract class GreenhouseState {}
+export interface GreenhouseState {}
 
-// Simulation - represents the current simulation state
-// A simulation is created from initial environment and greenhouse state
-// and can be queried at any time t (0 to infinity) to get the environment at that time
-export abstract class SimulationState {
-  abstract getEnvironment(time: number): Environment;
+// Simulation - can be queried at any time t to get environment readings.
+// The generic parameter allows implementations to return typed environments.
+export interface SimulationState<E extends Environment = Environment> {
+  getEnvironment(time: number): E;
 }
 
-// Complete state - combines current simulation and greenhouse machine outputs
-export abstract class State {
-  abstract simulation: SimulationState;
-  abstract greenhouse: GreenhouseState;
+// Complete state - combines simulation and greenhouse controls
+export interface State {
+  simulation: SimulationState;
+  greenhouse: GreenhouseState;
 }
 
-// State transformation - takes a state and returns a new state
+// State transformation - pure function from state to state
 export type StateTransformation = (state: State) => State;

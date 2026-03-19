@@ -1,1 +1,1 @@
-export type { Environment, GreenhouseState, SimulationState as Simulation, State, StateTransformation } from './types';
+export type { Environment, GreenhouseState, SimulationState, SimulationState as Simulation, State, StateTransformation } from './types';

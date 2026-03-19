@@ -1,12 +1,11 @@
 import { createInitialState } from '../implementations/multi-crop/initial';
-import { ConcreteEnvironment } from '../implementations/multi-crop/types';
+import { applyTransformations } from '../implementations/multi-crop/transformation';
 
-// Example usage of the multi-crop greenhouse simulation
 function runExample() {
   const state = createInitialState();
 
   console.log('=== Initial State ===');
-  const env0 = state.simulation.getEnvironment(0) as ConcreteEnvironment;
+  const env0 = state.simulation.getEnvironment(0);
   console.log('Air Temperature:', env0.airTemperature.toFixed(1), '°C');
   console.log('Humidity:', env0.humidity.toFixed(1), '%');
   console.log('CO2:', env0.co2Level.toFixed(0), 'ppm');
@@ -21,7 +20,7 @@ function runExample() {
 
   // Simulate 60 minutes
   console.log('\n=== After 60 minutes ===');
-  const env60 = state.simulation.getEnvironment(60) as ConcreteEnvironment;
+  const env60 = state.simulation.getEnvironment(60);
   console.log('Air Temperature:', env60.airTemperature.toFixed(1), '°C');
   console.log('Humidity:', env60.humidity.toFixed(1), '%');
   console.log('CO2:', env60.co2Level.toFixed(0), 'ppm');
@@ -36,16 +35,18 @@ function runExample() {
   console.log('  Growth:', env60.carrots.plantGrowth.toFixed(1), '%');
   console.log('  Leaf Area:', env60.carrots.leafArea.toFixed(2), 'm²');
 
-  // Adjust controls
+  // Adjust controls using immutable transformations (snapshot at t=60)
   console.log('\n=== Adjusting controls ===');
-  state.greenhouse.tomatoes.waterPumpRate = 15;
-  state.greenhouse.carrots.waterPumpRate = 12;
-  state.greenhouse.globalHeatingPower = 5000;
+  const updatedState = applyTransformations(state, 60, [
+    { type: 'crop', param: 'waterPumpRate', value: 15, crop: 'tomatoes' },
+    { type: 'crop', param: 'waterPumpRate', value: 12, crop: 'carrots' },
+    { type: 'greenhouse', param: 'globalHeatingPower', value: 5000 },
+  ]);
   console.log('Increased water and heating');
 
-  // Simulate another 60 minutes
+  // Simulate another 60 minutes from the updated snapshot
   console.log('\n=== After 120 minutes total ===');
-  const env120 = state.simulation.getEnvironment(120) as ConcreteEnvironment;
+  const env120 = updatedState.simulation.getEnvironment(60);
   console.log('Air Temperature:', env120.airTemperature.toFixed(1), '°C');
   console.log('\nTomatoes:');
   console.log('  Soil Moisture:', env120.tomatoes.soilMoisture.toFixed(1), '%');
