@@ -1,9 +1,9 @@
 "use client";
 
-import { type ReactNode, memo, useCallback, useMemo, useState } from "react";
+import { type ReactNode, memo, useCallback, useMemo, useRef, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion } from "motion/react";
-import { X } from "@phosphor-icons/react";
+import { X, Crosshair } from "@phosphor-icons/react";
 import { AnimatedParameterValue } from "@/components/ui/animated-parameter-value";
 
 import {
@@ -22,10 +22,10 @@ import {
 import { CropVideoPreview } from "@/components/interface/crop-video-preview";
 import { useAnimationConfig } from "@/lib/use-animation-config";
 
-const TILE = 120;
+const TILE = 80;
 const GAP = 3;
-const COLS = 8;
-const ROWS = 5;
+const COLS = 12;
+const ROWS = 9;
 const STEP = TILE + GAP;
 const GRID_WIDTH = COLS * TILE + (COLS - 1) * GAP;
 const GRID_HEIGHT = ROWS * TILE + (ROWS - 1) * GAP;
@@ -499,60 +499,131 @@ export function GreenhouseGrid({
   const handleClose = useCallback(() => setSelected(null), []);
   const interactive = introStage === "open";
 
+  // ── Pan & Zoom ────────────────────────────────────────────────────────
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    setZoom((z) => Math.min(3, Math.max(0.3, z - e.deltaY * 0.001)));
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    // Don't pan when clicking on interactive elements (buttons, etc.)
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, [role="button"]')) return;
+    // Pan on middle-click or left-click on background
+    if (e.button === 1 || (e.button === 0 && target.closest('.greenhouse-pan-area') === e.currentTarget)) {
+      isPanning.current = true;
+      panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      e.preventDefault();
+    }
+  }, [pan]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isPanning.current) return;
+    setPan({
+      x: panStart.current.panX + (e.clientX - panStart.current.x),
+      y: panStart.current.panY + (e.clientY - panStart.current.y),
+    });
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    isPanning.current = false;
+  }, []);
+
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+    <div
+      ref={containerRef}
+      className="greenhouse-pan-area absolute inset-0 flex flex-col items-center justify-center select-none"
+      style={{ cursor: "default" }}
+      onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
       {showBackdrop && <MarsBackdrop dustStormActive={dustStormActive} />}
 
       <TooltipProvider delay={120} closeDelay={0}>
         <div
-          className={interactive ? "pointer-events-auto relative" : "pointer-events-none relative"}
-          style={{ transform: "scaleY(0.58) rotate(-45deg)" }}
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: "center center",
+            willChange: "transform",
+          }}
         >
-          <MarsGroundShadow dustStormActive={dustStormActive} />
-          <MarsPreparedPad />
           <div
-            className="relative rounded-[18px] p-2"
-            style={{
-              border: "1px solid rgb(var(--mars-module-border) / 0.18)",
-              background: "rgb(var(--mars-module-surface) / 0.68)",
-              boxShadow: [
-                "0 18px 36px rgb(var(--mars-shadow-core) / 0.18)",
-                "0 0 0 1px rgb(var(--mars-module-inset) / 0.4) inset",
-                "inset 0 0 80px rgba(255, 255, 255, 0.12)",
-              ].join(", "),
-              backdropFilter: "blur(1.5px)",
-            }}
+            className={interactive ? "pointer-events-auto relative" : "pointer-events-none relative"}
+            style={{ transform: "scaleY(0.54) rotate(-45deg)" }}
           >
-            <Corner position="top-left" />
-            <Corner position="top-right" />
-            <Corner position="bottom-left" />
-            <Corner position="bottom-right" />
-            <GreenhouseOverlay introStage={introStage} />
-
+            <MarsGroundShadow dustStormActive={dustStormActive} />
+            <MarsPreparedPad />
             <div
-              className="grid"
+              className="relative rounded-[18px] p-2"
               style={{
-                gridTemplateColumns: `repeat(${COLS}, ${TILE}px)`,
-                gridTemplateRows: `repeat(${ROWS}, ${TILE}px)`,
-                gap: GAP,
+                border: "1px solid rgb(var(--mars-module-border) / 0.18)",
+                background: "rgb(var(--mars-module-surface) / 0.68)",
+                boxShadow: [
+                  "0 18px 36px rgb(var(--mars-shadow-core) / 0.18)",
+                  "0 0 0 1px rgb(var(--mars-module-inset) / 0.4) inset",
+                  "inset 0 0 80px rgba(255, 255, 255, 0.12)",
+                ].join(", "),
+                backdropFilter: "blur(1.5px)",
               }}
             >
-              {grid.map((row, r) =>
-                row.map((tile, c) => (
-                  <GridTile
-                    key={`${r}-${c}`}
-                    data={tile}
-                    row={r}
-                    col={c}
-                    focused={tile.kind === "crop" && tile.crop === focusedCrop}
-                    onSelect={handleSelect}
-                  />
-                ))
-              )}
+              <Corner position="top-left" />
+              <Corner position="top-right" />
+              <Corner position="bottom-left" />
+              <Corner position="bottom-right" />
+              <GreenhouseOverlay introStage={introStage} />
+
+              <div
+                className="grid"
+                style={{
+                  gridTemplateColumns: `repeat(${COLS}, ${TILE}px)`,
+                  gridTemplateRows: `repeat(${ROWS}, ${TILE}px)`,
+                  gap: GAP,
+                }}
+              >
+                {grid.map((row, r) =>
+                  row.map((tile, c) => (
+                    <GridTile
+                      key={`${r}-${c}`}
+                      data={tile}
+                      row={r}
+                      col={c}
+                      focused={tile.kind === "crop" && tile.crop === focusedCrop}
+                      onSelect={handleSelect}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
       </TooltipProvider>
+
+      {interactive && (zoom !== 1 || pan.x !== 0 || pan.y !== 0) && (
+        <button
+          type="button"
+          onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
+          style={{
+            background: "var(--dial-glass-bg)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid var(--dial-border)",
+            color: "var(--dial-text-secondary)",
+          }}
+        >
+          <Crosshair size={13} weight="bold" />
+          Reset view
+        </button>
+      )}
 
       {interactive && <CropDialog data={selected} onClose={handleClose} />}
     </div>
@@ -561,8 +632,8 @@ export function GreenhouseGrid({
 
 function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage }) {
   const inset = 6;
-  const rise = 128;
-  const roofPeak = 64;
+  const rise = 110;
+  const roofPeak = 56;
   const shadowOffsetX = 16;
   const shadowOffsetY = 20;
   const startCol = 0;
@@ -950,13 +1021,14 @@ const GROWTH_TO_COUNT: Record<number, number> = {
 /**
  * Three fixed size tiers per growth stage: [small, medium, large].
  * Each plant in a tile gets a different tier, shuffled procedurally.
+ * Scaled down for 80px tiles (from 120px).
  */
 const SIZE_TIERS: Record<number, [number, number, number]> = {
-  1: [20, 26, 34],
-  2: [22, 30, 38],
-  3: [24, 32, 42],
-  4: [26, 34, 44],
-  5: [28, 36, 46],
+  1: [14, 18, 24],
+  2: [16, 22, 28],
+  3: [18, 24, 30],
+  4: [20, 26, 32],
+  5: [22, 28, 34],
 };
 
 const TIER_PERMS: [number, number, number][] = [

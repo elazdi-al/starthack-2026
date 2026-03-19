@@ -197,44 +197,82 @@ function buildTileCropAtProgress(
 
 /**
  * Canonical tile layout. Matches the INITIAL_GRID in greenhouse-store.ts.
+ * 12×9 grid with 8 crop rectangles separated by clear paths.
  * Each entry is [tileId, cropType]. Path tiles are omitted.
  */
 export const TILE_CROP_LAYOUT: Array<{ tileId: string; cropType: CropType }> = [
-  // Row 0
+  // Row 0: Lettuce (cols 0–2) | Tomato (cols 4–5) | Potato (cols 7–9) | Wheat (col 11)
   { tileId: 'lettuce_0_0', cropType: 'lettuce' },
-  { tileId: 'tomato_0_1',  cropType: 'tomato' },
-  { tileId: 'spinach_0_2', cropType: 'spinach' },
-  { tileId: 'soybean_0_5', cropType: 'soybean' },
-  { tileId: 'wheat_0_6',   cropType: 'wheat' },
-  { tileId: 'kale_0_7',    cropType: 'kale' },
+  { tileId: 'lettuce_0_1', cropType: 'lettuce' },
+  { tileId: 'lettuce_0_2', cropType: 'lettuce' },
+  { tileId: 'tomato_0_4',  cropType: 'tomato' },
+  { tileId: 'tomato_0_5',  cropType: 'tomato' },
+  { tileId: 'potato_0_7',  cropType: 'potato' },
+  { tileId: 'potato_0_8',  cropType: 'potato' },
+  { tileId: 'potato_0_9',  cropType: 'potato' },
+  { tileId: 'wheat_0_11',  cropType: 'wheat' },
   // Row 1
-  { tileId: 'potato_1_0',  cropType: 'potato' },
+  { tileId: 'lettuce_1_0', cropType: 'lettuce' },
   { tileId: 'lettuce_1_1', cropType: 'lettuce' },
-  { tileId: 'radish_1_2',  cropType: 'radish' },
-  { tileId: 'radish_1_5',  cropType: 'radish' },
-  { tileId: 'tomato_1_6',  cropType: 'tomato' },
-  { tileId: 'spinach_1_7', cropType: 'spinach' },
+  { tileId: 'lettuce_1_2', cropType: 'lettuce' },
+  { tileId: 'tomato_1_4',  cropType: 'tomato' },
+  { tileId: 'tomato_1_5',  cropType: 'tomato' },
+  { tileId: 'potato_1_7',  cropType: 'potato' },
+  { tileId: 'potato_1_8',  cropType: 'potato' },
+  { tileId: 'potato_1_9',  cropType: 'potato' },
+  { tileId: 'wheat_1_11',  cropType: 'wheat' },
   // Row 2
-  { tileId: 'wheat_2_0',   cropType: 'wheat' },
-  { tileId: 'soybean_2_1', cropType: 'soybean' },
-  { tileId: 'kale_2_2',    cropType: 'kale' },
-  { tileId: 'lettuce_2_5', cropType: 'lettuce' },
-  { tileId: 'potato_2_6',  cropType: 'potato' },
+  { tileId: 'lettuce_2_0', cropType: 'lettuce' },
+  { tileId: 'lettuce_2_1', cropType: 'lettuce' },
+  { tileId: 'lettuce_2_2', cropType: 'lettuce' },
+  { tileId: 'tomato_2_4',  cropType: 'tomato' },
+  { tileId: 'tomato_2_5',  cropType: 'tomato' },
   { tileId: 'potato_2_7',  cropType: 'potato' },
-  // Row 3
-  { tileId: 'tomato_3_0',  cropType: 'tomato' },
-  { tileId: 'spinach_3_1', cropType: 'spinach' },
-  { tileId: 'potato_3_2',  cropType: 'potato' },
-  { tileId: 'wheat_3_5',   cropType: 'wheat' },
-  { tileId: 'radish_3_6',  cropType: 'radish' },
-  { tileId: 'soybean_3_7', cropType: 'soybean' },
-  // Row 4
-  { tileId: 'kale_4_0',    cropType: 'kale' },
-  { tileId: 'kale_4_1',    cropType: 'kale' },
-  { tileId: 'tomato_4_2',  cropType: 'tomato' },
+  { tileId: 'potato_2_8',  cropType: 'potato' },
+  { tileId: 'potato_2_9',  cropType: 'potato' },
+  { tileId: 'wheat_2_11',  cropType: 'wheat' },
+  // Row 3: all paths — no crop tiles
+  // Row 4: Soybean (cols 0–2) | Spinach (cols 4–5) | Wheat (cols 7–9) | Kale (col 11)
+  { tileId: 'soybean_4_0', cropType: 'soybean' },
+  { tileId: 'soybean_4_1', cropType: 'soybean' },
+  { tileId: 'soybean_4_2', cropType: 'soybean' },
+  { tileId: 'spinach_4_4', cropType: 'spinach' },
   { tileId: 'spinach_4_5', cropType: 'spinach' },
-  { tileId: 'soybean_4_6', cropType: 'soybean' },
   { tileId: 'wheat_4_7',   cropType: 'wheat' },
+  { tileId: 'wheat_4_8',   cropType: 'wheat' },
+  { tileId: 'wheat_4_9',   cropType: 'wheat' },
+  { tileId: 'kale_4_11',   cropType: 'kale' },
+  // Row 5
+  { tileId: 'soybean_5_0', cropType: 'soybean' },
+  { tileId: 'soybean_5_1', cropType: 'soybean' },
+  { tileId: 'soybean_5_2', cropType: 'soybean' },
+  { tileId: 'spinach_5_4', cropType: 'spinach' },
+  { tileId: 'spinach_5_5', cropType: 'spinach' },
+  { tileId: 'wheat_5_7',   cropType: 'wheat' },
+  { tileId: 'wheat_5_8',   cropType: 'wheat' },
+  { tileId: 'wheat_5_9',   cropType: 'wheat' },
+  { tileId: 'kale_5_11',   cropType: 'kale' },
+  // Row 6: all paths — no crop tiles
+  // Row 7: Radish (cols 0–2) | Kale (cols 4–5) | Soybean (col 7) + Radish (col 8) + Spinach (col 9) | Tomato (col 11)
+  { tileId: 'radish_7_0',  cropType: 'radish' },
+  { tileId: 'radish_7_1',  cropType: 'radish' },
+  { tileId: 'radish_7_2',  cropType: 'radish' },
+  { tileId: 'kale_7_4',    cropType: 'kale' },
+  { tileId: 'kale_7_5',    cropType: 'kale' },
+  { tileId: 'soybean_7_7', cropType: 'soybean' },
+  { tileId: 'radish_7_8',  cropType: 'radish' },
+  { tileId: 'spinach_7_9', cropType: 'spinach' },
+  { tileId: 'tomato_7_11', cropType: 'tomato' },
+  // Row 8
+  { tileId: 'radish_8_0',  cropType: 'radish' },
+  { tileId: 'radish_8_1',  cropType: 'radish' },
+  { tileId: 'radish_8_2',  cropType: 'radish' },
+  { tileId: 'kale_8_4',    cropType: 'kale' },
+  { tileId: 'kale_8_5',    cropType: 'kale' },
+  { tileId: 'soybean_8_7', cropType: 'soybean' },
+  { tileId: 'radish_8_8',  cropType: 'radish' },
+  { tileId: 'spinach_8_9', cropType: 'spinach' },
+  { tileId: 'tomato_8_11', cropType: 'tomato' },
 ];
 
 /**
