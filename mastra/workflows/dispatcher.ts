@@ -32,6 +32,29 @@ import {
   type WinningAgent,
 } from '../../lib/secretary-store';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Format a performance digest as a prompt preamble block. Returns empty string if no digest. */
+function digestPreamble(agentName: 'survival' | 'wellbeing' | 'arbiter'): string {
+  const digests = secretaryStore.getPerformanceDigests();
+  if (!digests) return '';
+  const text = digests[agentName];
+  return `[PERFORMANCE DIGEST — calibration signal from Secretary, last 10 sols]\n${text}\n`;
+}
+
+/** Apply preferenceUpdates array from wellbeing agent JSON to the secretary store. */
+function applyPreferenceUpdates(
+  updates: Array<{ crop: string; delta: number }> | undefined,
+  missionSol: number,
+): void {
+  if (!Array.isArray(updates)) return;
+  for (const u of updates) {
+    if (typeof u.crop === 'string' && typeof u.delta === 'number') {
+      secretaryStore.updateCrewPreference(u.crop, u.delta, missionSol);
+    }
+  }
+}
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const ActionSchema = z.object({
@@ -285,9 +308,12 @@ For requests or overrides: classify intent and provide your proposal.`;
               crewIntent = parsed.intent ?? 'question';
               wellbeingScore = parsed.wellbeingScore ?? 0.7;
 
+              // Apply preference updates from any crew interaction
+              applyPreferenceUpdates(parsed.preferenceUpdates, missionSol);
+              secretaryStore.addCrewRequest(crewMessage, missionSol);
+
               if (crewIntent === 'question') {
                 crewResponse = parsed.response ?? wText;
-                // Log to secretary intent log and return immediately
                 const decisionEntry = secretaryStore.addDecision({
                   missionSol,
                   triggerType: 'crew_question',
@@ -300,9 +326,6 @@ For requests or overrides: classify intent and provide your proposal.`;
                   actionsEnacted: [],
                   reasoning: crewResponse,
                 });
-
-                // Update secretary crew profile
-                secretaryStore.addCrewRequest(crewMessage, missionSol);
 
                 return {
                   triggerType: 'crew_question',
@@ -325,6 +348,7 @@ For requests or overrides: classify intent and provide your proposal.`;
               wellbeingProposal = parsed.proposal?.actions ?? [];
               wellbeingJustification = parsed.proposal?.justification ?? '';
               crewResponse = parsed.crewResponse ?? '';
+              // preferenceUpdates already applied above
             } catch { /* continue with empty proposal */ }
           }
         } catch (err) {
@@ -337,7 +361,7 @@ For requests or overrides: classify intent and provide your proposal.`;
         secretaryStore.logOverrideAttempt(crewMessage, false, missionSol); // optimistic false, update below
 
         if (survivalAgent) {
-          const vetoPrompt = `
+          const vetoPrompt = `${digestPreamble('survival')}
 ${contextBlock}
 
 Current greenhouse sensor readings:
@@ -496,11 +520,11 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
 
     const [survivalResult, wellbeingResult] = await Promise.allSettled([
       survivalAgent?.generate(
-        [{ role: 'user', content: `${basePrompt}\n\nProvide your risk assessment and conservative action proposal.` }],
+        [{ role: 'user', content: `${digestPreamble('survival')}${basePrompt}\n\nProvide your risk assessment and conservative action proposal.` }],
         { maxSteps: isEmergencySev2 ? 2 : 5 },
       ),
       wellbeingAgent?.generate(
-        [{ role: 'user', content: `[ARBITER_MODE]\n${basePrompt}\n\nProvide your wellbeing assessment and crew-centred action proposal.` }],
+        [{ role: 'user', content: `[ARBITER_MODE]\n${digestPreamble('wellbeing')}${basePrompt}\n\nProvide your wellbeing assessment and crew-centred action proposal.` }],
         { maxSteps: isEmergencySev2 ? 2 : 5 },
         // Memory only for crew-facing interactions
       ),
@@ -535,105 +559,148 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
           wellbeingActions = parsed.proposal?.actions ?? [];
           wellbeingJustification = parsed.proposal?.justification ?? wText.slice(0, 200);
           crewResponseText = parsed.crewResponse ?? '';
+          applyPreferenceUpdates(parsed.preferenceUpdates, missionSol);
         } catch { wellbeingJustification = wText.slice(0, 200); }
       } else {
         wellbeingJustification = wText.slice(0, 200);
       }
     }
 
-    // ── ARBITER LAYER (spec §4) ────────────────────────────────────────────
+    // ── SAFETY NET: Hard veto bypasses Arbiter entirely ──────────────────
+    // Risk > 0.85 is unconditional — no deliberation, no hybrid possible.
 
     let conflictType: ConflictType = 'none';
     let winningAgent: WinningAgent = 'both';
     let resolvedActions: z.infer<typeof ActionSchema>[] = [];
     let simulationP10: number | undefined;
     let simulationP90: number | undefined;
+    let arbiterReasoning = '';
 
-    // Hard veto check (spec §4.1 row 3)
     if (survivalVeto || survivalRiskScore > 0.85) {
       conflictType = 'hard_veto';
       winningAgent = 'survival';
       resolvedActions = survivalActions;
       crewResponseText = survivalVetoReason
-        ? `⚠️ Survival agent veto: ${survivalVetoReason}`
+        ? `⚠️ Mission commander veto: ${survivalVetoReason}`
         : `⚠️ Safety threshold exceeded — survival plan enacted.`;
-
-    } else if (isEmergencySev2) {
-      // Severity-2: Survival leads, Wellbeing not consulted
-      conflictType = 'none';
-      winningAgent = 'survival';
-      resolvedActions = survivalActions;
-
-      // Run fast simulation to validate survival actions vs. baseline
-      const simResult = runSimulation({
-        snapshot,
-        proposedActions: survivalActions,
-        horizonSols,
-        scenarioCount,
-      });
-      simulationP10 = simResult.p10YieldKg;
-      simulationP90 = simResult.p90YieldKg;
+      arbiterReasoning = `Hard veto invoked (risk ${survivalRiskScore.toFixed(2)} > 0.85). Survival plan enacted without deliberation. ${survivalVetoReason}`;
 
     } else {
-      // Check for agreement (both proposals compatible)
-      // Simple heuristic: same top-level action types
-      const survivalParamSet = new Set(survivalActions.map(a => `${a.type}:${a.param ?? a.crop}`));
-      const wellbeingParamSet = new Set(wellbeingActions.map(a => `${a.type}:${a.param ?? a.crop}`));
-      const intersection = [...survivalParamSet].filter(k => wellbeingParamSet.has(k));
-      const proposalsCompatible = intersection.length > 0 || wellbeingActions.length === 0;
+      // ── Run simulations before calling Arbiter so it has the data ────────
+      let simSurvivalResult: { p10YieldKg: number; p90YieldKg: number } | undefined;
+      let simWellbeingResult: { p10YieldKg: number; p90YieldKg: number } | undefined;
 
-      if (proposalsCompatible || survivalRiskScore < 0.5) {
-        // Agreement or low risk: merge both proposal sets (spec §4.1 row 1)
-        conflictType = 'agreement';
-        winningAgent = 'both';
-        // Merge: start with survival actions, add wellbeing actions that don't conflict
-        const mergedMap = new Map<string, z.infer<typeof ActionSchema>>();
-        for (const a of survivalActions) mergedMap.set(`${a.type}:${a.param ?? a.crop}`, a);
-        for (const a of wellbeingActions) {
-          const key = `${a.type}:${a.param ?? a.crop}`;
-          if (!mergedMap.has(key)) mergedMap.set(key, a); // wellbeing fills gaps
-        }
-        resolvedActions = [...mergedMap.values()];
+      // Always run sim for sev-2 emergency; run for both proposals when risk is elevated
+      const shouldSim = isEmergencySev2 || survivalRiskScore >= 0.5;
+      if (shouldSim) {
+        const [ss, sw] = await Promise.all([
+          Promise.resolve(runSimulation({ snapshot, proposedActions: survivalActions, horizonSols, scenarioCount })),
+          isEmergencySev2
+            ? Promise.resolve(null) // sev-2: only sim survival plan
+            : Promise.resolve(runSimulation({ snapshot, proposedActions: wellbeingActions, horizonSols, scenarioCount })),
+        ]);
+        simSurvivalResult = ss;
+        simWellbeingResult = sw ?? undefined;
+        simulationP10 = ss.p10YieldKg;
+        simulationP90 = ss.p90YieldKg;
+      }
 
-      } else {
-        // Soft conflict (risk 0.5–0.85): run simulation on both, pick safer P10 tail (spec §4.1 row 2)
-        conflictType = 'soft_conflict';
+      // ── Call Arbiter agent ─────────────────────────────────────────────
+      const arbiterAgent = mastra?.getAgent('arbiterAgent');
+      const missionPhase =
+        missionSol > 350 ? 'late (sols 350+) — crew morale weight increases to 50/50' :
+        missionSol > 100 ? `mid (sol ${missionSol}) — 60/40 survival/wellbeing balance` :
+        `early (sol ${missionSol}) — 70/30 bias toward survivability`;
 
-        const simSurvival = runSimulation({
-          snapshot,
-          proposedActions: survivalActions,
-          horizonSols,
-          scenarioCount,
-        });
-        const simWellbeing = runSimulation({
-          snapshot,
-          proposedActions: wellbeingActions,
-          horizonSols,
-          scenarioCount,
-        });
+      const arbiterPrompt = `${digestPreamble('arbiter')}
+MISSION PHASE: ${missionPhase}
+TRIGGER: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew request' : 'routine'}
 
-        // Mission phase weighting (spec §4.2)
-        // Early (1–100): 70/30, Mid (100–350): 60/40, Late (350+): 50/50
-        const wellbeingWeight =
-          missionSol > 350 ? 0.50 :
-          missionSol > 100 ? 0.40 : 0.30;
-        const survivalWeight = 1 - wellbeingWeight;
+SECRETARY CONTEXT (recent mission history):
+${secretaryContext || 'No prior decisions.'}
 
-        // Weighted P10 comparison
-        const survivalScore = simSurvival.p10YieldKg * survivalWeight + simSurvival.p90YieldKg * wellbeingWeight;
-        const wellbeingScore2 = simWellbeing.p10YieldKg * survivalWeight + simWellbeing.p90YieldKg * wellbeingWeight;
+CURRENT GREENHOUSE STATE:
+${snapshotJson}
+${crewMessage ? `\nCREW MESSAGE: "${crewMessage}"` : ''}
 
-        if (survivalScore >= wellbeingScore2) {
+SURVIVAL AGENT BRIEF:
+Risk score: ${survivalRiskScore.toFixed(3)}
+Justification: ${survivalJustification}
+Proposed actions: ${JSON.stringify(survivalActions, null, 2)}
+
+WELLBEING AGENT BRIEF:
+Wellbeing score: ${wellbeingScore.toFixed(3)}
+Justification: ${wellbeingJustification}
+Proposed actions: ${JSON.stringify(wellbeingActions, null, 2)}
+${crewResponseText ? `Crew-facing message from Wellbeing: "${crewResponseText}"` : ''}
+
+SIMULATION RESULTS (P10 = worst-case 10th percentile):
+${simSurvivalResult ? `Survival plan — P10: ${simSurvivalResult.p10YieldKg.toFixed(2)} kg, P90: ${simSurvivalResult.p90YieldKg.toFixed(2)} kg` : 'Survival plan: not simulated'}
+${simWellbeingResult ? `Wellbeing plan — P10: ${simWellbeingResult.p10YieldKg.toFixed(2)} kg, P90: ${simWellbeingResult.p90YieldKg.toFixed(2)} kg` : isEmergencySev2 ? 'Wellbeing plan: not consulted (emergency)' : 'Wellbeing plan: not simulated (low risk)'}
+
+Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditional survival veto (already checked — not applicable here).`.trim();
+
+      if (arbiterAgent) {
+        try {
+          const arbiterResult = await arbiterAgent.generate(
+            [{ role: 'user', content: arbiterPrompt }],
+            { maxSteps: 3 },
+          );
+          const aText = arbiterResult.text ?? '';
+          const jsonMatch = aText.match(/\{[\s\S]*\}/);
+
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            conflictType = (parsed.conflictType as ConflictType) ?? 'none';
+            arbiterReasoning = parsed.reasoning ?? aText.slice(0, 400);
+            if (parsed.crewMessage) crewResponseText = parsed.crewMessage;
+
+            // Resolve actions based on Arbiter decision
+            const rawActions: z.infer<typeof ActionSchema>[] = parsed.actions ?? [];
+            winningAgent =
+              parsed.decision === 'hybrid' ? 'arbiter' :
+              parsed.decision === 'survival' ? 'survival' :
+              parsed.decision === 'wellbeing' ? 'wellbeing' : 'both';
+
+            // Use Arbiter's actions if provided and non-empty, else fall back to chosen agent
+            if (rawActions.length > 0) {
+              resolvedActions = rawActions;
+            } else if (winningAgent === 'survival') {
+              resolvedActions = survivalActions;
+            } else if (winningAgent === 'wellbeing') {
+              resolvedActions = wellbeingActions;
+            } else {
+              // Fallback merge for agreement
+              const mergedMap = new Map<string, z.infer<typeof ActionSchema>>();
+              for (const a of survivalActions) mergedMap.set(`${a.type}:${a.param ?? a.crop}`, a);
+              for (const a of wellbeingActions) {
+                const key = `${a.type}:${a.param ?? a.crop}`;
+                if (!mergedMap.has(key)) mergedMap.set(key, a);
+              }
+              resolvedActions = [...mergedMap.values()];
+            }
+
+            if (simSurvivalResult) simulationP10 = simSurvivalResult.p10YieldKg;
+            if (simSurvivalResult) simulationP90 = simSurvivalResult.p90YieldKg;
+          } else {
+            // Arbiter returned plain text — use it as reasoning, fall back to survival plan
+            arbiterReasoning = aText.slice(0, 400);
+            winningAgent = 'survival';
+            resolvedActions = survivalActions;
+            conflictType = 'none';
+          }
+        } catch (err) {
+          console.error('[dispatcher] arbiter agent error:', err);
+          // Fallback: survival plan on error
           winningAgent = 'survival';
           resolvedActions = survivalActions;
-          simulationP10 = simSurvival.p10YieldKg;
-          simulationP90 = simSurvival.p90YieldKg;
-        } else {
-          winningAgent = 'wellbeing';
-          resolvedActions = wellbeingActions;
-          simulationP10 = simWellbeing.p10YieldKg;
-          simulationP90 = simWellbeing.p90YieldKg;
+          arbiterReasoning = `Arbiter error — defaulting to survival plan. ${err instanceof Error ? err.message : ''}`;
         }
+      } else {
+        // No arbiter available — deterministic fallback
+        winningAgent = survivalRiskScore >= 0.5 ? 'survival' : 'both';
+        resolvedActions = survivalRiskScore >= 0.5 ? survivalActions : [...survivalActions, ...wellbeingActions];
+        arbiterReasoning = 'Arbiter unavailable — deterministic fallback applied.';
       }
     }
 
@@ -644,21 +711,6 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
       if (a.type === 'crop') return !!a.crop && !!a.param && a.value !== undefined;
       return false;
     });
-
-    // ── ARBITER REASONING ─────────────────────────────────────────────────
-
-    const survivalSummary = survivalJustification && survivalJustification !== 'No proposal'
-      ? survivalJustification.slice(0, 150) : 'No input';
-    const wellbeingSummary = wellbeingJustification && wellbeingJustification !== 'No proposal'
-      ? wellbeingJustification.slice(0, 150) : 'No input';
-    const decisionOutcome = conflictType === 'hard_veto'
-      ? `Decision: Survival veto — safety threshold exceeded.`
-      : conflictType === 'soft_conflict'
-      ? `Decision: Conflict resolved via simulation — ${winningAgent} plan selected.`
-      : winningAgent === 'both'
-      ? `Decision: Agents agreed — merged both proposals.`
-      : `Decision: ${winningAgent} plan enacted.`;
-    const arbiterReasoning = `Survival: ${survivalSummary}\nWellbeing: ${wellbeingSummary}\n${decisionOutcome}`;
 
     // ── SECRETARY LOGGING ──────────────────────────────────────────────────
 

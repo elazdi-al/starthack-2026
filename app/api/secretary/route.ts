@@ -39,6 +39,9 @@ export async function GET(req: Request) {
     case 'context':
       return Response.json({ ok: true, data: secretaryStore.getAgentContext(10) });
 
+    case 'digests':
+      return Response.json({ ok: true, data: secretaryStore.getPerformanceDigests() });
+
     default:
       return Response.json({ ok: false, error: `Unknown type: ${type}` }, { status: 400 });
   }
@@ -102,6 +105,13 @@ Keep it under 300 words. Use plain language — no technical jargon. The crew ne
     } catch (err) {
       return Response.json({ ok: false, error: String(err) }, { status: 500 });
     }
+  }
+
+  if (type === 'memory') {
+    // Generate (or refresh) the mission memory package from current logs — no LLM needed
+    const { missionSol } = await req.json() as { missionSol: number };
+    const pkg = secretaryStore.generateMissionMemory(missionSol);
+    return Response.json({ ok: true, data: pkg });
   }
 
   if (type === 'outcome') {

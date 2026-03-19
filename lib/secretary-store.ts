@@ -15,7 +15,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ConflictType = 'agreement' | 'soft_conflict' | 'hard_veto' | 'none';
-export type WinningAgent = 'survival' | 'wellbeing' | 'both' | 'hardcoded';
+export type WinningAgent = 'survival' | 'wellbeing' | 'both' | 'hardcoded' | 'arbiter';
 export type TriggerType = 'emergency_sev1' | 'emergency_sev2' | 'routine' | 'crew_question' | 'crew_request' | 'crew_override';
 
 export interface DecisionLogEntry {
@@ -60,6 +60,13 @@ export interface CrewPreferenceProfile {
   lastUpdatedSol: number;
 }
 
+export interface PerformanceDigests {
+  survival: string;   // 3-line calibration signal for Survival agent
+  wellbeing: string;  // 3-line calibration signal for Wellbeing agent
+  arbiter: string;    // 3-line calibration signal for Arbiter agent
+  generatedAtSol: number;
+}
+
 export interface MissionMemoryPackage {
   generatedAt: number;
   missionSol: number;
@@ -99,6 +106,7 @@ class SecretaryStore {
   };
   private weeklyReports: WeeklyCrewReport[] = [];
   private missionMemory: MissionMemoryPackage | null = null;
+  private performanceDigests: PerformanceDigests | null = null;
 
   // ─── Decision Log ──────────────────────────────────────────────────────────
 
@@ -204,7 +212,245 @@ class SecretaryStore {
     return this.weeklyReports[0] ?? null;
   }
 
+  // ─── Performance Digests ───────────────────────────────────────────────────
+
+  /**
+   * Generate a 3-line calibration digest for each agent, covering the last ~20 decisions.
+   * Refreshed every 10 sols and injected into agent prompts as a preamble.
+   * The goal: give each agent a concise signal about how well-calibrated it has been
+   * so it can self-correct (e.g. "you're over-predicting risk").
+   */
+  generatePerformanceDigests(missionSol: number): PerformanceDigests {
+    const window = this.decisionLog.slice(0, 20); // newest first, up to 20 decisions
+    const n = window.length;
+
+    // ── Survival digest ──────────────────────────────────────────────────────
+    let survivalDigest: string;
+    if (n === 0) {
+      survivalDigest = 'No decision history yet — operating on priors.\nCalibration will appear after the first decisions are logged.\nMaintain conservative defaults until feedback accumulates.';
+    } else {
+      const avgRisk = window.reduce((s, d) => s + d.riskScore, 0) / n;
+
+      // "Nominal" = actualOutcome present and does not mention failure/emergency
+      const withOutcomes = window.filter(d => d.actualOutcome);
+      const nominalCount = withOutcomes.filter(
+        d => !/fail|emergency|critical|dead|lost/i.test(d.actualOutcome!),
+      ).length;
+      const outcomeClause = withOutcomes.length > 0
+        ? `actual outcomes were nominal in ${nominalCount} of ${withOutcomes.length} evaluated cases`
+        : 'no retroactive outcomes logged yet';
+
+      const hardVetoes = window.filter(d => d.conflictType === 'hard_veto').length;
+      const vetoesSurvival = window.filter(d => d.conflictType === 'hard_veto' && d.winningAgent === 'survival').length;
+      const vetoLine = hardVetoes > 0
+        ? `You triggered ${hardVetoes} hard veto(es) in this window; ${vetoesSurvival} enacted the survival plan.`
+        : 'No hard vetoes in this window — risk thresholds were not breached.';
+
+      const paramCounts: Record<string, number> = {};
+      for (const d of window) {
+        for (const a of d.actionsEnacted) {
+          if (a.param) paramCounts[a.param] = (paramCounts[a.param] ?? 0) + 1;
+        }
+      }
+      const topParam = Object.entries(paramCounts).sort(([, a], [, b]) => b - a)[0];
+      const actionLine = topParam
+        ? `Most frequently adjusted parameter: ${topParam[0]} (${topParam[1]}x).`
+        : 'No parameterised actions in this window.';
+
+      survivalDigest =
+        `Your last ${n} risk scores averaged ${avgRisk.toFixed(2)} but ${outcomeClause}.\n` +
+        `${vetoLine}\n` +
+        `${actionLine}`;
+    }
+
+    // ── Wellbeing digest ─────────────────────────────────────────────────────
+    let wellbeingDigest: string;
+    if (n === 0) {
+      wellbeingDigest = 'No decision history yet — crew baseline is unknown.\nCalibration will appear after the first interactions are logged.\nApply neutral crew satisfaction priors until data accumulates.';
+    } else {
+      const avgWellbeing = window.reduce((s, d) => s + d.wellbeingScore, 0) / n;
+
+      const profile = this.crewPreferenceProfile;
+      const topPrefs = Object.entries(profile.preferences)
+        .filter(([, v]) => v > 0.15)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([crop]) => crop);
+      const prefLine = topPrefs.length > 0
+        ? `Current crew favourites: ${topPrefs.join(', ')}.`
+        : 'No strong crew food preferences recorded yet.';
+
+      const recentReqs = profile.recentRequests.length;
+      const overrides = profile.overrideAttempts.length;
+      const deniedOverrides = profile.overrideAttempts.filter(o => !o.granted).length;
+      const interactionLine = overrides > 0
+        ? `${recentReqs} crew interactions logged; ${overrides} override attempt(s), ${deniedOverrides} denied by safety check.`
+        : `${recentReqs} crew interaction(s) logged; no override attempts.`;
+
+      const wellbeingWins = window.filter(d => d.winningAgent === 'wellbeing').length;
+      const winLine = `Your proposals were adopted (fully or hybrid) in ${wellbeingWins} of ${n} decisions.`;
+
+      wellbeingDigest =
+        `Your last ${n} wellbeing scores averaged ${avgWellbeing.toFixed(2)}.\n` +
+        `${prefLine}\n` +
+        `${interactionLine} ${winLine}`;
+    }
+
+    // ── Arbiter digest ───────────────────────────────────────────────────────
+    let arbiterDigest: string;
+    if (n === 0) {
+      arbiterDigest = 'No decision history yet — arbiter calibration unavailable.\nApply mission-phase defaults until decisions accumulate.\nHybrid proposals are encouraged when agents raise valid but conflicting concerns.';
+    } else {
+      const agreements = window.filter(d => d.conflictType === 'agreement' || d.conflictType === 'none').length;
+      const softConflicts = window.filter(d => d.conflictType === 'soft_conflict').length;
+      const hardVetoes = window.filter(d => d.conflictType === 'hard_veto').length;
+      const hybrids = window.filter(d => d.winningAgent === 'arbiter').length;
+      const conflictLine = `Last ${n} decisions: ${agreements} agreement(s), ${softConflicts} soft conflict(s), ${hardVetoes} hard veto(es).`;
+
+      const hybridLine = hybrids > 0
+        ? `You proposed ${hybrids} hybrid action set(s) — review outcomes to calibrate hybrid aggressiveness.`
+        : 'No hybrid decisions in this window — consider hybrid when agents raise compatible concerns.';
+
+      const survivalWins = window.filter(d => d.winningAgent === 'survival').length;
+      const wellbeingWins = window.filter(d => d.winningAgent === 'wellbeing').length;
+      const biasLine = survivalWins > wellbeingWins
+        ? `Bias this window: ${survivalWins} survival vs ${wellbeingWins} wellbeing — check if crew morale context warrants more balance.`
+        : survivalWins < wellbeingWins
+        ? `Bias this window: ${wellbeingWins} wellbeing vs ${survivalWins} survival — verify safety margins remain adequate.`
+        : `Balanced rulings: ${survivalWins} each this window.`;
+
+      arbiterDigest =
+        `${conflictLine}\n` +
+        `${hybridLine}\n` +
+        `${biasLine}`;
+    }
+
+    const digests: PerformanceDigests = {
+      survival: survivalDigest,
+      wellbeing: wellbeingDigest,
+      arbiter: arbiterDigest,
+      generatedAtSol: missionSol,
+    };
+    this.performanceDigests = digests;
+    return digests;
+  }
+
+  getPerformanceDigests(): PerformanceDigests | null {
+    return this.performanceDigests;
+  }
+
   // ─── Mission Memory Package ────────────────────────────────────────────────
+
+  /**
+   * Generate the mission memory package from the current decision + incident logs.
+   * Pure synthesis — no LLM required. Called at mission end or on a schedule.
+   *
+   * Per spec §5.1, the package gives Mission 2 agents:
+   * - Calibrated crop growth parameters (deviation from MCP baseline)
+   * - Storm response learnings (which playbook actions were effective)
+   * - Conflict resolution history (how often Survival vetoed, and whether correct)
+   * - Crew preference profile (food preferences to pre-warm Mission 2 Wellbeing agent)
+   * - Resource consumption actuals vs. projections (for improving simulation accuracy)
+   */
+  generateMissionMemory(missionSol: number): MissionMemoryPackage {
+    const decisions = this.decisionLog;
+    const incidents = this.incidentLog;
+
+    // ── Conflict resolution history ──────────────────────────────────────────
+    const totalVetoes = decisions.filter(d => d.conflictType === 'hard_veto').length;
+    const softConflicts = decisions.filter(d => d.conflictType === 'soft_conflict').length;
+    // A veto is "correct in hindsight" if the actual outcome was positive (no crop failure)
+    // We use actualOutcome presence as a proxy — a filled outcome that doesn't mention "failed"
+    const vetoesCorrectInHindsight = decisions
+      .filter(d => d.conflictType === 'hard_veto' && d.actualOutcome)
+      .filter(d => !d.actualOutcome!.toLowerCase().includes('fail')).length;
+
+    // ── Calibrated crop parameters ────────────────────────────────────────────
+    // Infer which crops were acted on most, and what parameter adjustments dominated
+    const cropActionCounts: Record<string, number> = {};
+    const paramAdjustments: Record<string, number[]> = {};
+    for (const d of decisions) {
+      for (const action of d.actionsEnacted) {
+        if (action.crop) {
+          cropActionCounts[action.crop] = (cropActionCounts[action.crop] ?? 0) + 1;
+        }
+        if (action.param && action.value !== undefined) {
+          if (!paramAdjustments[action.param]) paramAdjustments[action.param] = [];
+          paramAdjustments[action.param].push(action.value);
+        }
+      }
+    }
+    // Average value per parameter as the "calibrated" baseline
+    const calibratedCropParams: Record<string, unknown> = {};
+    for (const [param, values] of Object.entries(paramAdjustments)) {
+      calibratedCropParams[param] = values.reduce((s, v) => s + v, 0) / values.length;
+    }
+    calibratedCropParams['mostActedOnCrops'] = Object.entries(cropActionCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([crop, count]) => ({ crop, actionCount: count }));
+
+    // ── Storm response learnings ──────────────────────────────────────────────
+    const stormResponseLearnings: string[] = [];
+    const emergencyIncidents = incidents.filter(i => i.severity <= 2);
+    for (const inc of emergencyIncidents.slice(0, 10)) {
+      const resolved = inc.resolved ? `Resolved in ${inc.timeToResolutionSols ?? '?'} sols.` : 'Still active at package generation.';
+      stormResponseLearnings.push(
+        `[Sol ${inc.missionSol}] ${inc.emergencyType} (sev-${inc.severity}): ${inc.actionsExecuted.join(', ')}. ${resolved}`
+      );
+    }
+
+    // ── Simulation accuracy: P10 predictions vs actual outcomes ──────────────
+    const resourceActualsVsProjections: Record<string, { projected: number; actual: number }> = {};
+    const simdDecisions = decisions.filter(d => d.simulationP10 !== undefined && d.actualOutcome);
+    if (simdDecisions.length > 0) {
+      const avgP10 = simdDecisions.reduce((s, d) => s + (d.simulationP10 ?? 0), 0) / simdDecisions.length;
+      resourceActualsVsProjections['avgSimulationP10YieldKg'] = { projected: avgP10, actual: avgP10 }; // placeholder until actual yield tracking
+    }
+
+    // ── What worked / what failed ─────────────────────────────────────────────
+    const whatWorked: string[] = [];
+    const whatFailed: string[] = [];
+
+    if (totalVetoes > 0 && vetoesCorrectInHindsight / totalVetoes > 0.6) {
+      whatWorked.push(`Survival veto was reliable: ${vetoesCorrectInHindsight}/${totalVetoes} vetoes correct in hindsight.`);
+    }
+    if (softConflicts > 0) {
+      const survivalWins = decisions.filter(d => d.conflictType === 'soft_conflict' && d.winningAgent === 'survival').length;
+      whatWorked.push(`Simulation-based arbiter resolved ${softConflicts} soft conflicts (survival won ${survivalWins}).`);
+    }
+    const emergencyCount = incidents.filter(i => i.severity === 1).length;
+    if (emergencyCount > 0) {
+      const resolved = incidents.filter(i => i.severity === 1 && i.resolved).length;
+      (resolved === emergencyCount ? whatWorked : whatFailed).push(
+        `${emergencyCount} severity-1 emergencies — ${resolved} resolved, ${emergencyCount - resolved} unresolved.`
+      );
+    }
+    const crewOverrideAttempts = this.crewPreferenceProfile.overrideAttempts.length;
+    const deniedOverrides = this.crewPreferenceProfile.overrideAttempts.filter(o => !o.granted).length;
+    if (crewOverrideAttempts > 0) {
+      whatWorked.push(`Crew overrides: ${crewOverrideAttempts} attempted, ${deniedOverrides} denied by safety check.`);
+    }
+
+    const pkg: MissionMemoryPackage = {
+      generatedAt: Date.now(),
+      missionSol,
+      calibratedCropParams,
+      stormResponseLearnings,
+      conflictResolutionHistory: {
+        totalVetoes,
+        vetoesCorrectInHindsight,
+        softConflictsResolved: softConflicts,
+      },
+      crewPreferenceProfile: this.getCrewPreferenceProfile(),
+      resourceActualsVsProjections,
+      whatWorked,
+      whatFailed,
+    };
+
+    this.missionMemory = pkg;
+    return pkg;
+  }
 
   updateMissionMemory(pkg: MissionMemoryPackage): void {
     this.missionMemory = pkg;

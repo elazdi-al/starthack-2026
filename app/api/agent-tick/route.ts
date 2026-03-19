@@ -15,6 +15,14 @@ import { mastra } from '@/mastra';
 import { secretaryStore } from '@/lib/secretary-store';
 import type { EnvironmentSnapshot } from '@/lib/greenhouse-store';
 
+// Refresh memory package every 7 sols (spec §5.1 — configurable schedule)
+const MEMORY_REFRESH_INTERVAL_SOLS = 7;
+let lastMemoryRefreshSol = -1;
+
+// Refresh performance digests every 10 sols
+const DIGEST_REFRESH_INTERVAL_SOLS = 10;
+let lastDigestRefreshSol = -1;
+
 export async function POST(req: Request) {
   try {
     const body = await req.json() as {
@@ -90,6 +98,19 @@ export async function POST(req: Request) {
         wellbeingScore: 0.7,
         decisionId: null,
       });
+    }
+
+    // Auto-refresh mission memory package every 7 sols (fire-and-forget, non-blocking)
+    const sol = snapshot.missionSol;
+    if (sol - lastMemoryRefreshSol >= MEMORY_REFRESH_INTERVAL_SOLS) {
+      lastMemoryRefreshSol = sol;
+      secretaryStore.generateMissionMemory(sol);
+    }
+
+    // Auto-refresh performance digests every 10 sols
+    if (sol - lastDigestRefreshSol >= DIGEST_REFRESH_INTERVAL_SOLS) {
+      lastDigestRefreshSol = sol;
+      secretaryStore.generatePerformanceDigests(sol);
     }
 
     return Response.json({

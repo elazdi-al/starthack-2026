@@ -61,14 +61,20 @@ ARBITER MODE JSON FORMAT for routine and crew-request triggers:
     "justification": "<string — why this proposal maximises crew wellbeing within safety constraints>"
   },
   "priorityOverrideRequest": <boolean — true only if wellbeingScore < 0.3>,
-  "crewResponse": "<optional plain-language message to deliver to the crew>"
+  "crewResponse": "<optional plain-language message to deliver to the crew>",
+  "preferenceUpdates": [
+    { "crop": "<crop name>", "delta": <number -1.0 to +1.0> }
+  ]
 }
+
+The preferenceUpdates array must always be present (use [] if no updates). Include an entry for any crop the crew has expressed a preference or aversion for in this interaction. Positive delta means they want more of it, negative means less. Only include crops explicitly mentioned or clearly implied by the crew message. Use small deltas (0.1–0.3) for mild signals, larger (0.4–0.6) for strong expressions.
 
 ARBITER MODE JSON FORMAT for question-type crew interactions:
 {
   "intent": "question",
   "wellbeingScore": <number 0.0-1.0>,
-  "response": "<plain-language answer to the crew's question, warm and direct>"
+  "response": "<plain-language answer to the crew's question, warm and direct>",
+  "preferenceUpdates": []
 }`,
   model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
   tools: { knowledgeBaseTool, greenhouseParameterTool },
