@@ -61,6 +61,7 @@ import { SettingsButton } from "@/components/interface/settings-button";
 import { TemperatureWidget } from "@/components/interface/temperature-widget";
 import { SidebarToggle } from "@/components/interface/sidebar-toggle";
 import { SpeedSelector } from "@/components/interface/speed-selector";
+import { ChatSidebar } from "@/components/chat/chat-sidebar";
 
 const lightModeVars = {
   "--background": "#ffffff",
@@ -145,6 +146,8 @@ export default function Home() {
       <div className="absolute bottom-6 left-6">
         <SettingsButton />
       </div>
+
+      <ChatSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
     </main>
   );
 }
