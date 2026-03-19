@@ -9,6 +9,8 @@ import { SnapshotSync } from "@/components/interface/snapshot-sync";
 import { GreenhouseGrid, MarsBackdrop } from "@/components/interface/greenhouse-grid";
 import { CentralControlPanel } from "@/components/interface/central-control-panel";
 import { useGreenhouseStore, type CropType } from "@/lib/greenhouse-store";
+import { useSettingsStore } from "@/lib/settings-store";
+import { useChatStore } from "@/lib/chat-store";
 import { DialStore } from "@/components/ui/central-control";
 import { HighlightTabs } from "@/components/ui/highlight-tabs";
 
@@ -57,6 +59,32 @@ const GREENHOUSE_PANEL_VARIANTS = {
   }),
 };
 
+/** Dashboard panel — slides LEFT when exiting forward, RIGHT when exiting backward. */
+const DASHBOARD_PANEL_VARIANTS = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? "100%" : "-100%",
+  }),
+  center: {
+    x: 0,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? "-100%" : "100%",
+  }),
+};
+
+/** Mirrored variant for the reports panel — slides from the RIGHT. */
+const REPORTS_PANEL_VARIANTS = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? "100%" : "-100%",
+  }),
+  center: {
+    x: 0,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? "-100%" : "100%",
+  }),
+};
+
 /* ── Pre-computed animation tokens ──────────────────────────────────────────
  * Module-scope constants so every render reuses the same object references.
  * Only compositor-friendly props (opacity, translate, scale) — no
@@ -82,17 +110,15 @@ const ZERO_TRANSITION = { duration: 0 };
 const BACKDROP_ON     = { opacity: 1 };
 const BACKDROP_OFF    = { opacity: 0 };
 
-/** CSS containment styles for the dashboard view when active/hidden.
- *  `visibility: hidden` tells the browser to skip paint entirely.
- *  `contain: strict` prevents layout/paint from leaking across subtrees. */
-const DASHBOARD_ACTIVE: React.CSSProperties = { visibility: "visible", contain: "strict" };
-const DASHBOARD_HIDDEN: React.CSSProperties = { visibility: "hidden",  contain: "strict" };
+/** CSS containment for painted subtrees. */
+const CONTAINED: React.CSSProperties = { contain: "strict" };
 
 export default function Home() {
   const tickInFlight      = useGreenhouseStore((s) => s.tickInFlight);
   const autonomousEnabled = useGreenhouseStore((s) => s.autonomousEnabled);
   const decisionCount     = useGreenhouseStore((s) => s.agentDecisions.length);
   const dustStormActive   = useGreenhouseStore((s) => s.dustStormActive);
+  const seasonName        = useGreenhouseStore((s) => s.seasonName);
   const shouldReduceMotion = useReducedAnimations();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [controlOpen, setControlOpen] = React.useState(false);
@@ -103,6 +129,13 @@ export default function Home() {
   const [introStage, setIntroStage] = React.useState<IntroStage>("sealed");
   const [greenhouseVisible, setGreenhouseVisible] = React.useState(false);
   const setFocusedCrop = useGreenhouseStore((s) => s.setFocusedCrop);
+
+  // Hydrate all stores from localStorage after first render to avoid SSR mismatch
+  React.useEffect(() => {
+    useGreenhouseStore.getState().hydrateFromStorage();
+    useSettingsStore.getState().hydrateFromStorage();
+    useChatStore.getState().hydrateFromStorage();
+  }, []);
 
   React.useEffect(() => {
     if (shouldReduceMotion) {
@@ -189,19 +222,12 @@ export default function Home() {
         <CentralControlExample />
         <SnapshotSync />
         <SimulationOverrides />
-        <div className="absolute inset-0 isolate overflow-hidden">
-          <div
-            className="absolute inset-0"
-            style={activeView === "dashboard" ? DASHBOARD_ACTIVE : DASHBOARD_HIDDEN}
-          >
-            <DashboardView />
-          </div>
-
+        <div className="absolute inset-0 isolate overflow-hidden bg-background">
           <motion.div
             aria-hidden="true"
             animate={activeView === "greenhouse" ? BACKDROP_ON : BACKDROP_OFF}
             transition={shouldReduceMotion ? ZERO_TRANSITION : VIEWPORT_TRANSITION}
-            className="absolute inset-0 z-0"
+            className="absolute inset-0 z-0 pointer-events-none"
           >
             <MarsBackdrop dustStormActive={dustStormActive} />
           </motion.div>
@@ -226,6 +252,22 @@ export default function Home() {
               </motion.section>
             )}
 
+            {activeView === "dashboard" && (
+              <motion.section
+                key="dashboard"
+                custom={viewDirection}
+                initial={shouldReduceMotion ? false : "enter"}
+                animate="center"
+                exit={shouldReduceMotion ? BACKDROP_OFF : "exit"}
+                variants={DASHBOARD_PANEL_VARIANTS}
+                transition={shouldReduceMotion ? ZERO_TRANSITION : GREENHOUSE_PANEL_TRANSITION}
+                className="absolute inset-0 z-10 will-change-transform"
+                style={CONTAINED}
+              >
+                <DashboardView />
+              </motion.section>
+            )}
+
             {activeView === "reports" && (
               <motion.section
                 key="reports"
@@ -233,7 +275,7 @@ export default function Home() {
                 initial={shouldReduceMotion ? false : "enter"}
                 animate="center"
                 exit={shouldReduceMotion ? { opacity: 0 } : "exit"}
-                variants={GREENHOUSE_PANEL_VARIANTS}
+                variants={REPORTS_PANEL_VARIANTS}
                 transition={shouldReduceMotion ? { duration: 0 } : GREENHOUSE_PANEL_TRANSITION}
                 className="absolute inset-0 z-10 will-change-transform"
               >
@@ -253,6 +295,11 @@ export default function Home() {
                 transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_A}
                 className="absolute left-6 top-6 flex items-center gap-2"
               >
+                <div className="rounded-lg flex items-center h-10 px-3 bg-neutral-900 text-white dark:bg-white/8 dark:text-white/90">
+                  <span className="text-[11px] font-medium font-mono whitespace-nowrap">
+                    {seasonName}
+                  </span>
+                </div>
                 <ClockWidget />
                 <TemperatureWidget />
                 <EnvWidgetShells />

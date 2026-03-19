@@ -1,6 +1,36 @@
 import { create } from "zustand";
 import type { ChatMessageData, ToolCallData } from "@/components/chat/chat-message";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
+import { saveJSON, loadJSON, STORAGE_KEYS } from "@/lib/persistence";
+
+// ─── Persistence helpers ─────────────────────────────────────────────────────────
+
+const WELCOME_MESSAGE: ChatMessageData = {
+  id: "welcome",
+  role: "assistant",
+  content:
+    "Welcome to the Mars greenhouse. I can help you monitor conditions, adjust parameters, and optimize crop growth. What would you like to know?",
+};
+
+interface PersistedChat {
+  messages: ChatMessageData[];
+  threadId: string;
+}
+
+function loadPersistedChat(): { messages: ChatMessageData[]; threadId: string } {
+  const saved = loadJSON<PersistedChat>(STORAGE_KEYS.chat);
+  if (saved?.messages && saved.messages.length > 0) {
+    return { messages: saved.messages, threadId: saved.threadId ?? `thread-${Date.now()}` };
+  }
+  return { messages: [WELCOME_MESSAGE], threadId: `thread-${Date.now()}` };
+}
+
+function persistChat(messages: ChatMessageData[], threadId: string): void {
+  // Cap stored messages to the last 200 to avoid bloating localStorage
+  saveJSON(STORAGE_KEYS.chat, { messages: messages.slice(-200), threadId });
+}
+
+// ─── Store ───────────────────────────────────────────────────────────────────────
 
 export interface ChatState {
   messages: ChatMessageData[];
@@ -12,37 +42,42 @@ export interface ChatState {
   setStreaming: (streaming: boolean) => void;
   clearMessages: () => void;
   sendMessage: (text: string) => Promise<void>;
+  hydrateFromStorage: () => void;
 }
 
+const initialChat = { messages: [WELCOME_MESSAGE], threadId: "thread-init" };
+
 export const useChatStore = create<ChatState>((set, get) => ({
-  messages: [
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Welcome to the Mars greenhouse. I can help you monitor conditions, adjust parameters, and optimize crop growth. What would you like to know?",
-    },
-  ],
+  messages: initialChat.messages,
   isStreaming: false,
-  threadId: `thread-${Date.now()}`,
+  threadId: initialChat.threadId,
 
   addMessage: (message) =>
-    set((state) => ({ messages: [...state.messages, message] })),
+    set((state) => {
+      const messages = [...state.messages, message];
+      persistChat(messages, state.threadId);
+      return { messages };
+    }),
 
   updateMessage: (id, patch) =>
-    set((state) => ({
-      messages: state.messages.map((m) =>
+    set((state) => {
+      const messages = state.messages.map((m) =>
         m.id === id ? { ...m, ...patch } : m,
-      ),
-    })),
+      );
+      persistChat(messages, state.threadId);
+      return { messages };
+    }),
 
   setStreaming: (isStreaming) => set({ isStreaming }),
 
-  clearMessages: () =>
+  clearMessages: () => {
+    const threadId = `thread-${Date.now()}`;
+    persistChat([], threadId);
     set({
       messages: [],
-      threadId: `thread-${Date.now()}`,
-    }),
+      threadId,
+    });
+  },
 
   sendMessage: async (text: string) => {
     const { addMessage, updateMessage, setStreaming, messages, threadId } =
@@ -198,5 +233,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } finally {
       setStreaming(false);
     }
+  },
+
+  hydrateFromStorage: () => {
+    const loaded = loadPersistedChat();
+    set({ messages: loaded.messages, threadId: loaded.threadId });
   },
 }));
