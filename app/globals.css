@@ -1128,3 +1128,96 @@
     border-radius: 0;
   }
 }
+
+/* ─── Report markdown prose ──────────────────────────────────────────────────── */
+
+.report-markdown {
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.report-markdown h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--foreground);
+}
+.report-markdown h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 24px 0 10px;
+  color: var(--foreground);
+}
+.report-markdown h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+  color: var(--foreground);
+}
+.report-markdown p {
+  margin: 8px 0;
+}
+.report-markdown ul,
+.report-markdown ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.report-markdown li {
+  margin: 3px 0;
+}
+.report-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.report-markdown th,
+.report-markdown td {
+  border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+  padding: 6px 10px;
+  text-align: left;
+}
+.report-markdown th {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.report-markdown code {
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+}
+.report-markdown pre {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+.report-markdown pre code {
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.report-markdown blockquote {
+  border-left: 3px solid color-mix(in srgb, var(--foreground) 15%, transparent);
+  padding-left: 12px;
+  margin: 12px 0;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.report-markdown strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+.report-markdown em {
+  color: var(--muted-foreground);
+}
+.report-markdown hr {
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+  margin: 20px 0;
+}

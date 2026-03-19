@@ -19,14 +19,16 @@ import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { AgentDecisionPanel } from "@/components/interface/agent-decision-panel";
 import { SimulationOverrides } from "@/components/interface/simulation-overrides";
 import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
-import { SquaresFour, Leaf, Gavel, Robot } from "@phosphor-icons/react";
+import { ReportsView } from "@/components/interface/reports-view";
+import { SquaresFour, Leaf, Gavel, Robot, FileText } from "@phosphor-icons/react";
 
 type IntroStage = "sealed" | "opening" | "open";
-type MainView = "greenhouse" | "dashboard";
+type MainView = "greenhouse" | "dashboard" | "reports";
 
 const VIEW_ORDER: Record<MainView, number> = {
   greenhouse: 0,
   dashboard: 1,
+  reports: 2,
 };
 
 const VIEWPORT_TRANSITION = {
@@ -113,6 +115,7 @@ export default function Home() {
     () => [
       { value: "greenhouse", label: "Greenhouse", icon: <Leaf size={16} weight="fill" /> },
       { value: "dashboard",  label: "Dashboard",  icon: <SquaresFour size={16} weight="fill" /> },
+      { value: "reports",    label: "Reports",     icon: <FileText size={16} weight="fill" /> },
       { value: "rules",      label: "Rules",      icon: <Gavel size={16} weight="fill" /> },
     ],
     []
@@ -121,7 +124,7 @@ export default function Home() {
   const handleTabChange = React.useCallback((tab: string) => {
     setActiveTab(tab);
 
-    if (tab !== "greenhouse" && tab !== "dashboard") {
+    if (tab !== "greenhouse" && tab !== "dashboard" && tab !== "reports") {
       return;
     }
 
@@ -170,6 +173,21 @@ export default function Home() {
                 <GreenhouseView
                   introStage={introStage}
                 />
+              </motion.section>
+            )}
+
+            {activeView === "reports" && (
+              <motion.section
+                key="reports"
+                custom={viewDirection}
+                initial={shouldReduceMotion ? false : "enter"}
+                animate="center"
+                exit={shouldReduceMotion ? { opacity: 0 } : "exit"}
+                variants={GREENHOUSE_PANEL_VARIANTS}
+                transition={shouldReduceMotion ? { duration: 0 } : GREENHOUSE_PANEL_TRANSITION}
+                className="absolute inset-0 z-10 will-change-transform"
+              >
+                <ReportsView />
               </motion.section>
             )}
           </AnimatePresence>
