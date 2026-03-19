@@ -6,6 +6,7 @@ import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { useChatStore } from "@/lib/chat-store";
 import { cn } from "@/lib/utils";
+import { useAnimationConfig } from "@/lib/use-animation-config";
 
 interface ChatSidebarProps {
   open: boolean;
@@ -18,6 +19,7 @@ export function ChatSidebar({ open }: ChatSidebarProps) {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const [inputValue, setInputValue] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const anim = useAnimationConfig();
 
   const scrollToBottom = React.useCallback(() => {
     const el = scrollRef.current;
@@ -61,10 +63,10 @@ export function ChatSidebar({ open }: ChatSidebarProps) {
               return (
                 <motion.div
                   key={msg.id}
-                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                  initial={anim.enabled ? { opacity: 0, y: 8, scale: 0.97 } : false}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+                  exit={anim.enabled ? { opacity: 0, y: -6 } : undefined}
+                  transition={anim.enabled ? { duration: 0.2, ease: [0.32, 0.72, 0, 1] } : anim.instant}
                   className={cn(!isGrouped && i > 0 && "mt-2")}
                 >
                   <ChatMessage

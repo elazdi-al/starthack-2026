@@ -1,61 +1,104 @@
 "use client";
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { CropType } from "@/lib/greenhouse-store";
+import type { CropType, GrowthStage } from "@/lib/greenhouse-store";
+
+/**
+ * The 6 visible lifecycle stages in order.  "harvested" is excluded —
+ * it maps to the final frame (plant dead / fully dried).
+ */
+const LIFECYCLE_STAGES: GrowthStage[] = [
+  "seed",
+  "germination",
+  "vegetative",
+  "flowering",
+  "fruiting",
+  "harvest_ready",
+];
+
+/**
+ * Convert a (stage, stageProgress) pair into a 0–1 lifecycle fraction
+ * that maps linearly onto the 8-second video timeline.
+ *
+ * Each of the 6 stages occupies an equal 1/6 slice of the video.
+ *   seed           → 0.000 – 0.167
+ *   germination    → 0.167 – 0.333
+ *   vegetative     → 0.333 – 0.500
+ *   flowering      → 0.500 – 0.667
+ *   fruiting       → 0.667 – 0.833
+ *   harvest_ready  → 0.833 – 1.000
+ *   harvested      → 1.0 (final frame)
+ */
+function stageToLifecycleFraction(
+  stage: GrowthStage,
+  stageProgress: number,
+): number {
+  if (stage === "harvested") return 1;
+  const idx = LIFECYCLE_STAGES.indexOf(stage);
+  if (idx === -1) return 0;
+  const sliceSize = 1 / LIFECYCLE_STAGES.length;
+  return Math.min(1, idx * sliceSize + stageProgress * sliceSize);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const VIDEO_DURATION = 8; // Veo generates 8-second videos
 
 /**
- * Renders a single frame from a crop lifecycle video at the position
- * corresponding to the plant's current life percentage.
+ * Shows a single frame from a crop's lifecycle video that corresponds
+ * exactly to its current growth stage + progress within that stage.
  *
- * lifePercent: 0 = seed, 1 = end of life / death
- *
- * The video is paused and seeked to `lifePercent * duration`.
- * Falls back to `children` (the SVG preview) if the video fails to load.
+ * Falls back to `children` (the SVG preview) when the video is not
+ * available or still loading.
  */
 const CropVideoPreview = memo(function CropVideoPreview({
   crop,
-  lifePercent,
+  stage,
+  stageProgress,
   children,
 }: {
   crop: CropType;
-  lifePercent: number;
+  /** Current growth stage of the plant. */
+  stage: GrowthStage;
+  /** 0–1 progress within the current stage. */
+  stageProgress: number;
   children?: React.ReactNode;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(false);
+  const prevCropRef = useRef(crop);
 
   const src = `/videos/crops/${crop}.mp4`;
 
-  const handleLoaded = useCallback(() => {
-    setReady(true);
-  }, []);
+  // Reset state when the crop (and therefore video source) changes
+  if (prevCropRef.current !== crop) {
+    prevCropRef.current = crop;
+    setReady(false);
+    setError(false);
+  }
 
-  const handleError = useCallback(() => {
-    setError(true);
-  }, []);
+  const handleLoaded = useCallback(() => setReady(true), []);
+  const handleError = useCallback(() => setError(true), []);
 
-  // Seek to the correct frame whenever lifePercent changes
+  // Seek to the correct frame whenever stage/progress changes
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !ready) return;
 
-    const clamped = Math.max(0, Math.min(1, lifePercent));
+    const fraction = stageToLifecycleFraction(stage, stageProgress);
     const duration = video.duration || VIDEO_DURATION;
-    // Map 0–1 to 0–duration, but stay slightly inside bounds to avoid
-    // edge-frame artifacts
-    const targetTime = clamped * (duration - 0.05);
-    video.currentTime = Math.max(0, targetTime);
-  }, [lifePercent, ready]);
+    // Stay slightly inside bounds to avoid blank edge frames
+    const targetTime = Math.max(0, Math.min(fraction * duration, duration - 0.04));
+    video.currentTime = targetTime;
+  }, [stage, stageProgress, ready]);
 
   if (error) {
     return <>{children}</>;
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-[16px]">
+    <div className="relative h-full w-full overflow-hidden rounded-xl bg-white dark:bg-neutral-900">
       <video
         ref={videoRef}
         src={src}
@@ -64,12 +107,11 @@ const CropVideoPreview = memo(function CropVideoPreview({
         preload="auto"
         onLoadedData={handleLoaded}
         onError={handleError}
-        className={`h-full w-full object-cover transition-opacity duration-300 ${
+        className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-300 ${
           ready ? "opacity-100" : "opacity-0"
         }`}
         style={{ pointerEvents: "none" }}
       />
-      {/* Fallback while loading */}
       {!ready && !error && (
         <div className="absolute inset-0 flex items-center justify-center">
           {children}

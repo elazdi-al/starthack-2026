@@ -2,9 +2,11 @@
 generate-crop-videos.py
 =======================
 Generates hyper-realistic lifecycle videos for each greenhouse crop using
-Google Veo 3.1.  Each 8-second 1080p video captures a single plant on a
-clean studio white background progressing from seed → germination →
-vegetative → flowering → fruiting → harvest-ready → senescence/death.
+Google Veo 3.1.  Each 8-second 1080p portrait (9:16) video captures a
+single plant on a clean studio white background with a completely static
+camera — no movement whatsoever.  The plant progresses from seed →
+germination → vegetative → flowering → fruiting → harvest-ready →
+senescence/death, always centered and fully in frame.
 
 The videos are saved to  public/videos/crops/<crop>.mp4  so they can be
 served statically by Next.js and referenced by the crop-dialog UI.
@@ -36,7 +38,7 @@ from google.genai import types
 
 MODEL = "veo-3.1-generate-preview"
 RESOLUTION = "1080p"
-ASPECT_RATIO = "16:9"
+ASPECT_RATIO = "9:16"
 DURATION_SECONDS = "8"
 POLL_INTERVAL = 10  # seconds between status checks
 
@@ -50,93 +52,86 @@ CROPS: dict[str, dict] = {
     "lettuce": {
         "name": "Lettuce",
         "scientific": "Lactuca sativa",
-        "description": (
-            "a head of green butterhead lettuce with delicate ruffled leaves"
-        ),
+        "description": "a single lettuce plant with soft green ruffled leaves",
     },
     "tomato": {
         "name": "Tomato",
         "scientific": "Solanum lycopersicum",
-        "description": (
-            "a tomato plant with a sturdy green stem, yellow star-shaped "
-            "flowers, and bright red round tomatoes"
-        ),
+        "description": "a single tomato plant with green leaves, yellow flowers, and red fruits",
     },
     "potato": {
         "name": "Potato",
         "scientific": "Solanum tuberosum",
-        "description": (
-            "a potato plant with broad dark-green compound leaves above "
-            "soil, and golden-brown tubers forming underground visible "
-            "through a cross-section cutaway"
-        ),
+        "description": "a single potato plant with broad dark-green leaves",
     },
     "soybean": {
         "name": "Soybean",
         "scientific": "Glycine max",
-        "description": (
-            "a soybean plant with trifoliate green leaves and clusters "
-            "of fuzzy green soybean pods along the stems"
-        ),
+        "description": "a single soybean plant with trifoliate leaves and green pods",
     },
     "spinach": {
         "name": "Spinach",
         "scientific": "Spinacia oleracea",
-        "description": (
-            "a spinach plant with a rosette of thick, dark-green, "
-            "slightly crinkled spade-shaped leaves"
-        ),
+        "description": "a single spinach plant with a rosette of dark-green spade-shaped leaves",
     },
     "wheat": {
         "name": "Wheat",
         "scientific": "Triticum aestivum",
-        "description": (
-            "a cluster of wheat stalks with long narrow leaves and "
-            "golden grain heads with fine awns"
-        ),
+        "description": "a single wheat plant with narrow leaves and a golden grain head",
     },
     "radish": {
         "name": "Radish",
         "scientific": "Raphanus sativus",
-        "description": (
-            "a radish plant with lobed green leaves above the soil and "
-            "a round bright-red radish root bulging from the earth"
-        ),
+        "description": "a single radish plant with lobed green leaves and a red root",
     },
     "kale": {
         "name": "Kale",
         "scientific": "Brassica oleracea var. sabellica",
-        "description": (
-            "a curly kale plant with deeply ruffled blue-green leaves "
-            "on thick pale stems"
-        ),
+        "description": "a single kale plant with deeply curled blue-green leaves",
     },
 }
 
 
 def build_prompt(crop_key: str) -> str:
-    """Build a detailed, cinematic Veo prompt for one crop lifecycle."""
+    """Build a detailed, cinematic Veo prompt for one crop lifecycle.
+
+    Every prompt follows the exact same structure to guarantee uniform
+    framing, lighting, and composition across all eight crops.
+    """
     crop = CROPS[crop_key]
     return (
-        f"A perfectly smooth, continuous time-lapse of {crop['description']} "
-        f"({crop['scientific']}) completing its entire life cycle in a single "
-        f"unbroken shot. "
-        f"The plant sits centered on a matte white studio surface against a "
-        f"pure white seamless backdrop with soft, even studio lighting — no "
-        f"shadows, no distractions. "
-        f"The sequence begins with a single small seed resting on dark, rich "
-        f"potting soil. The seed cracks open and a pale sprout emerges, "
-        f"pushing upward. Cotyledon leaves unfurl, then true leaves appear "
-        f"and multiply as the plant enters vigorous vegetative growth — "
-        f"stems thicken, foliage expands. "
-        f"The plant transitions into flowering: buds form and blossoms open. "
-        f"Fruits or seed structures develop and ripen to full maturity. "
-        f"Finally the plant senesces — leaves yellow, curl, and dry; stems "
-        f"wither — until only a dried husk remains on the soil. "
-        f"Ultra-realistic botanical detail, 4K macro quality, shot at f/2.8 "
-        f"with creamy bokeh on the white background. Gentle ambient rustling "
-        f"sounds throughout. No camera movement — perfectly locked-off "
-        f"tripod, centered composition."
+        # ── Camera & framing ──────────────────────────────────────────
+        f"Perfectly static camera. Locked-off tripod. No camera movement "
+        f"whatsoever — no pan, no tilt, no zoom, no dolly, no shake. "
+        f"The exact same frame from the first frame to the last frame. "
+        # ── Composition ───────────────────────────────────────────────
+        f"Centered medium shot, portrait orientation (9:16). "
+        f"A small round terracotta pot sits in the exact center of the "
+        f"frame on a clean matte white surface. The pot contains "
+        f"{crop['description']}. "
+        f"The plant is always perfectly centered horizontally. "
+        f"The pot sits in the lower third of the frame. "
+        f"Generous empty space above the plant so it is never cropped "
+        f"even at maximum height. "
+        # ── Background & lighting ─────────────────────────────────────
+        f"Pure solid white background — seamless, no horizon line, "
+        f"no gradients, no shadows on the background. "
+        f"Soft diffused overhead studio lighting, perfectly even, "
+        f"very faint contact shadow directly under the pot only. "
+        # ── Action (lifecycle) ────────────────────────────────────────
+        f"Smooth continuous time-lapse of the full life cycle of "
+        f"{crop['scientific']}: "
+        f"Frame opens on a bare seed sitting on dark soil in the pot. "
+        f"The seed germinates — a small pale sprout pushes up. "
+        f"Cotyledon leaves open, then true leaves grow. "
+        f"Vigorous vegetative growth — stems and foliage fill out. "
+        f"The plant flowers. Fruit or seed structures develop and ripen. "
+        f"Then the plant dies — leaves turn yellow, wilt, dry, curl; "
+        f"stems brown and wither until only a dry husk remains in the pot. "
+        # ── Style ─────────────────────────────────────────────────────
+        f"Hyper-realistic photographic quality. Botanical macro detail. "
+        f"Clean, clinical, product-photography aesthetic. "
+        f"Silent — no audio, no music, no sound effects."
     )
 
 

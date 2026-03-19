@@ -10,6 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAnimationConfig } from "@/lib/use-animation-config";
 
 interface SegmentedControlOption {
   value: string;
@@ -39,6 +40,7 @@ function SegmentedControl({
     defaultValue ?? options[0]?.value
   );
   const currentValue = value ?? internalValue;
+  const anim = useAnimationConfig();
 
   function renderOptionIcon(icon: React.ReactNode) {
     return (
@@ -87,15 +89,19 @@ function SegmentedControl({
                     )}
                   >
                     {isActive && (
-                      <motion.span
-                        layoutId={indicatorId}
-                        className="absolute inset-0 rounded-full border border-[var(--dial-border)] bg-[var(--card)] shadow-none dark:shadow-sm"
-                        transition={{
-                          type: "spring",
-                          duration: 0.35,
-                          bounce: 0.15,
-                        }}
-                      />
+                      anim.enabled ? (
+                        <motion.span
+                          layoutId={indicatorId}
+                          className="absolute inset-0 rounded-full border border-[var(--dial-border)] bg-[var(--card)] shadow-none dark:shadow-sm"
+                          transition={{
+                            type: "spring",
+                            duration: 0.35,
+                            bounce: 0.15,
+                          }}
+                        />
+                      ) : (
+                        <span className="absolute inset-0 rounded-full border border-[var(--dial-border)] bg-[var(--card)] shadow-none dark:shadow-sm" />
+                      )
                     )}
                     <span
                       className={cn(

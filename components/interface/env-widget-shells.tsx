@@ -10,6 +10,7 @@ import {
   CaretRight,
 } from "@phosphor-icons/react";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
+import { useAnimationConfig } from "@/lib/use-animation-config";
 
 export function EnvWidgetShells() {
   const [expanded, setExpanded] = React.useState(false);
@@ -17,6 +18,7 @@ export function EnvWidgetShells() {
   const co2Level = useGreenhouseStore((s) => s.co2Level);
   const lightLevel = useGreenhouseStore((s) => s.lightLevel);
   const env = useGreenhouseStore((s) => s.environment);
+  const anim = useAnimationConfig();
 
   return (
     <div className="flex items-center gap-2">
@@ -28,7 +30,7 @@ export function EnvWidgetShells() {
       >
         <motion.span
           animate={{ rotate: expanded ? 90 : 0 }}
-          transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+          transition={anim.enabled ? { duration: 0.2, ease: [0.32, 0.72, 0, 1] } : anim.instant}
           className="flex items-center justify-center"
         >
           <CaretRight size={14} weight="bold" />
@@ -39,10 +41,10 @@ export function EnvWidgetShells() {
         {expanded && (
           <motion.div
             className="flex items-center gap-2 overflow-hidden"
-            initial={{ width: 0, opacity: 0 }}
+            initial={anim.enabled ? { width: 0, opacity: 0 } : false}
             animate={{ width: "auto", opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+            exit={anim.enabled ? { width: 0, opacity: 0 } : undefined}
+            transition={anim.enabled ? { duration: 0.25, ease: [0.32, 0.72, 0, 1] } : anim.instant}
           >
             <EnvShell
               icon={<Drop size={14} weight="fill" />}

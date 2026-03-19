@@ -64,6 +64,26 @@ export interface CropEnvironment {
   boltingHoursAccumulated: number; // hours spent above bolting threshold
 }
 
+/**
+ * Per-tile crop instance. Extends CropEnvironment with identity and genetic
+ * variance so each tile on the greenhouse grid is an independent entity —
+ * two lettuce tiles exposed to the same conditions will differ due to
+ * individual genetic factors (different optimal temps, growth rates, etc.).
+ */
+export interface TileCropEnvironment extends CropEnvironment {
+  tileId: string;            // stable key, e.g. "lettuce_0_0" (type_row_col)
+  cropType: CropType;        // which species
+  geneticSeed: number;       // deterministic seed for this individual's genetics
+  // Genetic multipliers (centred on 1.0, sampled once at planting)
+  geneticOptimalTempFactor: number;
+  geneticOptimalMoistureFactor: number;
+  geneticGrowthRateFactor: number;
+  geneticMaxYieldFactor: number;
+  geneticBoltingThresholdFactor: number;
+  geneticStressResilienceFactor: number;
+  geneticWaterEfficiencyFactor: number;
+}
+
 export interface CropControls {
   waterPumpRate: number;
   localHeatingPower: number;
@@ -108,7 +128,11 @@ export interface ConcreteEnvironment extends Environment {
   nutritionalOutput: NutritionalOutput;
   nutritionalCoverage: number;      // 0–1 vs 4-crew daily targets
 
+  /** Aggregate per-type crop state (backward compat: agents, nutrition, progress panel). */
   crops: Record<CropType, CropEnvironment>;
+
+  /** Per-tile independent crop instances with genetic variance. Keyed by tileId. */
+  tileCrops: Record<string, TileCropEnvironment>;
 }
 
 export interface ConcreteGreenhouseState extends GreenhouseState {

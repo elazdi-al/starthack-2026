@@ -130,58 +130,59 @@ export interface TileData {
   status: Status;
   sensor?: boolean;
   crop?: CropType;
+  tileId?: string;  // unique tile identifier for per-tile crop state (e.g. "lettuce_0_0")
 }
 
 const INITIAL_GRID: TileData[][] = [
   [
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "lettuce" },
-    { kind: "crop", growth: 4, water: 92, status: "ok", crop: "tomato" },
-    { kind: "crop", growth: 2, water: 65, status: "ok", crop: "spinach" },
+    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "lettuce", tileId: "lettuce_0_0" },
+    { kind: "crop", growth: 4, water: 92, status: "ok", crop: "tomato", tileId: "tomato_0_1" },
+    { kind: "crop", growth: 2, water: 65, status: "ok", crop: "spinach", tileId: "spinach_0_2" },
     { kind: "path", growth: 0, water: 0, status: null },
     { kind: "path", growth: 0, water: 0, status: null, sensor: true },
-    { kind: "crop", growth: 5, water: 88, status: "ok", crop: "soybean" },
-    { kind: "crop", growth: 3, water: 72, status: "ok", crop: "wheat" },
-    { kind: "crop", growth: 4, water: 95, status: "ok", crop: "kale" },
+    { kind: "crop", growth: 5, water: 88, status: "ok", crop: "soybean", tileId: "soybean_0_5" },
+    { kind: "crop", growth: 3, water: 72, status: "ok", crop: "wheat", tileId: "wheat_0_6" },
+    { kind: "crop", growth: 4, water: 95, status: "ok", crop: "kale", tileId: "kale_0_7" },
   ],
   [
-    { kind: "crop", growth: 5, water: 95, status: "ok", crop: "potato" },
-    { kind: "crop", growth: 3, water: 80, status: "ok", crop: "lettuce" },
-    { kind: "crop", growth: 0, water: 0, status: null, crop: "radish" },
+    { kind: "crop", growth: 5, water: 95, status: "ok", crop: "potato", tileId: "potato_1_0" },
+    { kind: "crop", growth: 3, water: 80, status: "ok", crop: "lettuce", tileId: "lettuce_1_1" },
+    { kind: "crop", growth: 0, water: 0, status: null, crop: "radish", tileId: "radish_1_2" },
     { kind: "path", growth: 0, water: 0, status: null },
     { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 2, water: 60, status: "ok", crop: "radish" },
-    { kind: "crop", growth: 5, water: 90, status: "ok", crop: "tomato" },
-    { kind: "crop", growth: 1, water: 82, status: "ok", crop: "spinach" },
+    { kind: "crop", growth: 2, water: 60, status: "ok", crop: "radish", tileId: "radish_1_5" },
+    { kind: "crop", growth: 5, water: 90, status: "ok", crop: "tomato", tileId: "tomato_1_6" },
+    { kind: "crop", growth: 1, water: 82, status: "ok", crop: "spinach", tileId: "spinach_1_7" },
   ],
   [
-    { kind: "crop", growth: 2, water: 55, status: "ok", crop: "wheat" },
-    { kind: "crop", growth: 5, water: 70, status: "warn", crop: "soybean" },
-    { kind: "crop", growth: 1, water: 90, status: "ok", crop: "kale" },
+    { kind: "crop", growth: 2, water: 55, status: "ok", crop: "wheat", tileId: "wheat_2_0" },
+    { kind: "crop", growth: 5, water: 70, status: "warn", crop: "soybean", tileId: "soybean_2_1" },
+    { kind: "crop", growth: 1, water: 90, status: "ok", crop: "kale", tileId: "kale_2_2" },
     { kind: "path", growth: 0, water: 0, status: null, sensor: true },
     { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 4, water: 75, status: "ok", crop: "lettuce" },
-    { kind: "crop", growth: 0, water: 0, status: null, crop: "potato" },
-    { kind: "crop", growth: 5, water: 70, status: "warn", crop: "potato" },
+    { kind: "crop", growth: 4, water: 75, status: "ok", crop: "lettuce", tileId: "lettuce_2_5" },
+    { kind: "crop", growth: 0, water: 0, status: null, crop: "potato", tileId: "potato_2_6" },
+    { kind: "crop", growth: 5, water: 70, status: "warn", crop: "potato", tileId: "potato_2_7" },
   ],
   [
-    { kind: "crop", growth: 4, water: 82, status: "ok", crop: "tomato" },
-    { kind: "crop", growth: 1, water: 65, status: "ok", crop: "spinach" },
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "potato" },
+    { kind: "crop", growth: 4, water: 82, status: "ok", crop: "tomato", tileId: "tomato_3_0" },
+    { kind: "crop", growth: 1, water: 65, status: "ok", crop: "spinach", tileId: "spinach_3_1" },
+    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "potato", tileId: "potato_3_2" },
     { kind: "path", growth: 0, water: 0, status: null },
     { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 3, water: 80, status: "ok", crop: "wheat" },
-    { kind: "crop", growth: 4, water: 55, status: "warn", crop: "radish" },
-    { kind: "crop", growth: 1, water: 88, status: "ok", crop: "soybean" },
+    { kind: "crop", growth: 3, water: 80, status: "ok", crop: "wheat", tileId: "wheat_3_5" },
+    { kind: "crop", growth: 4, water: 55, status: "warn", crop: "radish", tileId: "radish_3_6" },
+    { kind: "crop", growth: 1, water: 88, status: "ok", crop: "soybean", tileId: "soybean_3_7" },
   ],
   [
-    { kind: "crop", growth: 3, water: 90, status: "ok", crop: "kale" },
-    { kind: "crop", growth: 5, water: 85, status: "ok", crop: "kale" },
-    { kind: "crop", growth: 4, water: 72, status: "ok", crop: "tomato" },
+    { kind: "crop", growth: 3, water: 90, status: "ok", crop: "kale", tileId: "kale_4_0" },
+    { kind: "crop", growth: 5, water: 85, status: "ok", crop: "kale", tileId: "kale_4_1" },
+    { kind: "crop", growth: 4, water: 72, status: "ok", crop: "tomato", tileId: "tomato_4_2" },
     { kind: "path", growth: 0, water: 0, status: null },
     { kind: "path", growth: 0, water: 0, status: null, sensor: true },
-    { kind: "crop", growth: 1, water: 92, status: "ok", crop: "spinach" },
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "soybean" },
-    { kind: "crop", growth: 2, water: 65, status: "ok", crop: "wheat" },
+    { kind: "crop", growth: 1, water: 92, status: "ok", crop: "spinach", tileId: "spinach_4_5" },
+    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "soybean", tileId: "soybean_4_6" },
+    { kind: "crop", growth: 2, water: 65, status: "ok", crop: "wheat", tileId: "wheat_4_7" },
   ],
 ];
 
@@ -313,7 +314,9 @@ function syncGridFromEnv(grid: TileData[][], env: ConcreteEnvironment): TileData
   return grid.map((row) =>
     row.map((tile) => {
       if (tile.kind !== "crop" || !tile.crop) return tile;
-      const c = env.crops[tile.crop];
+      // Prefer per-tile state if available; fall back to aggregate per-type
+      const tileCrop = tile.tileId ? env.tileCrops?.[tile.tileId] : undefined;
+      const c: CropEnvironment = tileCrop ?? env.crops[tile.crop];
       return {
         ...tile,
         growth: STAGE_TO_GROWTH_INDEX[c.stage],

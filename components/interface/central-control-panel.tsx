@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useGreenhouseStore, type SpeedKey, type ManualOverrides } from "@/lib/greenhouse-store";
 import { triggerHaptic } from "@/lib/haptics";
 import { SpeedSelector } from "@/components/interface/speed-selector";
+import { useAnimationConfig } from "@/lib/use-animation-config";
 
 const MORPH_SPRING = { type: "spring" as const, bounce: 0.05, duration: 0.35 };
 
@@ -130,6 +131,7 @@ export function CentralControlPanel({
   };
 
   const showPanel = open && mounted && panels.length > 0;
+  const anim = useAnimationConfig();
 
   return (
     <div
@@ -148,7 +150,7 @@ export function CentralControlPanel({
           height: showPanel ? "auto" : 40,
           borderRadius: showPanel ? 14 : 20,
         }}
-        transition={MORPH_SPRING}
+        transition={anim.enabled ? MORPH_SPRING : anim.instant}
         style={{ overflow: "hidden", maxHeight: showPanel ? "calc(100vh - 80px)" : 40 }}
       >
         <motion.div
@@ -160,11 +162,11 @@ export function CentralControlPanel({
             WebkitBackdropFilter: "blur(14px)",
             boxShadow:
               "inset 0 0 0 1px var(--dial-border), 0 8px 24px rgb(0 0 0 / 0.04)",
-            willChange: "opacity",
+            willChange: anim.enabled ? "opacity" : undefined,
           }}
           initial={false}
           animate={{ opacity: showPanel ? 1 : 0 }}
-          transition={{ duration: 0.25 }}
+          transition={anim.enabled ? { duration: 0.25 } : anim.instant}
         />
 
         <div
@@ -203,10 +205,10 @@ export function CentralControlPanel({
               key="cc-panel-content"
               className="relative cc-morph-content dialkit-root overflow-y-auto"
               data-embedded=""
-              initial={{ opacity: 0 }}
+              initial={anim.enabled ? { opacity: 0 } : false}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
+              exit={anim.enabled ? { opacity: 0 } : undefined}
+              transition={anim.enabled ? { duration: 0.12 } : anim.instant}
               style={{ maxHeight: "calc(100vh - 160px)" }}
             >
               {/* Global toolbar */}
@@ -235,10 +237,10 @@ export function CentralControlPanel({
                       <motion.span
                         key="check"
                         className="cc-toolbar-icon"
-                        initial={{ scale: 0.5, opacity: 0 }}
+                        initial={anim.enabled ? { scale: 0.5, opacity: 0 } : false}
                         animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.5, opacity: 0 }}
-                        transition={{ type: "spring", visualDuration: 0.2, bounce: 0.2 }}
+                        exit={anim.enabled ? { scale: 0.5, opacity: 0 } : undefined}
+                        transition={anim.enabled ? { type: "spring", visualDuration: 0.2, bounce: 0.2 } : anim.instant}
                       >
                         <Check size={14} weight="bold" />
                       </motion.span>
@@ -246,10 +248,10 @@ export function CentralControlPanel({
                       <motion.span
                         key="copy"
                         className="cc-toolbar-icon"
-                        initial={{ scale: 0.5, opacity: 0 }}
+                        initial={anim.enabled ? { scale: 0.5, opacity: 0 } : false}
                         animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.5, opacity: 0 }}
-                        transition={{ type: "spring", visualDuration: 0.2, bounce: 0.2 }}
+                        exit={anim.enabled ? { scale: 0.5, opacity: 0 } : undefined}
+                        transition={anim.enabled ? { type: "spring", visualDuration: 0.2, bounce: 0.2 } : anim.instant}
                       >
                         <Copy size={14} weight="bold" />
                       </motion.span>

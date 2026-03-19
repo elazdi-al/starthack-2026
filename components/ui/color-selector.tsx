@@ -7,6 +7,7 @@ import { motion, type Variants } from "motion/react";
 
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { useAnimationConfig } from "@/lib/use-animation-config";
 
 export const WIDGET_ACCENTS = [
   "#ee4562",
@@ -204,6 +205,7 @@ function ColorSelector({
   const selectedValue = value ?? internalValue ?? fallbackValue;
   const selectedColor =
     normalizedColors.find((color) => color.value === selectedValue) ?? normalizedColors[0];
+  const anim = useAnimationConfig();
 
   const handleValueChange: RadioGroup.Props<string>["onValueChange"] = (
     nextValue,
@@ -232,13 +234,13 @@ function ColorSelector({
     <motion.div
       key="color-selector"
       data-slot="color-selector"
-      variants={colorSelectorPanelVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+      variants={anim.enabled ? colorSelectorPanelVariants : undefined}
+      initial={anim.enabled ? "hidden" : false}
+      animate={anim.enabled ? "visible" : undefined}
+      exit={anim.enabled ? "exit" : undefined}
       className={cn(colorSelectorPanelClassName, panelClassName)}
-      style={COLOR_SELECTOR_ANIMATED_STYLE}
-      transition={COLOR_SELECTOR_POPUP_TRANSITION}
+      style={anim.enabled ? COLOR_SELECTOR_ANIMATED_STYLE : undefined}
+      transition={anim.enabled ? COLOR_SELECTOR_POPUP_TRANSITION : anim.instant}
     >
       <RadioGroup
         value={selectedValue}

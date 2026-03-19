@@ -31,6 +31,19 @@ export interface CropProfile {
   rootO2Sensitivity: number;      // 0–1 multiplier for hypoxia stress
   diseaseSusceptibility: number;  // 0–1 baseline accumulation rate factor
   lightSaturationPoint: number;   // lux — above this photoinhibition begins
+
+  // Genetic variance coefficients (CV = coefficient of variation, unitless)
+  // These define the standard deviation as a fraction of the mean for per-individual variation.
+  // A CV of 0.08 means ±8% 1-σ spread around the profile baseline.
+  geneticVariance: {
+    optimalTempCV: number;          // variance in temperature preference
+    optimalMoistureCV: number;      // variance in moisture preference
+    growthRateCV: number;           // variance in growth cycle speed
+    maxYieldCV: number;             // variance in genetic yield potential
+    boltingThresholdCV: number;     // variance in bolting sensitivity
+    stressResilienceCV: number;     // variance in stress tolerance (healthScore decay)
+    waterEfficiencyCV: number;      // variance in water uptake efficiency
+  };
 }
 
 const STAGES_DEFAULT: Record<GrowthStage, number> = {
@@ -55,6 +68,11 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     boltingTempThreshold: 25, boltingHoursToTrigger: 12,
     nutrientSensitivity: 0.9, rootO2Sensitivity: 0.85, diseaseSusceptibility: 0.7,
     lightSaturationPoint: 40000,
+    geneticVariance: {
+      optimalTempCV: 0.06, optimalMoistureCV: 0.08, growthRateCV: 0.10,
+      maxYieldCV: 0.12, boltingThresholdCV: 0.07, stressResilienceCV: 0.09,
+      waterEfficiencyCV: 0.08,
+    },
   },
   tomato: {
     optimalTemp: 24, optimalMoisture: 70, tempSigma: 5, moistureSigma: 15,
@@ -67,6 +85,11 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     boltingTempThreshold: 32, boltingHoursToTrigger: 24,
     nutrientSensitivity: 0.75, rootO2Sensitivity: 0.7, diseaseSusceptibility: 0.6,
     lightSaturationPoint: 60000,
+    geneticVariance: {
+      optimalTempCV: 0.08, optimalMoistureCV: 0.10, growthRateCV: 0.14,
+      maxYieldCV: 0.18, boltingThresholdCV: 0.06, stressResilienceCV: 0.12,
+      waterEfficiencyCV: 0.10,
+    },
   },
   potato: {
     optimalTemp: 18, optimalMoisture: 65, tempSigma: 4, moistureSigma: 12,
@@ -79,6 +102,11 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     boltingTempThreshold: 27, boltingHoursToTrigger: 18,
     nutrientSensitivity: 0.8, rootO2Sensitivity: 0.75, diseaseSusceptibility: 0.5,
     lightSaturationPoint: 50000,
+    geneticVariance: {
+      optimalTempCV: 0.07, optimalMoistureCV: 0.09, growthRateCV: 0.11,
+      maxYieldCV: 0.15, boltingThresholdCV: 0.08, stressResilienceCV: 0.10,
+      waterEfficiencyCV: 0.09,
+    },
   },
   soybean: {
     optimalTemp: 25, optimalMoisture: 65, tempSigma: 5, moistureSigma: 15,
@@ -91,6 +119,11 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     boltingTempThreshold: 34, boltingHoursToTrigger: 30,
     nutrientSensitivity: 0.7, rootO2Sensitivity: 0.65, diseaseSusceptibility: 0.45,
     lightSaturationPoint: 55000,
+    geneticVariance: {
+      optimalTempCV: 0.07, optimalMoistureCV: 0.08, growthRateCV: 0.12,
+      maxYieldCV: 0.16, boltingThresholdCV: 0.06, stressResilienceCV: 0.11,
+      waterEfficiencyCV: 0.09,
+    },
   },
   spinach: {
     optimalTemp: 18, optimalMoisture: 65, tempSigma: 4, moistureSigma: 12,
@@ -103,6 +136,11 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     boltingTempThreshold: 24, boltingHoursToTrigger: 10,
     nutrientSensitivity: 0.85, rootO2Sensitivity: 0.8, diseaseSusceptibility: 0.65,
     lightSaturationPoint: 38000,
+    geneticVariance: {
+      optimalTempCV: 0.05, optimalMoistureCV: 0.07, growthRateCV: 0.09,
+      maxYieldCV: 0.11, boltingThresholdCV: 0.06, stressResilienceCV: 0.08,
+      waterEfficiencyCV: 0.07,
+    },
   },
   wheat: {
     optimalTemp: 21, optimalMoisture: 60, tempSigma: 5, moistureSigma: 15,
@@ -115,6 +153,11 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     boltingTempThreshold: 30, boltingHoursToTrigger: 20,
     nutrientSensitivity: 0.6, rootO2Sensitivity: 0.55, diseaseSusceptibility: 0.4,
     lightSaturationPoint: 65000,
+    geneticVariance: {
+      optimalTempCV: 0.06, optimalMoistureCV: 0.07, growthRateCV: 0.10,
+      maxYieldCV: 0.13, boltingThresholdCV: 0.05, stressResilienceCV: 0.08,
+      waterEfficiencyCV: 0.07,
+    },
   },
   radish: {
     optimalTemp: 19, optimalMoisture: 60, tempSigma: 4, moistureSigma: 12,
@@ -127,6 +170,11 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     boltingTempThreshold: 26, boltingHoursToTrigger: 8,
     nutrientSensitivity: 0.7, rootO2Sensitivity: 0.7, diseaseSusceptibility: 0.5,
     lightSaturationPoint: 45000,
+    geneticVariance: {
+      optimalTempCV: 0.06, optimalMoistureCV: 0.08, growthRateCV: 0.11,
+      maxYieldCV: 0.13, boltingThresholdCV: 0.07, stressResilienceCV: 0.09,
+      waterEfficiencyCV: 0.08,
+    },
   },
   kale: {
     optimalTemp: 19, optimalMoisture: 65, tempSigma: 5, moistureSigma: 15,
@@ -139,5 +187,10 @@ export const CROP_PROFILES: Record<CropType, CropProfile> = {
     boltingTempThreshold: 26, boltingHoursToTrigger: 14,
     nutrientSensitivity: 0.75, rootO2Sensitivity: 0.75, diseaseSusceptibility: 0.55,
     lightSaturationPoint: 42000,
+    geneticVariance: {
+      optimalTempCV: 0.06, optimalMoistureCV: 0.08, growthRateCV: 0.10,
+      maxYieldCV: 0.14, boltingThresholdCV: 0.06, stressResilienceCV: 0.09,
+      waterEfficiencyCV: 0.08,
+    },
   },
 };

@@ -13,6 +13,7 @@
  */
 
 import { CROP_PROFILES } from '../../greenhouse/implementations/multi-crop/profiles';
+import type { CropProfile } from '../../greenhouse/implementations/multi-crop/profiles';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,12 +51,69 @@ function makeRng(seed: number): () => number {
   };
 }
 
+// ─── Box-Muller Gaussian from uniform RNG ────────────────────────────────────
+
+function gaussianSample(rng: () => number, mean: number, stddev: number): number {
+  // Box-Muller transform — generates a standard normal from two uniforms
+  const u1 = Math.max(1e-10, rng()); // avoid log(0)
+  const u2 = rng();
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return mean + z * stddev;
+}
+
+// ─── Per-individual genetic identity ─────────────────────────────────────────
+
+/**
+ * Genetic identity for a single crop individual. These are fixed at "planting time"
+ * (entity creation) and remain constant for the plant's lifetime. They perturb the
+ * species-level CropProfile to create realistic intra-population variance.
+ *
+ * All values are multiplicative factors centred on 1.0:
+ *   effectiveParam = profile.param × geneticFactor
+ *
+ * Example: optimalTempFactor of 1.05 means this individual prefers 5% warmer temps.
+ */
+interface GeneticIdentity {
+  optimalTempFactor: number;
+  optimalMoistureFactor: number;
+  growthRateFactor: number;       // affects growthCycleSols inversely (faster = lower cycle)
+  maxYieldFactor: number;
+  boltingThresholdFactor: number;
+  stressResilienceFactor: number; // higher = slower healthScore decay
+  waterEfficiencyFactor: number;  // higher = needs less water
+}
+
+/**
+ * Generate a genetic identity for a single crop individual.
+ * Uses a dedicated RNG seeded uniquely per individual so that:
+ *  - The same individual always gets the same genetics (deterministic)
+ *  - Different individuals of the same species diverge
+ *  - Re-running with the same scenario seed reproduces identical populations
+ */
+function generateGeneticIdentity(
+  individualSeed: number,
+  gv: CropProfile['geneticVariance'],
+): GeneticIdentity {
+  const gRng = makeRng(individualSeed);
+  return {
+    optimalTempFactor:       Math.max(0.8, gaussianSample(gRng, 1.0, gv.optimalTempCV)),
+    optimalMoistureFactor:   Math.max(0.8, gaussianSample(gRng, 1.0, gv.optimalMoistureCV)),
+    growthRateFactor:        Math.max(0.7, gaussianSample(gRng, 1.0, gv.growthRateCV)),
+    maxYieldFactor:          Math.max(0.6, gaussianSample(gRng, 1.0, gv.maxYieldCV)),
+    boltingThresholdFactor:  Math.max(0.85, gaussianSample(gRng, 1.0, gv.boltingThresholdCV)),
+    stressResilienceFactor:  Math.max(0.7, gaussianSample(gRng, 1.0, gv.stressResilienceCV)),
+    waterEfficiencyFactor:   Math.max(0.75, gaussianSample(gRng, 1.0, gv.waterEfficiencyCV)),
+  };
+}
+
 // ─── Crop state for simulation ───────────────────────────────────────────────
 
 interface SimCropState {
   cropType: string;
-  stageProgress: number;  // 0–1 through entire growth cycle
-  healthScore: number;    // 0–1
+  instanceId: string;         // unique identifier: "{cropType}#{index}"
+  genetics: GeneticIdentity;  // per-individual genetic perturbations
+  stageProgress: number;      // 0–1 through entire growth cycle
+  healthScore: number;        // 0–1
   accumulatedStress: number;
   soilMoisture: number;
   waterPumpRate: number;
@@ -181,27 +239,90 @@ function runScenario(
     }
   }
 
-  // Build crop simulation states
-  const cropStates: SimCropState[] = Object.entries(crops).map(([name, c]) => ({
-    cropType: name,
-    stageProgress: ((c.stageProgress as number) ?? 0),
-    healthScore: ((c.healthScore as number) ?? 1.0),
-    accumulatedStress: 0,
-    soilMoisture: ((c.soilMoisture as number) ?? 65),
-    waterPumpRate: (((c.controls as Record<string, number>)?.waterPumpRate) ?? 5),
-    isBolting: ((c.isBolting as boolean) ?? false),
-    stage: ((c.stage as string) ?? 'vegetative'),
-  }));
+  // Build crop simulation states — each crop type is expanded into individual
+  // plant entities, each with unique genetic identity. This ensures that two
+  // plants of the same species in identical conditions diverge due to genetic
+  // variation (different optimal temps, growth rates, yield potential, etc.).
+  //
+  // For simulation performance, we model a representative sample of individuals
+  // per tile rather than every single plant. We use min(plantsPerTile, 6) reps
+  // and scale yield proportionally. This keeps the simulation tractable while
+  // preserving meaningful per-individual variance.
 
-  // Handle immediate harvest/replant actions
+  const cropStates: SimCropState[] = [];
+
+  // Derive a stable per-scenario genetic base seed. We mix the scenario seed
+  // with a large prime so genetic seeds are independent from environmental RNG.
+  const geneticBaseSeed = (scenarioSeed * 2654435761) >>> 0;
+
+  for (const [name, c] of Object.entries(crops)) {
+    const profile = CROP_PROFILES[name as keyof typeof CROP_PROFILES];
+    if (!profile) continue;
+
+    // Number of representative individuals to simulate per tile
+    const repsPerTile = Math.min(profile.plantsPerTile, 6);
+
+    for (let i = 0; i < repsPerTile; i++) {
+      // Unique seed per individual: hash(geneticBase, cropName, individualIndex)
+      // Using FNV-1a-like mixing for good distribution
+      let individualSeed = geneticBaseSeed;
+      for (let ci = 0; ci < name.length; ci++) {
+        individualSeed ^= name.charCodeAt(ci);
+        individualSeed = Math.imul(individualSeed, 16777619) >>> 0;
+      }
+      individualSeed = (individualSeed + i * 0x9e3779b9) >>> 0;
+
+      const genetics = generateGeneticIdentity(individualSeed, profile.geneticVariance);
+
+      // Jitter initial conditions per individual (same seed gives reproducible jitter)
+      const jitterRng = makeRng(individualSeed ^ 0xdeadbeef);
+      const baseProgress = (c.stageProgress as number) ?? 0;
+      const progressJitter = (jitterRng() - 0.5) * 0.06; // ±3% progress
+      const baseMoisture = (c.soilMoisture as number) ?? 65;
+      const moistureJitter = (jitterRng() - 0.5) * 6; // ±3 percentage points
+      const healthJitter = jitterRng() * 0.06; // 0–6% initial health variation
+      const stressJitter = jitterRng() * 0.5;  // 0–0.5 background stress
+
+      cropStates.push({
+        cropType: name,
+        instanceId: `${name}#${i}`,
+        genetics,
+        stageProgress: Math.max(0, Math.min(1, baseProgress + progressJitter)),
+        healthScore: Math.max(0.88, ((c.healthScore as number) ?? 1.0) - healthJitter),
+        accumulatedStress: stressJitter,
+        soilMoisture: Math.max(10, Math.min(100, baseMoisture + moistureJitter)),
+        waterPumpRate: (((c.controls as Record<string, number>)?.waterPumpRate) ?? 5),
+        isBolting: ((c.isBolting as boolean) ?? false),
+        stage: ((c.stage as string) ?? 'vegetative'),
+      });
+    }
+  }
+
+  // Handle immediate harvest/replant actions (applied to all individuals of the crop type)
   for (const action of proposedActions) {
     if (action.type === 'harvest' && action.crop) {
-      const cs = cropStates.find(c => c.cropType === action.crop);
-      if (cs) cs.stage = 'harvested';
+      for (const cs of cropStates) {
+        if (cs.cropType === action.crop) cs.stage = 'harvested';
+      }
     }
     if (action.type === 'replant' && action.crop) {
-      const cs = cropStates.find(c => c.cropType === action.crop);
-      if (cs) { cs.stage = 'seed'; cs.stageProgress = 0; cs.healthScore = 1.0; }
+      for (const cs of cropStates) {
+        if (cs.cropType === action.crop) {
+          cs.stage = 'seed';
+          cs.stageProgress = 0;
+          cs.healthScore = 1.0;
+          // Generate fresh genetics for the new plant generation
+          let replantSeed = (scenarioSeed * 0x45d9f3b + cs.instanceId.length) >>> 0;
+          for (let ci = 0; ci < cs.instanceId.length; ci++) {
+            replantSeed ^= cs.instanceId.charCodeAt(ci);
+            replantSeed = Math.imul(replantSeed, 16777619) >>> 0;
+          }
+          const profile = CROP_PROFILES[cs.cropType as keyof typeof CROP_PROFILES];
+          if (profile) {
+            cs.genetics = generateGeneticIdentity(replantSeed, profile.geneticVariance);
+          }
+        }
+      }
     }
   }
 
@@ -229,20 +350,29 @@ function runScenario(
       ? 0.5
       : 1.0;
 
-    // Update each crop
+    // Update each crop individual
     for (const cs of cropStates) {
       if (cs.stage === 'harvested') continue;
 
       const profile = CROP_PROFILES[cs.cropType as keyof typeof CROP_PROFILES];
       if (!profile) continue;
 
-      // Temperature stress (Gaussian response)
-      const tempDev = (env.airTemperature - profile.optimalTemp) / profile.tempSigma;
-      const moistureDev = (cs.soilMoisture - profile.optimalMoisture) / profile.moistureSigma;
+      const g = cs.genetics;
+
+      // Genetically-adjusted parameters for this individual
+      const effectiveOptimalTemp = profile.optimalTemp * g.optimalTempFactor;
+      const effectiveOptimalMoisture = profile.optimalMoisture * g.optimalMoistureFactor;
+      const effectiveGrowthCycleSols = profile.growthCycleSols / g.growthRateFactor; // faster grower = shorter cycle
+      const effectiveBoltingThreshold = profile.boltingTempThreshold * g.boltingThresholdFactor;
+      const effectiveWaterBase = profile.waterLPerHourBase / g.waterEfficiencyFactor; // efficient = needs less
+
+      // Temperature stress (Gaussian response) — uses this individual's optimal
+      const tempDev = (env.airTemperature - effectiveOptimalTemp) / profile.tempSigma;
+      const moistureDev = (cs.soilMoisture - effectiveOptimalMoisture) / profile.moistureSigma;
 
       // Water availability (affected by recycling efficiency)
       const waterAvailable = cs.waterPumpRate * env.waterRecyclingEfficiency;
-      const optimalWater = profile.waterLPerHourBase * 24;
+      const optimalWater = effectiveWaterBase * 24;
       const waterStress = Math.max(0, (optimalWater - waterAvailable) / optimalWater);
 
       // Light stress
@@ -260,8 +390,10 @@ function runScenario(
       // Accumulated stress decays 15% per sol (spec §7.3)
       cs.accumulatedStress = cs.accumulatedStress * 0.85 + instantStress * 0.15;
 
-      // Health degrades with accumulated stress
-      cs.healthScore = Math.max(0, cs.healthScore - cs.accumulatedStress * 0.05);
+      // Health degrades with accumulated stress — modulated by genetic resilience
+      // Higher stressResilienceFactor = slower degradation
+      const healthDecayRate = 0.05 / g.stressResilienceFactor;
+      cs.healthScore = Math.max(0, cs.healthScore - cs.accumulatedStress * healthDecayRate);
 
       // Growth factor: Gaussian response × health × no-bolting check
       const growthFactor =
@@ -270,26 +402,41 @@ function runScenario(
         cs.healthScore *
         (cs.isBolting ? 0.3 : 1.0);
 
-      // Advance stage progress (1/growthCycleSols per sol at full rate)
-      const dailyProgress = growthFactor / profile.growthCycleSols;
+      // Advance stage progress (uses genetically-adjusted cycle length)
+      const dailyProgress = growthFactor / effectiveGrowthCycleSols;
       cs.stageProgress = Math.min(1, cs.stageProgress + dailyProgress);
       cs.stage = progressToStage(cs.stageProgress, cs.cropType);
 
-      // Bolting check (temperature threshold)
-      if (env.airTemperature > profile.boltingTempThreshold && rng() < 0.1) {
+      // Bolting check (uses this individual's genetically-adjusted threshold)
+      if (env.airTemperature > effectiveBoltingThreshold && rng() < 0.1) {
         cs.isBolting = true;
       }
 
-      // Harvest when ready
+      // Harvest when ready — yield scaled by genetic maxYieldFactor and
+      // proportioned to represent all plants in the tile
       if (cs.stage === 'harvest_ready') {
-        const yieldKg = profile.maxYieldKgPerPlant * profile.plantsPerTile * profile.harvestIndex * cs.healthScore;
-        totalYieldKg += yieldKg;
+        const repsPerTile = Math.min(profile.plantsPerTile, 6);
+        const plantsRepresented = profile.plantsPerTile / repsPerTile;
+        const individualYieldKg =
+          profile.maxYieldKgPerPlant * g.maxYieldFactor *
+          profile.harvestIndex * cs.healthScore;
+        totalYieldKg += individualYieldKg * plantsRepresented;
+
         // Auto-replant in simulation (continuous production assumption)
+        // New plant generation gets fresh genetics
         cs.stage = 'seed';
         cs.stageProgress = 0;
         cs.healthScore = 1.0;
         cs.accumulatedStress = 0;
         cs.isBolting = false;
+
+        // Derive new genetic seed for the replanted individual
+        let replantSeed = (scenarioSeed * 0x45d9f3b + sol * 0x9e3779b9) >>> 0;
+        for (let ci = 0; ci < cs.instanceId.length; ci++) {
+          replantSeed ^= cs.instanceId.charCodeAt(ci);
+          replantSeed = Math.imul(replantSeed, 16777619) >>> 0;
+        }
+        cs.genetics = generateGeneticIdentity(replantSeed, profile.geneticVariance);
       }
     }
   }

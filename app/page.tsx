@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useReducedAnimations } from "@/lib/use-animation-config";
 
 import { CentralControlExample } from "@/components/examples/central-control-example";
 import { GreenhouseGrid, MarsBackdrop } from "@/components/interface/greenhouse-grid";
@@ -64,7 +65,7 @@ export default function Home() {
   const autonomousEnabled = useGreenhouseStore((s) => s.autonomousEnabled);
   const decisionCount     = useGreenhouseStore((s) => s.agentDecisions.length);
   const dustStormActive   = useGreenhouseStore((s) => s.dustStormActive);
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = useReducedAnimations();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [controlOpen, setControlOpen] = React.useState(false);
   const [agentOpen, setAgentOpen]     = React.useState(false);
@@ -176,10 +177,10 @@ export default function Home() {
           {interfaceVisible && (
             <>
               <motion.div
-                initial={{ opacity: 0, y: -10, filter: "blur(10px)" }}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: -10, filter: "blur(10px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -6, filter: "blur(8px)" }}
-                transition={{ duration: 0.42, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+                exit={shouldReduceMotion ? undefined : { opacity: 0, y: -6, filter: "blur(8px)" }}
+                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
                 className="absolute left-6 top-6 flex items-center gap-2"
               >
                 <ClockWidget />
@@ -188,10 +189,10 @@ export default function Home() {
               </motion.div>
 
               <motion.div
-                initial={{ opacity: 0, y: -10, filter: "blur(10px)" }}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: -10, filter: "blur(10px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -6, filter: "blur(8px)" }}
-                transition={{ duration: 0.42, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+                exit={shouldReduceMotion ? undefined : { opacity: 0, y: -6, filter: "blur(8px)" }}
+                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
                 className={`absolute right-6 top-6 flex items-center gap-3 ${controlOpen ? "z-50" : ""}`}
               >
                 <CentralControlPanel
@@ -203,10 +204,10 @@ export default function Home() {
 
               {agentOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
+                  initial={shouldReduceMotion ? false : { opacity: 0, y: 10, filter: "blur(10px)" }}
                   animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: 6, filter: "blur(8px)" }}
-                  transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+                  exit={shouldReduceMotion ? undefined : { opacity: 0, y: 6, filter: "blur(8px)" }}
+                  transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
                   className="absolute top-20 left-6"
                 >
                   <AgentDecisionPanel onClose={() => setAgentOpen(false)} />
@@ -214,10 +215,10 @@ export default function Home() {
               )}
 
               <motion.div
-                initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 10, filter: "blur(10px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: 6, filter: "blur(8px)" }}
-                transition={{ duration: 0.42, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                exit={shouldReduceMotion ? undefined : { opacity: 0, y: 6, filter: "blur(8px)" }}
+                transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
                 className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2"
               >
                 <SettingsButton />
@@ -244,10 +245,10 @@ export default function Home() {
         {interfaceVisible && (
           <>
             <motion.div
-              initial={{ opacity: 0, x: 12, filter: "blur(10px)" }}
+              initial={shouldReduceMotion ? false : { opacity: 0, x: 12, filter: "blur(10px)" }}
               animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, x: 8, filter: "blur(8px)" }}
-              transition={{ duration: 0.42, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+              exit={shouldReduceMotion ? undefined : { opacity: 0, x: 8, filter: "blur(8px)" }}
+              transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
               className={`fixed right-6 top-6 ${controlOpen ? "z-40" : "z-60"}`}
             >
               <SidebarToggle

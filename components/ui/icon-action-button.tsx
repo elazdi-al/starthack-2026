@@ -11,12 +11,12 @@ import { animate } from "motion";
 import {
   AnimatePresence,
   motion,
-  useReducedMotion,
   type HTMLMotionProps,
 } from "motion/react";
 
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { useReducedAnimations } from "@/lib/use-animation-config";
 
 type IconActionButtonBehavior = "toggle" | "confirm" | "delete";
 
@@ -75,7 +75,7 @@ function Spinner({
   width?: number;
   height?: number;
 }) {
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = useReducedAnimations();
 
   return (
     <motion.svg

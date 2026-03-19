@@ -153,7 +153,24 @@ export function harvestCrop(
     fruitCount: 0,
   };
 
-  const newEnv = { ...env, crops: newCrops };
+  // Also update all tiles of this crop type
+  const newTileCrops = { ...env.tileCrops };
+  for (const [tileId, tile] of Object.entries(newTileCrops)) {
+    if (tile.cropType === crop) {
+      newTileCrops[tileId] = {
+        ...tile,
+        stage: 'harvested' as const,
+        stageProgress: 0,
+        biomassKg: 0,
+        estimatedYieldKg: 0,
+        plantGrowth: 0,
+        leafArea: 0,
+        fruitCount: 0,
+      };
+    }
+  }
+
+  const newEnv = { ...env, crops: newCrops, tileCrops: newTileCrops };
   const simulation = createSimulation(newEnv, state.greenhouse);
   return { state: { simulation, greenhouse: state.greenhouse }, yieldKg };
 }
@@ -188,7 +205,35 @@ export function replantCrop(
     boltingHoursAccumulated: 0,
   };
 
-  const newEnv = { ...env, crops: newCrops };
+  // Also replant all tiles of this crop type (with fresh genetics per tile)
+  const newTileCrops = { ...env.tileCrops };
+  for (const [tileId, tile] of Object.entries(newTileCrops)) {
+    if (tile.cropType === crop) {
+      newTileCrops[tileId] = {
+        ...tile,
+        soilMoisture: tile.soilMoisture,
+        soilTemperature: tile.soilTemperature,
+        stage: 'seed' as const,
+        stageProgress: 0,
+        daysSincePlanting: 0,
+        healthScore: 1,
+        stressAccumulator: 0,
+        biomassKg: 0,
+        estimatedYieldKg: 0,
+        plantGrowth: 0,
+        leafArea: 0,
+        fruitCount: 0,
+        rootO2Level: 90,
+        nutrientEC: 2.0,
+        diseaseRisk: 0,
+        isBolting: false,
+        boltingHoursAccumulated: 0,
+        // Genetic identity preserved — same plant stock
+      };
+    }
+  }
+
+  const newEnv = { ...env, crops: newCrops, tileCrops: newTileCrops };
   const simulation = createSimulation(newEnv, state.greenhouse);
   return { simulation, greenhouse: state.greenhouse };
 }

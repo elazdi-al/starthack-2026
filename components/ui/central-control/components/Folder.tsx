@@ -2,6 +2,7 @@ import { useState, memo, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Faders } from '@phosphor-icons/react';
 import { triggerHaptic } from '@/lib/haptics';
+import { useAnimationConfig } from '@/lib/use-animation-config';
 
 interface FolderProps {
   title: string;
@@ -17,6 +18,7 @@ interface FolderProps {
 export const Folder = memo(function Folder({ title, children, defaultOpen = true, open, isRoot = false, inline = false, onOpenChange, toolbar }: FolderProps) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isOpen = open !== undefined ? open : internalOpen;
+  const anim = useAnimationConfig();
 
   const handleToggle = () => {
     if (inline && isRoot) return;
@@ -77,7 +79,7 @@ export const Folder = memo(function Folder({ title, children, defaultOpen = true
                 strokeLinejoin="round"
                 initial={false}
                 animate={{ rotate: isOpen ? 0 : 180 }}
-                transition={{ type: 'spring', visualDuration: 0.35, bounce: 0.15 }}
+                transition={anim.enabled ? { type: 'spring', visualDuration: 0.35, bounce: 0.15 } : anim.instant}
               >
                 <path d="M6 9.5L12 15.5L18 9.5" />
               </motion.svg>
@@ -96,10 +98,10 @@ export const Folder = memo(function Folder({ title, children, defaultOpen = true
         {isOpen && (
           <motion.div
             className="dialkit-folder-content"
-            initial={isRoot ? undefined : { height: 0, opacity: 0 }}
+            initial={isRoot ? undefined : (anim.enabled ? { height: 0, opacity: 0 } : false)}
             animate={isRoot ? undefined : { height: 'auto', opacity: 1 }}
-            exit={isRoot ? undefined : { height: 0, opacity: 0 }}
-            transition={isRoot ? undefined : { type: 'spring', visualDuration: 0.35, bounce: 0.1 }}
+            exit={isRoot ? undefined : (anim.enabled ? { height: 0, opacity: 0 } : undefined)}
+            transition={isRoot ? undefined : (anim.enabled ? { type: 'spring', visualDuration: 0.35, bounce: 0.1 } : anim.instant)}
             style={isRoot ? undefined : { clipPath: 'inset(0 -20px)' }}
           >
             <div className="dialkit-folder-inner">{children}</div>
@@ -126,8 +128,8 @@ export const Folder = memo(function Folder({ title, children, defaultOpen = true
           aria-label={`${isOpen ? 'Collapse' : 'Open'} ${title}`}
           title={`${isOpen ? 'Collapse' : 'Open'} ${title}`}
           onClick={handleToggle}
-          whileTap={{ scale: 0.92 }}
-          transition={{ type: 'spring', visualDuration: 0.15, bounce: 0.3 }}
+          whileTap={anim.enabled ? { scale: 0.92 } : undefined}
+          transition={anim.enabled ? { type: 'spring', visualDuration: 0.15, bounce: 0.3 } : anim.instant}
         >
           <Faders className="dialkit-panel-icon" size={16} weight="fill" />
         </motion.button>
@@ -137,10 +139,10 @@ export const Folder = memo(function Folder({ title, children, defaultOpen = true
             <motion.div
               className="dialkit-panel-inner"
               style={{ transformOrigin: 'top right', width: 280, marginTop: 8 }}
-              initial={{ opacity: 0, scale: 0.96 }}
+              initial={anim.enabled ? { opacity: 0, scale: 0.96 } : false}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={{ type: 'spring', visualDuration: 0.25, bounce: 0.1 }}
+              exit={anim.enabled ? { opacity: 0, scale: 0.96 } : undefined}
+              transition={anim.enabled ? { type: 'spring', visualDuration: 0.25, bounce: 0.1 } : anim.instant}
             >
               {toolbar && (
                 <div className="dialkit-panel-header">

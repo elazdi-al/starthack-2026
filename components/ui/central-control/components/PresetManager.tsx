@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { triggerHaptic } from '@/lib/haptics';
 import { DialStore, Preset } from '../store/DialStore';
+import { useAnimationConfig } from '@/lib/use-animation-config';
 
 interface PresetManagerProps {
   panelId: string;
@@ -16,6 +17,7 @@ export function PresetManager({ panelId, presets, activePresetId, onAdd }: Prese
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const anim = useAnimationConfig();
 
   const hasPresets = presets.length > 0;
   const activePreset = presets.find((p) => p.id === activePresetId);
@@ -92,7 +94,7 @@ export function PresetManager({ panelId, presets, activePresetId, onAdd }: Prese
           strokeLinecap="round"
           strokeLinejoin="round"
           animate={{ rotate: isOpen ? 180 : 0, opacity: hasPresets ? 0.6 : 0.25 }}
-          transition={{ type: 'spring', visualDuration: 0.2, bounce: 0.15 }}
+          transition={anim.enabled ? { type: 'spring', visualDuration: 0.2, bounce: 0.15 } : anim.instant}
         >
           <path d="M6 9.5L12 15.5L18 9.5" />
         </motion.svg>
@@ -105,10 +107,10 @@ export function PresetManager({ panelId, presets, activePresetId, onAdd }: Prese
               ref={dropdownRef}
               className="dialkit-root dialkit-preset-dropdown"
               style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.width }}
-              initial={{ opacity: 0, y: 4, scale: 0.97 }}
+              initial={anim.enabled ? { opacity: 0, y: 4, scale: 0.97 } : false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 4, scale: 0.97, pointerEvents: 'none' as any }}
-              transition={{ type: 'spring', visualDuration: 0.15, bounce: 0 }}
+              exit={anim.enabled ? { opacity: 0, y: 4, scale: 0.97, pointerEvents: 'none' as any } : undefined}
+              transition={anim.enabled ? { type: 'spring', visualDuration: 0.15, bounce: 0 } : anim.instant}
             >
               <div
                 className="dialkit-preset-item"

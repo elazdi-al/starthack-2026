@@ -10,10 +10,12 @@ export interface SettingsState {
   themePreference: ThemePreference
   tempUnit: TempUnit
   timeFormat: TimeFormat
+  reducedAnimations: boolean
 
   setThemePreference: (preference: ThemePreference) => void
   setTempUnit: (unit: TempUnit) => void
   setTimeFormat: (format: TimeFormat) => void
+  setReducedAnimations: (enabled: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -25,8 +27,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     setThemePreference(themePreference)
     set({ themePreference })
   },
+  reducedAnimations: false,
+
   setTempUnit: (tempUnit) => set({ tempUnit }),
   setTimeFormat: (timeFormat) => set({ timeFormat }),
+  setReducedAnimations: (reducedAnimations) => set({ reducedAnimations }),
 }))
 
 export function formatTemperature(celsius: number, unit: TempUnit): string {

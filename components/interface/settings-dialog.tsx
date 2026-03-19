@@ -26,6 +26,8 @@ import {
   type TempUnit,
   type TimeFormat,
 } from "@/lib/settings-store"
+import { useAnimationConfig } from "@/lib/use-animation-config"
+import { Switch } from "@/components/ui/switch"
 
 type Section = "appearance" | "display"
 
@@ -36,8 +38,11 @@ interface SettingsDialogProps {
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [activeSection, setActiveSection] = React.useState<Section>("appearance")
+  const anim = useAnimationConfig()
 
-  const handleClose = () => onOpenChange(false)
+  const handleClose = React.useCallback(() => onOpenChange(false), [onOpenChange])
+  const handleSetAppearance = React.useCallback(() => setActiveSection("appearance"), [])
+  const handleSetDisplay = React.useCallback(() => setActiveSection("display"), [])
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -48,12 +53,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               <Dialog.Backdrop
                 render={
                   <motion.div
-                    initial={{ opacity: 0 }}
+                    initial={anim.enabled ? { opacity: 0 } : false}
                     animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                    exit={anim.enabled ? { opacity: 0 } : undefined}
+                    transition={anim.enabled ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : anim.instant}
                     className="fixed inset-0 z-9998 bg-white/60 dark:bg-black/60 backdrop-blur-2xl"
-                    style={{ willChange: "opacity" }}
+                    style={{ willChange: anim.enabled ? "opacity" : undefined }}
                   />
                 }
               />
@@ -61,13 +66,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               <Dialog.Popup
                 render={
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                    initial={anim.enabled ? { opacity: 0, scale: 0.97, y: 8 } : false}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.97, y: 8 }}
-                    transition={{
-                      duration: 0.28,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    exit={anim.enabled ? { opacity: 0, scale: 0.97, y: 8 } : undefined}
+                    transition={anim.enabled ? { duration: 0.28, ease: [0.22, 1, 0.36, 1] } : anim.instant}
                   />
                 }
                 className="fixed inset-0 z-9999 flex items-center justify-center p-8 pointer-events-none outline-none"
@@ -95,13 +97,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             icon={Palette}
                             label="Appearance"
                             active={activeSection === "appearance"}
-                            onClick={() => setActiveSection("appearance")}
+                            onClick={handleSetAppearance}
                           />
                           <NavItem
                             icon={Monitor}
                             label="Display"
                             active={activeSection === "display"}
-                            onClick={() => setActiveSection("display")}
+                            onClick={handleSetDisplay}
                           />
                         </nav>
                       </div>
@@ -109,14 +111,25 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
                     {/* Content */}
                     <div className="flex-1 overflow-y-auto">
-                      <AnimatePresence mode="wait">
-                        {activeSection === "appearance" && (
-                          <AppearanceSection key="appearance" />
-                        )}
-                        {activeSection === "display" && (
-                          <DisplaySection key="display" />
-                        )}
-                      </AnimatePresence>
+                      {anim.enabled ? (
+                        <AnimatePresence mode="wait">
+                          {activeSection === "appearance" && (
+                            <SectionShell key="appearance">
+                              <AppearanceSectionContent />
+                            </SectionShell>
+                          )}
+                          {activeSection === "display" && (
+                            <SectionShell key="display">
+                              <DisplaySectionContent />
+                            </SectionShell>
+                          )}
+                        </AnimatePresence>
+                      ) : (
+                        <div className="p-6">
+                          {activeSection === "appearance" && <AppearanceSectionContent />}
+                          {activeSection === "display" && <DisplaySectionContent />}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -129,7 +142,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   )
 }
 
-function NavItem({
+/* ─── Nav ─────────────────────────────────────────────────────────────────────── */
+
+const NavItem = React.memo(function NavItem({
   icon: Icon,
   label,
   active,
@@ -140,13 +155,15 @@ function NavItem({
   active: boolean
   onClick: () => void
 }) {
+  const handleClick = React.useCallback(() => {
+    onClick()
+    triggerHaptic("selection")
+  }, [onClick])
+
   return (
     <button
       type="button"
-      onClick={() => {
-        onClick()
-        triggerHaptic("selection")
-      }}
+      onClick={handleClick}
       className={cn(
         "flex items-center gap-2.5 px-3 py-2 rounded-lg type-label w-full transition-all cursor-pointer",
         active
@@ -158,13 +175,11 @@ function NavItem({
       <span>{label}</span>
     </button>
   )
-}
+})
 
-function SectionShell({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+/* ─── Layout helpers ──────────────────────────────────────────────────────────── */
+
+function SectionShell({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 10 }}
@@ -178,7 +193,7 @@ function SectionShell({
   )
 }
 
-function SectionHeader({
+const SectionHeader = React.memo(function SectionHeader({
   title,
   description,
 }: {
@@ -193,9 +208,9 @@ function SectionHeader({
       </p>
     </div>
   )
-}
+})
 
-function SettingRow({
+const SettingRow = React.memo(function SettingRow({
   label,
   description,
   children,
@@ -217,11 +232,14 @@ function SettingRow({
       <div className="shrink-0">{children}</div>
     </div>
   )
-}
+})
 
-function AppearanceSection() {
+/* ─── Appearance Section ──────────────────────────────────────────────────────── */
+
+function AppearanceSectionContent() {
   const themePreference = useSettingsStore((s) => s.themePreference)
   const setThemePreference = useSettingsStore((s) => s.setThemePreference)
+  const anim = useAnimationConfig()
   const systemTheme = useSyncExternalStore(
     subscribeToTheme,
     readSystemThemeSnapshot,
@@ -233,8 +251,32 @@ function AppearanceSection() {
     () => "light"
   )
 
+  const handleSelectLight = React.useCallback(() => setThemePreference("light"), [setThemePreference])
+  const handleSelectDark = React.useCallback(() => setThemePreference("dark"), [setThemePreference])
+  const handleSelectSystem = React.useCallback(() => setThemePreference("system"), [setThemePreference])
+
+  const lightPreview = React.useMemo(() => (
+    <div className="w-full h-full rounded-md bg-[#f8f8f8] border border-black/6 flex flex-col items-center justify-center gap-1.5">
+      <Sun size={16} weight="fill" className="text-amber-500" />
+      <span className="text-[10px] font-medium text-black/40">Aa</span>
+    </div>
+  ), [])
+
+  const darkPreview = React.useMemo(() => (
+    <div className="w-full h-full rounded-md bg-[#1a1a1a] border border-white/8 flex flex-col items-center justify-center gap-1.5">
+      <Moon size={16} weight="fill" className="text-indigo-300" />
+      <span className="text-[10px] font-medium text-white/35">Aa</span>
+    </div>
+  ), [])
+
+  const systemPreview = React.useMemo(() => (
+    <div className="w-full h-full rounded-md border border-black/6 bg-[linear-gradient(135deg,#f8f8f8_0%,#f8f8f8_50%,#1a1a1a_50%,#1a1a1a_100%)] dark:border-white/8 flex items-center justify-center">
+      <Monitor size={18} weight="fill" className="text-white mix-blend-difference" />
+    </div>
+  ), [])
+
   return (
-    <SectionShell>
+    <>
       <SectionHeader
         title="Appearance"
         description="Choose a fixed theme or follow your operating system"
@@ -249,34 +291,23 @@ function AppearanceSection() {
           <ThemeCard
             label="Light"
             active={themePreference === "light"}
-            onClick={() => setThemePreference("light")}
-            preview={
-              <div className="w-full h-full rounded-md bg-[#f8f8f8] border border-black/6 flex flex-col items-center justify-center gap-1.5">
-                <Sun size={16} weight="fill" className="text-amber-500" />
-                <span className="text-[10px] font-medium text-black/40">Aa</span>
-              </div>
-            }
+            onClick={handleSelectLight}
+            preview={lightPreview}
+            animEnabled={anim.enabled}
           />
           <ThemeCard
             label="Dark"
             active={themePreference === "dark"}
-            onClick={() => setThemePreference("dark")}
-            preview={
-              <div className="w-full h-full rounded-md bg-[#1a1a1a] border border-white/8 flex flex-col items-center justify-center gap-1.5">
-                <Moon size={16} weight="fill" className="text-indigo-300" />
-                <span className="text-[10px] font-medium text-white/35">Aa</span>
-              </div>
-            }
+            onClick={handleSelectDark}
+            preview={darkPreview}
+            animEnabled={anim.enabled}
           />
           <ThemeCard
             label="System"
             active={themePreference === "system"}
-            onClick={() => setThemePreference("system")}
-            preview={
-              <div className="w-full h-full rounded-md border border-black/6 bg-[linear-gradient(135deg,#f8f8f8_0%,#f8f8f8_50%,#1a1a1a_50%,#1a1a1a_100%)] dark:border-white/8 flex items-center justify-center">
-                <Monitor size={18} weight="fill" className="text-white mix-blend-difference" />
-              </div>
-            }
+            onClick={handleSelectSystem}
+            preview={systemPreview}
+            animEnabled={anim.enabled}
           />
         </div>
 
@@ -287,68 +318,88 @@ function AppearanceSection() {
           Active app appearance: {effectiveTheme === "dark" ? "Dark" : "Light"}
         </p>
       </div>
-    </SectionShell>
+    </>
   )
 }
 
-function ThemeCard({
+const ThemeCard = React.memo(function ThemeCard({
   label,
   active,
   onClick,
   preview,
+  animEnabled,
 }: {
   label: string
   active: boolean
   onClick: () => void
   preview: React.ReactNode
+  animEnabled: boolean
 }) {
+  const handleClick = React.useCallback(() => {
+    onClick()
+    triggerHaptic("selection")
+  }, [onClick])
+
   return (
     <motion.button
       type="button"
-      onClick={() => {
-        onClick()
-        triggerHaptic("selection")
-      }}
+      onClick={handleClick}
       className={cn(
         "relative rounded-xl border-2 p-3 transition-colors cursor-pointer",
         active
           ? "border-[#6B97FF]"
           : "border-black/6 dark:border-white/8 hover:border-black/12 dark:hover:border-white/16"
       )}
-      whileTap={{ scale: 0.98 }}
+      whileTap={animEnabled ? { scale: 0.98 } : undefined}
     >
       <div className="w-full h-20 mb-2.5">
         {preview}
       </div>
       <span className="type-caption text-foreground">{label}</span>
-      <AnimatePresence>
-        {active && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="absolute bottom-2 right-2 w-5 h-5 bg-[#6B97FF] rounded-full flex items-center justify-center"
-          >
+      {animEnabled ? (
+        <AnimatePresence>
+          {active && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute bottom-2 right-2 w-5 h-5 bg-[#6B97FF] rounded-full flex items-center justify-center"
+            >
+              <Check size={11} weight="bold" className="text-white" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      ) : (
+        active && (
+          <div className="absolute bottom-2 right-2 w-5 h-5 bg-[#6B97FF] rounded-full flex items-center justify-center">
             <Check size={11} weight="bold" className="text-white" />
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        )
+      )}
     </motion.button>
   )
-}
+})
 
-function DisplaySection() {
+/* ─── Display Section ─────────────────────────────────────────────────────────── */
+
+function DisplaySectionContent() {
   const tempUnit = useSettingsStore((s) => s.tempUnit)
   const setTempUnit = useSettingsStore((s) => s.setTempUnit)
   const timeFormat = useSettingsStore((s) => s.timeFormat)
   const setTimeFormat = useSettingsStore((s) => s.setTimeFormat)
+  const reducedAnimations = useSettingsStore((s) => s.reducedAnimations)
+  const setReducedAnimations = useSettingsStore((s) => s.setReducedAnimations)
+
+  const handleTempChange = React.useCallback((v: string) => setTempUnit(v as TempUnit), [setTempUnit])
+  const handleTimeChange = React.useCallback((v: string) => setTimeFormat(v as TimeFormat), [setTimeFormat])
+  const handleAnimToggle = React.useCallback((checked: boolean) => setReducedAnimations(checked), [setReducedAnimations])
 
   return (
-    <SectionShell>
+    <>
       <SectionHeader
         title="Display"
-        description="Configure units and formatting"
+        description="Configure units, formatting, and motion"
       />
 
       <div className="divide-y divide-black/5 dark:divide-white/6">
@@ -358,12 +409,9 @@ function DisplaySection() {
         >
           <TogglePill
             id="temp-unit"
-            options={[
-              { value: "celsius", label: "°C" },
-              { value: "fahrenheit", label: "°F" },
-            ]}
+            options={TEMP_OPTIONS}
             value={tempUnit}
-            onChange={(v) => setTempUnit(v as TempUnit)}
+            onChange={handleTempChange}
           />
         </SettingRow>
 
@@ -373,30 +421,52 @@ function DisplaySection() {
         >
           <TogglePill
             id="time-format"
-            options={[
-              { value: "24h", label: "24h" },
-              { value: "12h", label: "12h" },
-            ]}
+            options={TIME_OPTIONS}
             value={timeFormat}
-            onChange={(v) => setTimeFormat(v as TimeFormat)}
+            onChange={handleTimeChange}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Reduced animations"
+          description="Disable transitions and motion effects"
+        >
+          <Switch
+            checked={reducedAnimations}
+            onToggle={handleAnimToggle}
           />
         </SettingRow>
       </div>
-    </SectionShell>
+    </>
   )
 }
 
-function TogglePill({
+/** Constant option arrays lifted out of render to avoid re-allocations. */
+const TEMP_OPTIONS = [
+  { value: "celsius", label: "\u00B0C" },
+  { value: "fahrenheit", label: "\u00B0F" },
+] as const
+
+const TIME_OPTIONS = [
+  { value: "24h", label: "24h" },
+  { value: "12h", label: "12h" },
+] as const
+
+/* ─── Toggle pill ─────────────────────────────────────────────────────────────── */
+
+const TogglePill = React.memo(function TogglePill({
   id,
   options,
   value,
   onChange,
 }: {
   id: string
-  options: { value: string; label: string }[]
+  options: readonly { readonly value: string; readonly label: string }[]
   value: string
   onChange: (value: string) => void
 }) {
+  const anim = useAnimationConfig()
+
   return (
     <div className="relative flex rounded-full border border-[var(--dial-border)] bg-[var(--dial-surface)] p-0.5">
       {options.map((option) => {
@@ -419,15 +489,19 @@ function TogglePill({
             )}
           >
             {isActive && (
-              <motion.span
-                layoutId={`settings-pill-${id}`}
-                className="absolute inset-0 rounded-full border border-[var(--dial-border)] bg-[var(--card)] shadow-sm"
-                transition={{
-                  type: "spring",
-                  duration: 0.35,
-                  bounce: 0.15,
-                }}
-              />
+              anim.enabled ? (
+                <motion.span
+                  layoutId={`settings-pill-${id}`}
+                  className="absolute inset-0 rounded-full border border-[var(--dial-border)] bg-[var(--card)] shadow-sm"
+                  transition={{
+                    type: "spring",
+                    duration: 0.35,
+                    bounce: 0.15,
+                  }}
+                />
+              ) : (
+                <span className="absolute inset-0 rounded-full border border-[var(--dial-border)] bg-[var(--card)] shadow-sm" />
+              )
             )}
             <span className="relative z-10">{option.label}</span>
           </button>
@@ -435,4 +509,4 @@ function TogglePill({
       })}
     </div>
   )
-}
+})

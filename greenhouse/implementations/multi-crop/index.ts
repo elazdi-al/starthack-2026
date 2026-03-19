@@ -1,5 +1,5 @@
 export type {
-  CropType, CropEnvironment, CropControls,
+  CropType, CropEnvironment, CropControls, TileCropEnvironment,
   ConcreteEnvironment, ConcreteGreenhouseState, ConcreteState,
   GrowthStage, SeasonName, DustStormRisk, ManualOverrides,
   SimEvent, NutritionalOutput, MissionResources,
@@ -15,6 +15,8 @@ export {
   createInitialGreenhouseState,
   createInitialState,
   MISSION_START_LS,
+  TILE_CROP_LAYOUT,
+  aggregateTileCrops,
 } from './initial';
 
 export {

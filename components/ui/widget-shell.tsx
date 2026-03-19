@@ -21,6 +21,7 @@ import {
 import { Checkmark1SmallIcon, ClipboardIcon } from "@/components/icons";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { useAnimationConfig } from "@/lib/use-animation-config";
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 
@@ -446,11 +447,13 @@ export function WidgetShell({
   const bottomLeftId = `${layoutId}-bottom-left`;
   const topRightId = `${layoutId}-top-right`;
   const bottomRightId = `${layoutId}-bottom-right`;
+  const anim = useAnimationConfig();
+  const shellTransition = anim.enabled ? WIDGET_SHELL_TRANSITION : anim.instant;
 
   return (
     <div className={cn(widgetFrameClassName, isOpen && "z-50", className)} {...props}>
       <div className="relative z-10 flex h-[384px] w-full items-center justify-center">
-        <MotionConfig transition={WIDGET_SHELL_TRANSITION}>
+        <MotionConfig transition={shellTransition}>
           <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
             <AnimatePresence initial={false}>
               {!isOpen && (
@@ -483,11 +486,11 @@ export function WidgetShell({
                   <motion.div
                     initial={false}
                     animate={{ opacity: isOpen ? 1 : 0 }}
-                    transition={WIDGET_OVERLAY_TRANSITION}
+                    transition={anim.enabled ? WIDGET_OVERLAY_TRANSITION : anim.instant}
                     className="fixed inset-0 z-[2147483646] bg-background/20 backdrop-blur-[12px] dark:bg-background/38"
                     style={{
                       pointerEvents: isOpen ? "auto" : "none",
-                      willChange: "opacity",
+                      willChange: anim.enabled ? "opacity" : undefined,
                     }}
                   />
                 }

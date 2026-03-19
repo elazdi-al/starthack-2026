@@ -684,14 +684,18 @@
 
   .crop-tooltip-popup {
     max-width: none;
-    color: rgb(244 244 240 / 0.96);
-    border-color: rgb(255 255 255 / 0.08);
-    background:
-      linear-gradient(180deg, rgb(52 52 48 / 0.98), rgb(35 35 33 / 0.98));
+    color: var(--popover-foreground);
+    border-color: var(--border);
+    background: var(--popover);
     box-shadow:
-      0 14px 34px rgb(0 0 0 / 0.28),
+      0 14px 34px rgb(0 0 0 / 0.08),
+      0 1px 3px rgb(0 0 0 / 0.06);
+  }
+
+  :is(.dark) .crop-tooltip-popup {
+    box-shadow:
+      0 14px 34px rgb(0 0 0 / 0.32),
       0 1px 3px rgb(0 0 0 / 0.24);
-    backdrop-filter: blur(14px);
   }
 
   .crop-tooltip-card {
@@ -722,17 +726,17 @@
   }
 
   .crop-tooltip-title {
-    color: rgb(248 248 244 / 0.98);
+    color: var(--popover-foreground);
     line-height: 1.1rem;
   }
 
   .crop-tooltip-meta {
-    color: rgb(198 198 190 / 0.8);
+    color: var(--muted-foreground);
     line-height: 1rem;
   }
 
   .crop-tooltip-summary {
-    color: rgb(225 225 218 / 0.84);
+    color: var(--secondary-foreground);
     text-wrap: pretty;
     overflow-wrap: anywhere;
     line-height: 1.1rem;
@@ -745,10 +749,9 @@
     width: 92px;
     height: 92px;
     flex-shrink: 0;
-    border: 1px solid rgb(255 255 255 / 0.08);
+    border: 1px solid var(--border);
     border-radius: 14px;
-    background:
-      radial-gradient(circle at top, rgb(255 255 255 / 0.1), rgb(0 0 0 / 0.18));
+    background: var(--muted);
   }
 
   .crop-tooltip-stats {
@@ -766,7 +769,7 @@
     min-width: 0;
     padding-top: 0.35rem;
     padding-bottom: 0.35rem;
-    border-top: 1px solid rgb(255 255 255 / 0.06);
+    border-top: 1px solid var(--border);
   }
 
   .crop-tooltip-stat-label,
@@ -775,12 +778,12 @@
   }
 
   .crop-tooltip-stat-label {
-    color: rgb(176 176 169 / 0.72);
+    color: var(--muted-foreground);
     line-height: 1.1rem;
   }
 
   .crop-tooltip-stat-value {
-    color: rgb(245 245 239 / 0.96);
+    color: var(--popover-foreground);
     white-space: normal;
     text-wrap: pretty;
     overflow-wrap: anywhere;
@@ -1005,20 +1008,6 @@
 
   .crop-preview-kale-3 {
     fill: #39573e;
-  }
-
-  .crop-dialog-preview {
-    position: relative;
-    display: flex;
-    width: 280px;
-    height: 200px;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    border: 1px solid rgb(0 0 0 / 0.05);
-    border-radius: 20px;
-    background:
-      radial-gradient(circle at top, rgb(255 255 255 / 0.92), rgb(0 0 0 / 0.03));
   }
 
   /* ── Grid tile focused pulse ── */

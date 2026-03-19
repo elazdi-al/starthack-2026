@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Calligraph, type CalligraphProps } from "calligraph";
+import { useReducedAnimations } from "@/lib/use-animation-config";
 
 const DEFAULT_DEBOUNCE_MS = 72;
 const DIGIT_PATTERN = /\d/;
@@ -67,7 +68,15 @@ export const AnimatedParameterValue = React.memo(function AnimatedParameterValue
   autoSize = false,
   ...props
 }: AnimatedParameterValueProps) {
+  const reduced = useReducedAnimations();
   const debouncedValue = useDebouncedDisplayValue(String(value), debounceMs);
+
+  // When animations are reduced, render a plain span instead of the
+  // spring-driven Calligraph character transitions.
+  if (reduced) {
+    return <span {...props}>{debouncedValue}</span>;
+  }
+
   const resolvedVariant = variant ?? (DIGIT_PATTERN.test(debouncedValue) ? "number" : "text");
   const resolvedAnimation = animation ?? (resolvedVariant === "text" ? "smooth" : "snappy");
 

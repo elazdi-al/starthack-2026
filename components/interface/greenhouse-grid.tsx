@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, memo, useCallback, useState } from "react";
+import { type ReactNode, memo, useCallback, useMemo, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "@phosphor-icons/react";
@@ -20,6 +20,7 @@ import {
   type TileData,
 } from "@/lib/greenhouse-store";
 import { CropVideoPreview } from "@/components/interface/crop-video-preview";
+import { useAnimationConfig } from "@/lib/use-animation-config";
 
 const TILE = 120;
 const GAP = 3;
@@ -1080,7 +1081,7 @@ const GridTile = memo(function GridTile({
         variant="card"
         side="top"
         sideOffset={12}
-        className="crop-tooltip-popup !w-[280px] !max-w-[280px] !border-white/10 !bg-[rgb(38,38,35)] !text-[rgb(244,244,240)] p-0 shadow-[0_14px_34px_rgba(0,0,0,0.32),0_1px_3px_rgba(0,0,0,0.22)] sm:!w-[292px] sm:!max-w-[292px]"
+        className="crop-tooltip-popup !w-[280px] !max-w-[280px] p-0 sm:!w-[292px] sm:!max-w-[292px]"
       >
         <CropTooltip data={data} info={cropInfo} />
       </TooltipContent>
@@ -1110,7 +1111,12 @@ const CropDialog = memo(function CropDialog({
   const info = data?.crop ? CROP_DB[data.crop] : null;
   const hoverMeta = data?.crop ? CROP_HOVER_META[data.crop] : null;
   const env = useGreenhouseStore((s) => s.environment);
-  const cropEnv = data?.crop ? env.crops[data.crop] : null;
+  // Prefer per-tile state if tileId is present; fall back to aggregate per-type
+  const tileCrop = data?.tileId ? env.tileCrops?.[data.tileId] : undefined;
+  const cropEnv = data?.crop
+    ? (tileCrop || env.crops[data.crop])
+    : null;
+  const anim = useAnimationConfig();
 
   return (
     <Dialog.Root
@@ -1126,12 +1132,12 @@ const CropDialog = memo(function CropDialog({
               <Dialog.Backdrop
                 render={
                   <motion.div
-                    initial={{ opacity: 0 }}
+                    initial={anim.enabled ? { opacity: 0 } : false}
                     animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                    exit={anim.enabled ? { opacity: 0 } : undefined}
+                    transition={anim.enabled ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : anim.instant}
                     className="fixed inset-0 z-9998 bg-white/60 dark:bg-black/60 backdrop-blur-2xl"
-                    style={{ willChange: "opacity" }}
+                    style={{ willChange: anim.enabled ? "opacity" : undefined }}
                   />
                 }
               />
@@ -1139,13 +1145,10 @@ const CropDialog = memo(function CropDialog({
               <Dialog.Popup
                 render={
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                    initial={anim.enabled ? { opacity: 0, scale: 0.97, y: 8 } : false}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.97, y: 8 }}
-                    transition={{
-                      duration: 0.28,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    exit={anim.enabled ? { opacity: 0, scale: 0.97, y: 8 } : undefined}
+                    transition={anim.enabled ? { duration: 0.28, ease: [0.22, 1, 0.36, 1] } : anim.instant}
                   />
                 }
                 className="fixed inset-0 z-9999 flex items-center justify-center p-8 pointer-events-none outline-none"
@@ -1165,28 +1168,18 @@ const CropDialog = memo(function CropDialog({
                   </button>
 
                   <div className="flex h-full">
-                    <div className="flex flex-1 items-center justify-center border-r border-black/4 dark:border-white/6">
-                      <div className="flex flex-col items-center gap-4">
-                        <div className="crop-dialog-preview">
-                          <CropVideoPreview
-                            crop={data.crop!}
-                            lifePercent={
-                              cropEnv && info
-                                ? Math.min(1, cropEnv.daysSincePlanting / info.growthCycleDays)
-                                : 0
-                            }
-                          >
-                            {hoverMeta ? (
-                              <CropPreview crop={data.crop!} />
-                            ) : (
-                              <div className="h-6 w-6 rounded-full bg-green-800/12 dark:bg-green-400/15" />
-                            )}
-                          </CropVideoPreview>
-                        </div>
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-black/20 dark:text-white/20">
-                          Plant Preview
-                        </span>
-                      </div>
+                    <div className="relative flex-1 border-r border-black/4 dark:border-white/6 p-3">
+                      <CropVideoPreview
+                        crop={data.crop!}
+                        stage={cropEnv?.stage ?? "seed"}
+                        stageProgress={cropEnv?.stageProgress ?? 0}
+                      >
+                        {hoverMeta ? (
+                          <CropPreview crop={data.crop!} />
+                        ) : (
+                          <div className="h-6 w-6 rounded-full bg-green-800/12 dark:bg-green-400/15" />
+                        )}
+                      </CropVideoPreview>
                     </div>
 
                     <div className="flex flex-1 flex-col overflow-y-auto p-8">

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { useAnimationConfig } from "@/lib/use-animation-config";
 
 function SearchBar({
   placeholder = "Ask about",
@@ -19,6 +20,7 @@ function SearchBar({
 } & Omit<React.ComponentProps<"input">, "placeholder">) {
   const [value, setValue] = React.useState("");
   const [index, setIndex] = React.useState(0);
+  const anim = useAnimationConfig();
 
   React.useEffect(() => {
     if (suggestions.length <= 1) return;
@@ -62,13 +64,10 @@ function SearchBar({
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={index}
-                    initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}
+                    initial={anim.enabled ? { opacity: 0, y: 6, filter: "blur(2px)" } : false}
                     animate={{ opacity: 0.56, y: 0, filter: "blur(0px)" }}
-                    exit={{ opacity: 0, y: -6, filter: "blur(2px)" }}
-                    transition={{
-                      duration: 0.42,
-                      ease: [0.32, 0.72, 0, 1],
-                    }}
+                    exit={anim.enabled ? { opacity: 0, y: -6, filter: "blur(2px)" } : undefined}
+                    transition={anim.enabled ? { duration: 0.42, ease: [0.32, 0.72, 0, 1] } : anim.instant}
                     className="truncate text-[var(--dial-text-secondary)]"
                   >
                     {suggestions[index]}

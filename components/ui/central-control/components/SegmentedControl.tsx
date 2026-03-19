@@ -1,6 +1,7 @@
 import { useRef, useState, useLayoutEffect } from 'react';
 import { motion } from 'motion/react';
 import { triggerHaptic } from '@/lib/haptics';
+import { useAnimationConfig } from '@/lib/use-animation-config';
 
 interface SegmentedControlOption<T extends string> {
   value: T;
@@ -22,6 +23,7 @@ export function SegmentedControl<T extends string>({
   const buttonRefs = useRef<Map<T, HTMLButtonElement>>(new Map());
   const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null);
   const hasAnimated = useRef(false);
+  const anim = useAnimationConfig();
 
   useLayoutEffect(() => {
     const button = buttonRefs.current.get(value);
@@ -44,9 +46,11 @@ export function SegmentedControl<T extends string>({
           style={{ left: pillStyle.left, width: pillStyle.width }}
           animate={{ left: pillStyle.left, width: pillStyle.width }}
           transition={
-            hasAnimated.current
-              ? { type: 'spring', visualDuration: 0.2, bounce: 0.15 }
-              : { duration: 0 }
+            !anim.enabled
+              ? { duration: 0 }
+              : hasAnimated.current
+                ? { type: 'spring', visualDuration: 0.2, bounce: 0.15 }
+                : { duration: 0 }
           }
           onAnimationComplete={() => { hasAnimated.current = true; }}
         />

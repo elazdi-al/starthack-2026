@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { triggerHaptic } from '@/lib/haptics';
+import { useAnimationConfig } from '@/lib/use-animation-config';
 
 type SelectOption = string | { value: string; label: string };
 
@@ -29,6 +30,7 @@ export const SelectControl = memo(function SelectControl({ label, value, options
   const [pos, setPos] = useState<{ top: number; left: number; width: number; above: boolean } | null>(null);
   const normalized = useMemo(() => normalizeOptions(options), [options]);
   const selectedOption = normalized.find((o) => o.value === value);
+  const anim = useAnimationConfig();
 
   const updatePos = useCallback(() => {
     const el = triggerRef.current;
@@ -90,7 +92,7 @@ export const SelectControl = memo(function SelectControl({ label, value, options
             strokeLinecap="round"
             strokeLinejoin="round"
             animate={{ rotate: isOpen ? 180 : 0 }}
-            transition={{ type: 'spring', visualDuration: 0.2, bounce: 0.15 }}
+            transition={anim.enabled ? { type: 'spring', visualDuration: 0.2, bounce: 0.15 } : anim.instant}
           >
             <path d="M6 9.5L12 15.5L18 9.5" />
           </motion.svg>
@@ -103,10 +105,10 @@ export const SelectControl = memo(function SelectControl({ label, value, options
             <motion.div
               ref={dropdownRef}
               className="dialkit-select-dropdown"
-              initial={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 }}
+              initial={anim.enabled ? { opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 } : false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 }}
-              transition={{ type: 'spring', visualDuration: 0.15, bounce: 0 }}
+              exit={anim.enabled ? { opacity: 0, y: pos.above ? 8 : -8, scale: 0.95 } : undefined}
+              transition={anim.enabled ? { type: 'spring', visualDuration: 0.15, bounce: 0 } : anim.instant}
               style={{
                 position: 'fixed',
                 left: pos.left,

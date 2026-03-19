@@ -2,10 +2,11 @@ import type { SimulationState } from '../../state/types';
 import type {
   ConcreteEnvironment, ConcreteGreenhouseState,
   CropEnvironment, CropControls, CropType, GrowthStage,
-  SeasonName, DustStormRisk, NutritionalOutput,
+  SeasonName, DustStormRisk, NutritionalOutput, TileCropEnvironment,
 } from './types';
 import { ALL_CROP_TYPES, GROWTH_STAGES, CREW_DAILY_TARGETS } from './types';
 import { CROP_PROFILES, type CropProfile } from './profiles';
+import { aggregateTileCrops } from './initial';
 
 export { CROP_PROFILES } from './profiles';
 
@@ -355,17 +356,43 @@ function simulate(
 
   const lightLevel = effectiveLighting * 2 + solarRadiation * 5;
 
-  // ─── Per-crop simulation ───
-  const crops = {} as Record<CropType, CropEnvironment>;
+  // ─── Per-tile crop simulation (individual entities with genetic variance) ───
+  const tileCrops: Record<string, TileCropEnvironment> = {};
   let totalLeafArea = 0;
-  for (const ct of ALL_CROP_TYPES) {
-    crops[ct] = simulateCrop(
-      initialEnv.crops[ct], greenhouse.crops[ct],
-      airTemp, humidity, co2Level, lightLevel, deltaHours,
-      CROP_PROFILES[ct], irrigationEffectiveness,
-    );
-    totalLeafArea += crops[ct].leafArea;
+
+  if (initialEnv.tileCrops && Object.keys(initialEnv.tileCrops).length > 0) {
+    // Simulate each tile as an independent entity
+    for (const [tileId, tileCrop] of Object.entries(initialEnv.tileCrops)) {
+      const ct = tileCrop.cropType;
+      const profile = CROP_PROFILES[ct];
+      const controls = greenhouse.crops[ct]; // controls are still per-type
+
+      const simulated = simulateTileCrop(
+        tileCrop, controls,
+        airTemp, humidity, co2Level, lightLevel, deltaHours,
+        profile, irrigationEffectiveness,
+      );
+      tileCrops[tileId] = simulated;
+      totalLeafArea += simulated.leafArea;
+    }
   }
+
+  // Aggregate per-type for backward compat (agents, nutrition panel, progress)
+  const crops = Object.keys(tileCrops).length > 0
+    ? aggregateTileCrops(tileCrops)
+    : (() => {
+        // Fallback: no tileCrops — use legacy per-type simulation
+        const c = {} as Record<CropType, CropEnvironment>;
+        for (const ct of ALL_CROP_TYPES) {
+          c[ct] = simulateCrop(
+            initialEnv.crops[ct], greenhouse.crops[ct],
+            airTemp, humidity, co2Level, lightLevel, deltaHours,
+            CROP_PROFILES[ct], irrigationEffectiveness,
+          );
+          totalLeafArea += c[ct].leafArea;
+        }
+        return c;
+      })();
 
   // ─── O₂ ───
   const o2Rate = lightLevel * Math.max(totalLeafArea, 0.1) * O2_PRODUCTION_FACTOR;
@@ -414,6 +441,7 @@ function simulate(
     nutritionalOutput,
     nutritionalCoverage,
     crops,
+    tileCrops,
   };
 }
 
@@ -538,6 +566,68 @@ function simulateCrop(
     biomassKg, estimatedYieldKg,
     plantGrowth, leafArea, fruitCount,
     rootO2Level, nutrientEC, diseaseRisk, isBolting, boltingHoursAccumulated,
+  };
+}
+
+// ─── Per-Tile Crop Simulation (genetically modulated) ────────────────────────
+
+/**
+ * Simulates a single tile crop instance, modulating profile parameters
+ * by the tile's genetic factors. The core physics are identical to
+ * simulateCrop, but optimalTemp, optimalMoisture, growth rate, bolting
+ * threshold, stress resilience, water needs, and yield potential are all
+ * perturbed by per-individual genetic multipliers.
+ */
+function simulateTileCrop(
+  initial: TileCropEnvironment,
+  controls: CropControls,
+  airTemp: number,
+  humidity: number,
+  co2Level: number,
+  lightLevel: number,
+  deltaHours: number,
+  baseProfile: CropProfile,
+  irrigationEffectiveness: number,
+): TileCropEnvironment {
+  if (initial.stage === 'harvested') return { ...initial };
+
+  // Build a genetically-modulated profile for this individual
+  const g = initial;
+  const profile: CropProfile = {
+    ...baseProfile,
+    optimalTemp: baseProfile.optimalTemp * g.geneticOptimalTempFactor,
+    optimalMoisture: baseProfile.optimalMoisture * g.geneticOptimalMoistureFactor,
+    growthCycleSols: baseProfile.growthCycleSols / g.geneticGrowthRateFactor,
+    maxYieldKgPerPlant: baseProfile.maxYieldKgPerPlant * g.geneticMaxYieldFactor,
+    boltingTempThreshold: baseProfile.boltingTempThreshold * g.geneticBoltingThresholdFactor,
+    waterLPerHourBase: baseProfile.waterLPerHourBase / g.geneticWaterEfficiencyFactor,
+  };
+
+  // Delegate to the base simulateCrop with the modulated profile
+  const baseCropEnv = simulateCrop(
+    initial, controls, airTemp, humidity, co2Level, lightLevel, deltaHours,
+    profile, irrigationEffectiveness,
+  );
+
+  // Modulate stress resilience: scale the stress accumulator growth
+  // Higher stressResilienceFactor → less stress accumulation
+  const resilienceAdjustedStress = baseCropEnv.stressAccumulator / g.geneticStressResilienceFactor;
+  const resilienceAdjustedHealth = clamp(0, 1, 1 - resilienceAdjustedStress / 100);
+
+  return {
+    ...baseCropEnv,
+    stressAccumulator: resilienceAdjustedStress,
+    healthScore: resilienceAdjustedHealth,
+    tileId: initial.tileId,
+    cropType: initial.cropType,
+    geneticSeed: initial.geneticSeed,
+    geneticOptimalTempFactor: initial.geneticOptimalTempFactor,
+    geneticOptimalMoistureFactor: initial.geneticOptimalMoistureFactor,
+    geneticGrowthRateFactor: initial.geneticGrowthRateFactor,
+    geneticMaxYieldFactor: initial.geneticMaxYieldFactor,
+    geneticBoltingThresholdFactor: initial.geneticBoltingThresholdFactor,
+    geneticStressResilienceFactor: initial.geneticStressResilienceFactor,
+    geneticWaterEfficiencyFactor: initial.geneticWaterEfficiencyFactor,
   };
 }
 
