@@ -2,11 +2,13 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { Phone, PhoneDisconnect } from "@phosphor-icons/react";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { useChatStore } from "@/lib/chat-store";
 import { cn } from "@/lib/utils";
 import { useAnimationConfig } from "@/lib/use-animation-config";
+import { useElevenLabsCall } from "@/lib/use-eleven-labs-call";
 
 interface ChatSidebarProps {
   open: boolean;
@@ -20,6 +22,17 @@ export function ChatSidebar({ open }: ChatSidebarProps) {
   const [inputValue, setInputValue] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const anim = useAnimationConfig();
+  const { status, isSpeaking, startCall, endCall } = useElevenLabsCall();
+
+  const isConnected = status === "connected";
+
+  const handleCallToggle = React.useCallback(() => {
+    if (isConnected) {
+      endCall();
+    } else {
+      startCall();
+    }
+  }, [isConnected, startCall, endCall]);
 
   const scrollToBottom = React.useCallback(() => {
     const el = scrollRef.current;
@@ -47,10 +60,36 @@ export function ChatSidebar({ open }: ChatSidebarProps) {
         open ? "translate-x-0" : "translate-x-full",
       )}
     >
+      {/* Header — Call button */}
+      <div className="shrink-0 px-5 pt-5 flex items-center">
+        <button
+          type="button"
+          onClick={handleCallToggle}
+          className={cn(
+            "inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full",
+            "text-[12px] font-medium tracking-[0.01em] transition-colors duration-150",
+            "select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+            isConnected
+              ? "bg-red-500/12 text-red-500 dark:bg-red-400/15 dark:text-red-400 hover:bg-red-500/18 dark:hover:bg-red-400/22"
+              : "bg-[var(--dial-surface)] text-[var(--dial-text-secondary)] hover:bg-[var(--dial-surface-hover)] hover:text-[var(--dial-text-primary)]",
+          )}
+        >
+          {isConnected ? (
+            <PhoneDisconnect size={14} weight="fill" />
+          ) : (
+            <Phone size={14} weight="fill" />
+          )}
+          <span>{isConnected ? "End" : "Call"}</span>
+          {isConnected && isSpeaking && (
+            <span className="ml-0.5 size-1.5 rounded-full bg-current animate-pulse" />
+          )}
+        </button>
+      </div>
+
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-5 pt-16 pb-4 scrollbar-none"
+        className="flex-1 overflow-y-auto px-5 pt-4 pb-4 scrollbar-none"
       >
         <div className="flex flex-col gap-[6px]">
           <AnimatePresence initial={false}>
