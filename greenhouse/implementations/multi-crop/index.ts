@@ -14,3 +14,5 @@ export {
   createInitialSimulationState,
   createInitialState,
 } from './initial';
+
+export { simpleDecide } from './decision';
