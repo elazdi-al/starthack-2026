@@ -21,6 +21,7 @@ import {
   type TileData,
 } from "@/lib/greenhouse-store";
 import { useHydrated } from "@/lib/use-hydrated";
+import { CropVideoPreview } from "@/components/interface/crop-video-preview";
 
 const TILE = 120;
 const GAP = 3;
@@ -343,28 +344,6 @@ export function GreenhouseGrid({
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-      <motion.div
-        initial={false}
-        animate={{
-          opacity: interfaceVisible ? 1 : 0,
-          y: interfaceVisible ? 0 : -8,
-          filter: interfaceVisible ? "blur(0px)" : "blur(8px)",
-        }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="mb-6 flex items-center gap-2"
-      >
-        <span className="text-[13px] font-medium tracking-wide text-black/40">
-          Greenhouse Module
-        </span>
-        <span className="text-sm text-black/15">·</span>
-        <span className="font-mono text-xs text-black/25">Sol {missionSol + 1} / {TOTAL_MISSION_SOLS}</span>
-        {dustStormActive && (
-          <>
-            <span className="text-sm text-black/15">·</span>
-            <span className="font-mono text-xs text-amber-600/70">Dust Storm</span>
-          </>
-        )}
-      </motion.div>
 
       <TooltipProvider delay={120} closeDelay={0}>
         <div
@@ -403,18 +382,7 @@ export function GreenhouseGrid({
         </div>
       </TooltipProvider>
 
-      <motion.div
-        initial={false}
-        animate={{
-          opacity: interfaceVisible ? 1 : 0,
-          y: interfaceVisible ? 0 : 8,
-          filter: interfaceVisible ? "blur(0px)" : "blur(8px)",
-        }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-8 min-h-[14px]"
-      >
-        <LiveEnvReadings />
-      </motion.div>
+   
 
       {interactive && <CropDialog data={selected} onClose={handleClose} />}
     </div>
@@ -1029,11 +997,20 @@ const CropDialog = memo(function CropDialog({
                     <div className="flex flex-1 items-center justify-center border-r border-black/4 dark:border-white/6">
                       <div className="flex flex-col items-center gap-4">
                         <div className="crop-dialog-preview">
-                          {hoverMeta ? (
-                            <CropPreview crop={data.crop!} />
-                          ) : (
-                            <div className="h-6 w-6 rounded-full bg-green-800/12 dark:bg-green-400/15" />
-                          )}
+                          <CropVideoPreview
+                            crop={data.crop!}
+                            lifePercent={
+                              cropEnv && info
+                                ? Math.min(1, cropEnv.daysSincePlanting / info.growthCycleDays)
+                                : 0
+                            }
+                          >
+                            {hoverMeta ? (
+                              <CropPreview crop={data.crop!} />
+                            ) : (
+                              <div className="h-6 w-6 rounded-full bg-green-800/12 dark:bg-green-400/15" />
+                            )}
+                          </CropVideoPreview>
                         </div>
                         <span className="text-[11px] font-medium uppercase tracking-wide text-black/20 dark:text-white/20">
                           Plant Preview
@@ -1202,58 +1179,4 @@ const Corner = memo(function Corner({
   );
 });
 
-function LiveEnvReadings() {
-  const temperature = useGreenhouseStore((s) => s.temperature);
-  const humidity = useGreenhouseStore((s) => s.humidity);
-  const co2Level = useGreenhouseStore((s) => s.co2Level);
-  const lightLevel = useGreenhouseStore((s) => s.lightLevel);
-  const env = useGreenhouseStore((s) => s.environment);
-  const isHydrated = useHydrated();
 
-  if (!isHydrated) {
-    return (
-      <div className="mt-8 flex items-center gap-4">
-        <EnvReading label="Temp" value="--°C" />
-        <EnvDivider />
-        <EnvReading label="Humidity" value="--%" />
-        <EnvDivider />
-        <EnvReading label="CO₂" value="-- ppm" />
-        <EnvDivider />
-        <EnvReading label="O₂" value="--%" />
-        <EnvDivider />
-        <EnvReading label="Light" value="-- lux" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-8 flex items-center gap-4">
-      <EnvReading label="Temp" value={`${Math.round(temperature * 10) / 10}°C`} />
-      <EnvDivider />
-      <EnvReading label="Humidity" value={`${Math.round(humidity)}%`} />
-      <EnvDivider />
-      <EnvReading label="CO₂" value={`${Math.round(co2Level)} ppm`} />
-      <EnvDivider />
-      <EnvReading label="O₂" value={`${Math.round(env.o2Level * 10) / 10}%`} />
-      <EnvDivider />
-      <EnvReading label="Light" value={`${Math.round(lightLevel)} lux`} />
-    </div>
-  );
-}
-
-function EnvReading({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <span className="text-[10px] font-medium uppercase tracking-widest text-black/30 dark:text-white/35">
-        {label}
-      </span>
-      <span className="font-mono text-xs text-black/50 dark:text-white/55">
-        <AnimatedParameterValue value={value} debounceMs={72} />
-      </span>
-    </div>
-  );
-}
-
-function EnvDivider() {
-  return <div className="h-3 w-px bg-black/6 dark:bg-white/8" />;
-}

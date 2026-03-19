@@ -964,11 +964,13 @@
   }
 
   .crop-dialog-preview {
+    position: relative;
     display: flex;
-    width: 132px;
-    height: 132px;
+    width: 280px;
+    height: 200px;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     border: 1px solid rgb(0 0 0 / 0.05);
     border-radius: 20px;
     background:

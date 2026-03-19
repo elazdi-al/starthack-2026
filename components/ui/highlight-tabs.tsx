@@ -14,17 +14,25 @@ interface HighlightTabItem {
 interface HighlightTabsProps {
   items: HighlightTabItem[];
   defaultValue?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
   className?: string;
 }
 
-function HighlightTabs({ items, defaultValue, className }: HighlightTabsProps) {
+function HighlightTabs({ items, defaultValue, value, onValueChange, className }: HighlightTabsProps) {
   const firstItem = items[0]?.value;
-  const [activeTab, setActiveTab] = useState(defaultValue ?? firstItem);
+  const [internalTab, setInternalTab] = useState(defaultValue ?? firstItem);
+  const activeTab = value ?? internalTab;
   const [clipPath, setClipPath] = useState("inset(0px 100% 0px 0px round 17px)");
   const listRef = useRef<HTMLDivElement>(null);
   const resolvedActiveTab = items.some((item) => item.value === activeTab)
     ? activeTab
     : defaultValue ?? firstItem;
+
+  const handleValueChange = (next: string) => {
+    setInternalTab(next);
+    onValueChange?.(next);
+  };
 
   useLayoutEffect(() => {
     const updateClipPath = () => {
@@ -80,13 +88,13 @@ function HighlightTabs({ items, defaultValue, className }: HighlightTabsProps) {
   return (
     <div
       className={cn(
-        "relative flex h-[18rem] w-full items-center justify-center overflow-hidden rounded-xl bg-[var(--highlight-tabs-bg)] px-4 py-6 md:h-[20rem] md:px-6 md:py-8",
+        "relative flex w-fit items-center justify-center rounded-full bg-[var(--highlight-tabs-bg)] p-1",
         className
       )}
     >
       <Tabs
         value={resolvedActiveTab}
-        onValueChange={setActiveTab}
+        onValueChange={handleValueChange}
         className="relative items-center gap-0"
       >
         <div ref={listRef} className="relative flex w-fit items-center">
