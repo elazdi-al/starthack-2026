@@ -20,7 +20,7 @@ import { AgentDecisionPanel } from "@/components/interface/agent-decision-panel"
 import { SimulationOverrides } from "@/components/interface/simulation-overrides";
 import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
 import { ReportsView } from "@/components/interface/reports-view";
-import { SquaresFour, Leaf, Gavel, Robot, FileText } from "@phosphor-icons/react";
+import { SquaresFour, Leaf, Robot, FileText } from "@phosphor-icons/react";
 
 type IntroStage = "sealed" | "opening" | "open";
 type MainView = "greenhouse" | "dashboard" | "reports";
@@ -117,7 +117,6 @@ export default function Home() {
       { value: "greenhouse", label: "Greenhouse", icon: <Leaf size={16} weight="fill" /> },
       { value: "dashboard",  label: "Dashboard",  icon: <SquaresFour size={16} weight="fill" /> },
       { value: "reports",    label: "Reports",     icon: <FileText size={16} weight="fill" /> },
-      { value: "rules",      label: "Rules",      icon: <Gavel size={16} weight="fill" /> },
     ],
     []
   );
