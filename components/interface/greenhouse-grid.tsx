@@ -132,15 +132,18 @@ function DepthPoly({
 function CropPreview({
   crop,
   className,
+  size,
 }: {
   crop: CropType;
   className?: string;
+  size?: number;
 }) {
   const svgClassName = className ? `crop-preview-svg ${className}` : "crop-preview-svg";
+  const sizeStyle = size ? { width: size, height: size } as const : undefined;
 
   if (crop === "radish") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
         <DepthPoly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
         <DepthPoly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
         <DepthPoly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
@@ -154,7 +157,7 @@ function CropPreview({
 
   if (crop === "potato") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
         <DepthPoly points="44,14 54,30 34,30" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
         <DepthPoly points="28,28 44,38 24,46" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
         <DepthPoly points="60,28 64,46 44,38" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
@@ -168,7 +171,7 @@ function CropPreview({
 
   if (crop === "wheat") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
         <DepthPoly points="37,18 43,72 34,72" fill={PREVIEW_COLORS.stem} shadow="#556847" />
         <DepthPoly points="49,14 55,70 46,70" fill={PREVIEW_COLORS.stem} shadow="#556847" />
         <DepthPoly points="43,9 54,17 42,24" fill={PREVIEW_COLORS.grain1} shadow="#a18d57" />
@@ -183,7 +186,7 @@ function CropPreview({
 
   if (crop === "tomato") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
         <DepthPoly points="44,10 53,26 35,26" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
         <DepthPoly points="28,24 47,39 20,43" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
         <DepthPoly points="60,24 68,43 41,39" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
@@ -197,7 +200,7 @@ function CropPreview({
 
   if (crop === "soybean") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
         <DepthPoly points="44,12 55,29 33,29" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
         <DepthPoly points="28,24 49,39 24,46" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
         <DepthPoly points="60,24 64,46 40,39" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
@@ -211,7 +214,7 @@ function CropPreview({
 
   if (crop === "spinach") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
         <DepthPoly points="44,14 57,34 31,34" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
         <DepthPoly points="26,30 46,41 23,56" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
         <DepthPoly points="62,30 65,55 42,41" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
@@ -223,7 +226,7 @@ function CropPreview({
 
   if (crop === "kale") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
         <DepthPoly points="44,12 57,28 31,28" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
         <DepthPoly points="23,30 46,40 22,55" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
         <DepthPoly points="65,30 66,55 42,40" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
@@ -237,7 +240,7 @@ function CropPreview({
 
   if (crop === "lettuce") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
         <DepthPoly points="44,16 56,34 32,34" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
         <DepthPoly points="23,31 47,44 21,54" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
         <DepthPoly points="65,31 67,54 41,44" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
@@ -250,7 +253,7 @@ function CropPreview({
   }
 
   return (
-    <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+    <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
       <DepthPoly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
       <DepthPoly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
       <DepthPoly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
@@ -353,6 +356,8 @@ export function GreenhouseGrid() {
                   <GridTile
                     key={`${r}-${c}`}
                     data={tile}
+                    row={r}
+                    col={c}
                     onSelect={() => setSelected(tile)}
                   />
                 ))
@@ -369,11 +374,105 @@ export function GreenhouseGrid() {
   );
 }
 
+/**
+ * Simple deterministic hash for procedural generation.
+ * Returns 0–1 from integer inputs.
+ */
+function hash(a: number, b: number, c: number): number {
+  let h = (a * 2654435761) ^ (b * 2246822519) ^ (c * 3266489917);
+  h = ((h >>> 16) ^ h) * 0x45d9f3b;
+  h = ((h >>> 16) ^ h) * 0x45d9f3b;
+  h = (h >>> 16) ^ h;
+  return (h >>> 0) / 0xffffffff;
+}
+
+/**
+ * Preset positions per plant count (% of tile).
+ * Layouts are balanced around the tile centre.
+ * Each entry: [left%, top%, zIndex].
+ */
+const LAYOUTS: Record<number, [number, number, number][]> = {
+  1: [[50, 50, 1]],
+  2: [
+    [35, 38, 1],
+    [65, 62, 2],
+  ],
+  3: [
+    [50, 24, 1],
+    [24, 68, 2],
+    [76, 68, 3],
+  ],
+  4: [
+    [50, 20, 1],
+    [22, 50, 2],
+    [78, 50, 3],
+    [50, 76, 4],
+  ],
+  5: [
+    [50, 18, 1],
+    [20, 44, 2],
+    [80, 44, 3],
+    [30, 76, 4],
+    [70, 76, 5],
+  ],
+};
+
+/** Growth → how many plants on the tile */
+const GROWTH_TO_COUNT: Record<number, number> = {
+  1: 1,
+  2: 2,
+  3: 3,
+  4: 4,
+  5: 5,
+};
+
+/**
+ * Three fixed size tiers per growth stage: [small, medium, large].
+ * Each plant in a tile gets a different tier, shuffled procedurally.
+ */
+const SIZE_TIERS: Record<number, [number, number, number]> = {
+  1: [20, 26, 34],
+  2: [22, 30, 38],
+  3: [24, 32, 42],
+  4: [26, 34, 44],
+  5: [28, 36, 46],
+};
+
+const TIER_PERMS: [number, number, number][] = [
+  [0, 1, 2], [0, 2, 1], [1, 0, 2],
+  [1, 2, 0], [2, 0, 1], [2, 1, 0],
+];
+
+interface PlantInstance {
+  left: number;
+  top: number;
+  size: number;
+  z: number;
+}
+
+function generatePlants(row: number, col: number, growth: number): PlantInstance[] {
+  const count = GROWTH_TO_COUNT[growth] ?? 1;
+  const layout = LAYOUTS[count];
+  const tiers = SIZE_TIERS[growth] ?? SIZE_TIERS[3];
+  const perm = TIER_PERMS[((row * 7 + col * 13) >>> 0) % 6];
+
+  return layout.map(([left, top, z], i) => {
+    const size = tiers[perm[i % 3]];
+    const jx = (hash(row + 5, col + 3, i + 7) - 0.5) * 6;
+    const jy = (hash(row + 11, col + 2, i + 13) - 0.5) * 6;
+    return { left: left + jx, top: top + jy, size, z };
+  });
+}
+
 function GridTile({
   data,
+  row,
+  col,
   onSelect,
 }: {
   data: TileData;
+  row: number;
+  col: number;
   onSelect: () => void;
 }) {
   if (data.kind === "path") {
@@ -410,10 +509,22 @@ function GridTile({
       )}
 
       {planted && data.crop && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="crop-tile-plant">
-            <CropPreview crop={data.crop} className="crop-preview-svg--tile" />
-          </div>
+        <div className="crop-tile-plants">
+          {generatePlants(row, col, data.growth).map((p, i) => (
+            <div
+              key={i}
+              className="crop-tile-plant"
+              style={{
+                left: `${p.left}%`,
+                top: `${p.top}%`,
+                width: p.size,
+                height: p.size,
+                zIndex: p.z,
+              }}
+            >
+              <CropPreview crop={data.crop!} className="crop-preview-svg--tile" size={p.size} />
+            </div>
+          ))}
         </div>
       )}
 
