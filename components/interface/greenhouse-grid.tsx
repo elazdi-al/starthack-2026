@@ -445,7 +445,7 @@ function GridTile({
         variant="card"
         side="top"
         sideOffset={12}
-        className="crop-tooltip-popup !w-[292px] !max-w-[292px] !border-white/10 !bg-[rgb(38,38,35)] !text-[rgb(244,244,240)] p-0 shadow-[0_14px_34px_rgba(0,0,0,0.32),0_1px_3px_rgba(0,0,0,0.22)] sm:!w-[304px] sm:!max-w-[304px]"
+        className="crop-tooltip-popup !w-[280px] !max-w-[280px] !border-white/10 !bg-[rgb(38,38,35)] !text-[rgb(244,244,240)] p-0 shadow-[0_14px_34px_rgba(0,0,0,0.32),0_1px_3px_rgba(0,0,0,0.22)] sm:!w-[292px] sm:!max-w-[292px]"
       >
         <CropTooltip data={data} info={cropInfo} />
       </TooltipContent>
