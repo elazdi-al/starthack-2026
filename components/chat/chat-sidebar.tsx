@@ -4,8 +4,6 @@ import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import { ChatInput } from "./chat-input";
-import { Button } from "@/components/ui/button";
-import { SidebarSimpleIcon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 const MOCK_MESSAGES: ChatMessageData[] = [
@@ -83,67 +81,48 @@ export function ChatSidebar({ open, onOpenChange }: ChatSidebarProps) {
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.aside
-          initial={{ x: "100%" }}
-          animate={{ x: 0 }}
-          exit={{ x: "100%" }}
-          transition={{ type: "spring", damping: 30, stiffness: 340 }}
-          className="fixed top-0 right-0 z-50 flex h-full w-[360px] flex-col border-l border-[var(--dial-border)] bg-[var(--dial-glass-bg)]"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4">
-            <span className="type-label text-[var(--dial-text-primary)]">
-              Chat
-            </span>
-            <Button
-              aria-label="Close chat"
-              variant="ghost"
-              size="icon-xs"
-              className="text-[var(--dial-text-label)] hover:text-[var(--dial-text-primary)]"
-              onClick={() => onOpenChange(false)}
-            >
-              <SidebarSimpleIcon size={18} weight="fill" />
-            </Button>
-          </div>
-
-          <div className="mx-5 h-px bg-[var(--dial-border)]" />
-
-          {/* Messages */}
-          <div
-            ref={scrollRef}
-            className={cn(
-              "flex-1 overflow-y-auto px-5 py-4 space-y-2.5",
-              "scrollbar-none"
-            )}
-          >
-            <AnimatePresence initial={false}>
-              {messages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                >
-                  <ChatMessage message={msg} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-
-          {/* Input */}
-          <div className="px-5 pb-5 pt-3">
-            <ChatInput
-              value={inputValue}
-              onChange={setInputValue}
-              onSubmit={handleSubmit}
-              placeholder="Message…"
-            />
-          </div>
-        </motion.aside>
+    <aside
+      className={cn(
+        "fixed top-0 right-0 z-50 flex h-full w-[360px] flex-col border-l border-[var(--dial-border)] bg-[var(--dial-glass-bg)]",
+        "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+        open ? "translate-x-0" : "translate-x-full"
       )}
-    </AnimatePresence>
+    >
+      <div className="flex items-center px-5 pt-6 pb-14">
+       
+      </div>
+
+
+      <div
+        ref={scrollRef}
+        className={cn(
+          "flex-1 overflow-y-auto px-5 py-4 space-y-2.5",
+          "scrollbar-none"
+        )}
+      >
+        <AnimatePresence initial={false}>
+          {messages.map((msg) => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+              <ChatMessage message={msg} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      <div className="px-5 pb-5 pt-3">
+        <ChatInput
+          value={inputValue}
+          onChange={setInputValue}
+          onSubmit={handleSubmit}
+          placeholder="Message…"
+        />
+      </div>
+    </aside>
   );
 }

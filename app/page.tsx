@@ -54,7 +54,6 @@ import {
   Swatches,
   TextAa,
 } from "@phosphor-icons/react";
->>>>>>> aca35ad (feat: add central control)
 
 import { ClockWidget } from "@/components/interface/clock-widget";
 import { SettingsButton } from "@/components/interface/settings-button";
@@ -112,42 +111,48 @@ export default function Home() {
   };
 
   return (
-    <main
-      ref={mainRef}
-      className="relative min-h-screen bg-background text-foreground"
-      style={lightModeVars}
-    >
-      <CentralControlExample />
-      <GreenhouseGrid />
+    <div style={lightModeVars} className="relative min-h-screen bg-background text-foreground">
+      <main
+        ref={mainRef}
+        className="relative min-h-screen transition-[margin-right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+        style={{ marginRight: sidebarOpen ? 360 : 0 }}
+      >
+        <CentralControlExample />
+        <GreenhouseGrid />
 
-      <div className="absolute left-6 top-6 flex items-center gap-2">
-        <ClockWidget />
-        <TemperatureWidget />
-      </div>
+        <div className="absolute left-6 top-6 flex items-center gap-2">
+          <ClockWidget />
+          <TemperatureWidget />
+        </div>
 
-      <div className="absolute right-6 top-6 flex items-center gap-3">
-        <SpeedSelector
-          value={speed}
-          onValueChange={setSpeed}
-          open={speedOpen}
-          onOpenChange={handleSpeedOpenChange}
-          portalContainer={portalContainer}
-        />
-        <CentralControlPanel
-          open={controlOpen}
-          onOpenChange={handleControlOpenChange}
-        />
+        <div className="absolute right-6 top-6 flex items-center gap-3">
+          <SpeedSelector
+            value={speed}
+            onValueChange={setSpeed}
+            open={speedOpen}
+            onOpenChange={handleSpeedOpenChange}
+            portalContainer={portalContainer}
+          />
+          <CentralControlPanel
+            open={controlOpen}
+            onOpenChange={handleControlOpenChange}
+          />
+          <div className="size-10 shrink-0" />
+        </div>
+
+        <div className="absolute bottom-6 left-6">
+          <SettingsButton />
+        </div>
+      </main>
+
+      <div className="fixed right-6 top-6 z-60">
         <SidebarToggle
           pressed={sidebarOpen}
           onPressedChange={setSidebarOpen}
         />
       </div>
 
-      <div className="absolute bottom-6 left-6">
-        <SettingsButton />
-      </div>
-
       <ChatSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
-    </main>
+    </div>
   );
 }

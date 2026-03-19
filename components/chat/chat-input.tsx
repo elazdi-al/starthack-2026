@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ArrowCircleUpIcon } from "@phosphor-icons/react";
+import { ArrowUp } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -36,7 +37,7 @@ export function ChatInput({
   }, [value]);
 
   return (
-    <div className="relative flex items-end gap-2 rounded-2xl border border-[var(--dial-border)] bg-[var(--dial-glass-bg)] px-3 py-2 shadow-sm transition-colors focus-within:border-[var(--dial-border-hover)]">
+    <div className="relative flex items-end gap-2 rounded-full border border-input bg-transparent px-3.5 py-2 transition-[border-color,box-shadow] focus-within:border-[var(--input-hover)]">
       <textarea
         ref={textareaRef}
         value={value}
@@ -46,22 +47,19 @@ export function ChatInput({
         placeholder={placeholder}
         rows={1}
         className={cn(
-          "flex-1 resize-none bg-transparent text-[15px] leading-relaxed text-[var(--foreground)] placeholder:text-[var(--dial-text-tertiary)] outline-none",
+          "flex-1 resize-none bg-transparent text-[13px] font-medium leading-relaxed text-[var(--dial-text-primary)] placeholder:text-[var(--dial-text-tertiary)] outline-none",
           "scrollbar-none"
         )}
       />
-      <button
-        type="button"
+      <Button
+        variant="default"
+        size="icon-xs"
         onClick={onSubmit}
         disabled={disabled || !value.trim()}
-        className="mb-px flex-shrink-0 transition-opacity disabled:opacity-30"
+        aria-label="Send message"
       >
-        <ArrowCircleUpIcon
-          size={28}
-          weight="fill"
-          className="text-[#007AFF]"
-        />
-      </button>
+        <ArrowUp size={14} weight="bold" />
+      </Button>
     </div>
   );
 }
