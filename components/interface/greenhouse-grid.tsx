@@ -453,6 +453,11 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
   const poly = (...points: [number, number][]) => points.map(([px, py]) => `${px},${py}`).join(" ");
   const rafterFractions = [0.18, 0.38, 0.58, 0.78];
   const showShell = introStage !== "open";
+  const floorGradientId = "greenhouse-floor-fill";
+  const frontGradientId = "greenhouse-glass-front";
+  const sideGradientId = "greenhouse-glass-side";
+  const roofBackGradientId = "greenhouse-roof-back";
+  const roofFrontGradientId = "greenhouse-roof-front";
 
   return (
     <svg
@@ -464,25 +469,25 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
       fill="none"
     >
       <defs>
-        <linearGradient id="greenhouse-floor-fill" x1={x} y1={y} x2={x + width} y2={y + height}>
-          <stop offset="0%" className="gh-floor-start" />
-          <stop offset="100%" className="gh-floor-end" />
+        <linearGradient id={floorGradientId} x1={x} y1={y} x2={x + width} y2={y + height}>
+          <stop offset="0%" style={{ stopColor: "var(--greenhouse-floor-start)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--greenhouse-floor-end)" }} />
         </linearGradient>
-        <linearGradient id="greenhouse-glass-front" x1={x} y1={y} x2={x + width} y2={y + height}>
-          <stop offset="0%" className="gh-front-start" />
-          <stop offset="100%" className="gh-front-end" />
+        <linearGradient id={frontGradientId} x1={x} y1={y} x2={x + width} y2={y + height}>
+          <stop offset="0%" style={{ stopColor: "var(--greenhouse-glass-front-start)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--greenhouse-glass-front-end)" }} />
         </linearGradient>
-        <linearGradient id="greenhouse-glass-side" x1={x} y1={y} x2={x + rise} y2={y + height}>
-          <stop offset="0%" className="gh-side-start" />
-          <stop offset="100%" className="gh-side-end" />
+        <linearGradient id={sideGradientId} x1={x} y1={y} x2={x + rise} y2={y + height}>
+          <stop offset="0%" style={{ stopColor: "var(--greenhouse-glass-side-start)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--greenhouse-glass-side-end)" }} />
         </linearGradient>
-        <linearGradient id="greenhouse-roof-back" x1={x + rise} y1={y - rise} x2={x + width + rise} y2={y - rise + height / 2}>
-          <stop offset="0%" className="gh-roof-back-start" />
-          <stop offset="100%" className="gh-roof-back-end" />
+        <linearGradient id={roofBackGradientId} x1={x + rise} y1={y - rise} x2={x + width + rise} y2={y - rise + height / 2}>
+          <stop offset="0%" style={{ stopColor: "var(--greenhouse-roof-back-start)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--greenhouse-roof-back-end)" }} />
         </linearGradient>
-        <linearGradient id="greenhouse-roof-front" x1={x + rise} y1={y + height - rise} x2={x + width + rise} y2={y - rise + height / 2}>
-          <stop offset="0%" className="gh-roof-front-start" />
-          <stop offset="100%" className="gh-roof-front-end" />
+        <linearGradient id={roofFrontGradientId} x1={x + rise} y1={y + height - rise} x2={x + width + rise} y2={y - rise + height / 2}>
+          <stop offset="0%" style={{ stopColor: "var(--greenhouse-roof-front-start)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--greenhouse-roof-front-end)" }} />
         </linearGradient>
         <filter id="greenhouse-shadow" x="-20%" y="-20%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="10" />
@@ -494,21 +499,21 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           {introStage === "sealed" && (
             <g>
               <polygon
-              points={poly(
-                [baseTL[0] + shadowOffsetX, baseTL[1] + shadowOffsetY],
-                [baseTR[0] + shadowOffsetX, baseTR[1] + shadowOffsetY],
-                [baseBR[0] + shadowOffsetX, baseBR[1] + shadowOffsetY],
-                [baseBL[0] + shadowOffsetX, baseBL[1] + shadowOffsetY],
-              )}
-              className="gh-shadow"
-              filter="url(#greenhouse-shadow)"
-            />
-            <polygon
-              points={poly(baseTL, baseTR, baseBR, baseBL)}
-              fill="url(#greenhouse-floor-fill)"
-              className="gh-line-soft"
-              strokeWidth="0.95"
-            />
+                points={poly(
+                  [baseTL[0] + shadowOffsetX, baseTL[1] + shadowOffsetY],
+                  [baseTR[0] + shadowOffsetX, baseTR[1] + shadowOffsetY],
+                  [baseBR[0] + shadowOffsetX, baseBR[1] + shadowOffsetY],
+                  [baseBL[0] + shadowOffsetX, baseBL[1] + shadowOffsetY],
+                )}
+                style={{ fill: "var(--greenhouse-shadow)" }}
+                filter="url(#greenhouse-shadow)"
+              />
+              <polygon
+                points={poly(baseTL, baseTR, baseBR, baseBL)}
+                fill={`url(#${floorGradientId})`}
+                style={{ stroke: "var(--greenhouse-line-soft)" }}
+                strokeWidth="0.95"
+              />
             </g>
           )}
 
@@ -524,8 +529,8 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           >
             <polygon
               points={poly(baseTL, baseTR, eaveTR, eaveTL)}
-              fill="url(#greenhouse-glass-front)"
-              className="gh-line-soft"
+              fill={`url(#${frontGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="0.9"
             />
           </motion.g>
@@ -542,8 +547,8 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           >
             <polygon
               points={poly(baseTL, baseBL, eaveBL, eaveTL)}
-              fill="url(#greenhouse-glass-side)"
-              className="gh-line-soft"
+              fill={`url(#${sideGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="0.9"
             />
             <line
@@ -551,7 +556,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
               y1={baseBL[1]}
               x2={eaveBL[0]}
               y2={eaveBL[1]}
-              className="gh-line-strong"
+              style={{ stroke: "var(--greenhouse-line-strong)" }}
               strokeWidth="1.3"
               strokeLinecap="round"
             />
@@ -569,24 +574,30 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           >
             <polygon
               points={poly(eaveTL, eaveTR, ridgeR, ridgeL)}
-              fill="url(#greenhouse-roof-back)"
-              className="gh-line-soft"
+              fill={`url(#${roofBackGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="0.85"
             />
             <polygon
               points={poly(eaveBL, eaveBR, ridgeR, ridgeL)}
-              fill="url(#greenhouse-roof-front)"
-              className="gh-line-mid"
+              fill={`url(#${roofFrontGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-mid)" }}
               strokeWidth="0.9"
             />
             <polygon
               points={poly(eaveTL, eaveBL, ridgeL)}
-              className="gh-side-fill gh-line-soft"
+              style={{
+                fill: "var(--greenhouse-glass-side-end)",
+                stroke: "var(--greenhouse-line-soft)",
+              }}
               strokeWidth="0.85"
             />
             <polygon
               points={poly(eaveTR, eaveBR, ridgeR)}
-              className="gh-side-fill gh-line-soft"
+              style={{
+                fill: "var(--greenhouse-glass-side-end)",
+                stroke: "var(--greenhouse-line-soft)",
+              }}
               strokeWidth="0.8"
             />
             <line
@@ -594,7 +605,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
               y1={ridgeL[1]}
               x2={ridgeR[0]}
               y2={ridgeR[1]}
-              className="gh-line-mid"
+              style={{ stroke: "var(--greenhouse-line-mid)" }}
               strokeWidth="1.2"
               strokeLinecap="round"
             />
@@ -603,7 +614,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
               y1={eaveBL[1]}
               x2={eaveBR[0]}
               y2={eaveBR[1]}
-              className="gh-line-mid"
+              style={{ stroke: "var(--greenhouse-line-mid)" }}
               strokeWidth="1.2"
               strokeLinecap="round"
             />
@@ -612,7 +623,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
               y1={eaveBL[1]}
               x2={ridgeL[0]}
               y2={ridgeL[1]}
-              className="gh-line-soft"
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="1.05"
               strokeLinecap="round"
             />
@@ -621,7 +632,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
               y1={eaveBR[1]}
               x2={ridgeR[0]}
               y2={ridgeR[1]}
-              className="gh-line-soft"
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="1.05"
               strokeLinecap="round"
             />
@@ -641,7 +652,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
                     y1={backPostBaseY}
                     x2={frontPostTopX}
                     y2={backPostTopY}
-                    className="gh-line-soft"
+                    style={{ stroke: "var(--greenhouse-line-soft)" }}
                     strokeWidth="0.8"
                     strokeLinecap="round"
                   />
@@ -650,7 +661,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
                     y1={backPostTopY}
                     x2={roofJointX}
                     y2={roofJointY}
-                    className="gh-line-soft"
+                    style={{ stroke: "var(--greenhouse-line-soft)" }}
                     strokeWidth="0.75"
                     strokeLinecap="round"
                   />
@@ -659,7 +670,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
                     y1={postTopY}
                     x2={roofJointX}
                     y2={roofJointY}
-                    className="gh-line-soft"
+                    style={{ stroke: "var(--greenhouse-line-soft)" }}
                     strokeWidth="0.78"
                     strokeLinecap="round"
                   />
@@ -680,8 +691,8 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           >
             <polygon
               points={poly(baseTR, baseBR, eaveBR, eaveTR)}
-              fill="url(#greenhouse-glass-side)"
-              className="gh-line-soft"
+              fill={`url(#${sideGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-soft)" }}
               strokeWidth="0.85"
             />
             <line
@@ -689,7 +700,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
               y1={baseBR[1]}
               x2={eaveBR[0]}
               y2={eaveBR[1]}
-              className="gh-line-mid"
+              style={{ stroke: "var(--greenhouse-line-mid)" }}
               strokeWidth="1.25"
               strokeLinecap="round"
             />
@@ -707,8 +718,8 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
           >
             <polygon
               points={poly(baseBL, baseBR, eaveBR, eaveBL)}
-              fill="url(#greenhouse-glass-front)"
-              className="gh-line-mid"
+              fill={`url(#${frontGradientId})`}
+              style={{ stroke: "var(--greenhouse-line-mid)" }}
               strokeWidth="1"
             />
             {rafterFractions.map((fraction) => {
@@ -724,7 +735,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
                   y1={frontPostBaseY}
                   x2={frontPostTopX}
                   y2={postTopY}
-                  className="gh-line-mid"
+                  style={{ stroke: "var(--greenhouse-line-mid)" }}
                   strokeWidth="0.9"
                   strokeLinecap="round"
                 />
@@ -735,7 +746,7 @@ function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage })
               y1={baseBL[1]}
               x2={baseBR[0]}
               y2={baseBR[1]}
-              className="gh-line-strong"
+              style={{ stroke: "var(--greenhouse-line-strong)" }}
               strokeWidth="1.45"
               strokeLinecap="round"
             />
