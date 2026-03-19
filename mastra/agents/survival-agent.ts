@@ -69,6 +69,6 @@ You must always respond with valid JSON matching this exact structure:
 }
 
 Use the knowledge base to look up crop stress tolerances and resource consumption profiles when diagnosing specific threats.`,
-  model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+  model: bedrock('us.amazon.nova-lite-v1:0'),
   tools: { knowledgeBaseTool },
 });
