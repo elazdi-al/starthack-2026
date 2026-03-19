@@ -29,12 +29,12 @@ export const greenhouseParameterTool = createTool({
     'Harvest tile (type "harvest-tile", requires tileId): harvest one specific tile only. ' +
     'Clear tile (type "clear-tile", requires tileId): remove a crop from a tile without harvesting. ' +
     'Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale. ' +
-    'Available tileIds follow the pattern "{cropType}_{row}_{col}" (e.g. "lettuce_0_0", "tomato_2_4").',
+    'Available tileIds follow the pattern "{row}_{col}" (e.g. "0_0", "2_4", "7_11"). The crop planted on each tile is visible in the tileCrops snapshot.',
   inputSchema: z.object({
     changes: z
       .array(
         z.object({
-          type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'plant-tile', 'harvest-tile', 'clear-tile']),
+          type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'plant-tile', 'harvest-tile', 'clear-tile', 'batch-tile']),
           param: z.string().optional().describe('Parameter name (for greenhouse/crop types)'),
           value: z.number().optional().describe('New value (for greenhouse/crop types)'),
           crop: z
@@ -45,6 +45,9 @@ export const greenhouseParameterTool = createTool({
             .string()
             .optional()
             .describe('Required for plant-tile/harvest-tile/clear-tile — e.g. "lettuce_0_0"'),
+          harvests: z.array(z.string()).optional().describe('(batch-tile) Tile IDs to harvest'),
+          plants: z.array(z.object({ tileId: z.string(), crop: z.string() })).optional().describe('(batch-tile) Tiles to plant with crop type'),
+          clears: z.array(z.string()).optional().describe('(batch-tile) Tile IDs to clear'),
         }),
       )
       .min(1)
@@ -102,6 +105,10 @@ export const greenhouseParameterTool = createTool({
       } else if (change.type === 'clear-tile') {
         if (!change.tileId) {
           return { success: false, error: 'tileId is required for clear-tile' };
+        }
+      } else if (change.type === 'batch-tile') {
+        if (!change.harvests?.length && !change.plants?.length && !change.clears?.length) {
+          return { success: false, error: `batch-tile must include at least one harvest, plant, or clear operation` };
         }
       }
       validated.push(change);

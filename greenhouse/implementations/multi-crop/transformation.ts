@@ -90,11 +90,14 @@ export function applyTransformations(
   initialState: ConcreteState,
   time: number,
   transformations: Array<{
-    type: 'greenhouse' | 'crop' | 'harvest' | 'replant' | 'harvest-tile' | 'plant-tile' | 'clear-tile';
+    type: 'greenhouse' | 'crop' | 'harvest' | 'replant' | 'harvest-tile' | 'plant-tile' | 'clear-tile' | 'batch-tile';
     param: string;
     value: number;
     crop?: CropType;
     tileId?: string;
+    harvests?: string[];
+    plants?: Array<{ tileId: string; crop: CropType }>;
+    clears?: string[];
   }>,
 ): ConcreteState {
   let state = initialState;
@@ -125,6 +128,14 @@ export function applyTransformations(
       state = plantTile(state, t.tileId, t.crop, time);
     } else if (t.type === 'clear-tile' && t.tileId) {
       state = clearTile(state, t.tileId, time);
+    } else if (t.type === 'batch-tile') {
+      const ops: BatchTileOp = {
+        harvests: t.harvests ?? [],
+        plants: t.plants ?? [],
+        clears: t.clears ?? [],
+      };
+      const result = batchTileActions(state, ops, time);
+      state = result.state;
     }
   }
 
@@ -385,4 +396,83 @@ export function clearTile(
   const newEnv = { ...env, crops: newCrops, tileCrops: newTileCrops };
   const simulation = createSimulation(newEnv, state.greenhouse);
   return { simulation, greenhouse: state.greenhouse };
+}
+
+// ─── Batch tile operations ───────────────────────────────────────────────────
+
+export interface BatchTileOp {
+  harvests: string[];
+  plants: Array<{ tileId: string; crop: CropType }>;
+  clears: string[];
+}
+
+export function batchTileActions(
+  state: ConcreteState,
+  ops: BatchTileOp,
+  time: number,
+): { state: ConcreteState; totalYieldKg: number } {
+  const env = state.simulation.getEnvironment(time);
+  const newTileCrops = { ...env.tileCrops };
+  let totalYieldKg = 0;
+
+  // 1. Harvests
+  for (const tileId of ops.harvests) {
+    const tile = newTileCrops[tileId];
+    if (!tile) continue;
+    totalYieldKg += tile.estimatedYieldKg;
+    newTileCrops[tileId] = {
+      ...tile,
+      stage: 'harvested' as const,
+      stageProgress: 0, biomassKg: 0, estimatedYieldKg: 0,
+      plantGrowth: 0, leafArea: 0, fruitCount: 0,
+    };
+  }
+
+  // 2. Clears
+  for (const tileId of ops.clears) {
+    const tile = newTileCrops[tileId];
+    if (!tile) continue;
+    newTileCrops[tileId] = {
+      ...tile,
+      stage: 'harvested' as const,
+      stageProgress: 0, daysSincePlanting: 0, healthScore: 0,
+      stressAccumulator: 0, biomassKg: 0, estimatedYieldKg: 0,
+      plantGrowth: 0, leafArea: 0, fruitCount: 0,
+      diseaseRisk: 0, isBolting: false, boltingHoursAccumulated: 0,
+    };
+  }
+
+  // 3. Plants
+  for (const { tileId, crop } of ops.plants) {
+    const existing = newTileCrops[tileId];
+    if (!existing) continue;
+    const seed = hashTileId(tileId);
+    const genetics = generateGeneticFactors(seed, crop);
+    const baseEnv = buildCropAtProgress(crop, 0);
+    newTileCrops[tileId] = {
+      ...baseEnv,
+      tileId,
+      cropType: crop,
+      geneticSeed: seed,
+      geneticOptimalTempFactor: genetics.optimalTempFactor,
+      geneticOptimalMoistureFactor: genetics.optimalMoistureFactor,
+      geneticGrowthRateFactor: genetics.growthRateFactor,
+      geneticMaxYieldFactor: genetics.maxYieldFactor,
+      geneticBoltingThresholdFactor: genetics.boltingThresholdFactor,
+      geneticStressResilienceFactor: genetics.stressResilienceFactor,
+      geneticWaterEfficiencyFactor: genetics.waterEfficiencyFactor,
+      stage: 'seed' as const,
+      stageProgress: 0, daysSincePlanting: 0, healthScore: 1,
+      stressAccumulator: 0, biomassKg: 0, estimatedYieldKg: 0,
+      plantGrowth: 0, leafArea: 0, fruitCount: 0,
+      rootO2Level: 90, nutrientEC: 2.0, diseaseRisk: 0,
+      isBolting: false, boltingHoursAccumulated: 0,
+    };
+  }
+
+  // ONE aggregation + ONE simulation rebuild
+  const newCrops = aggregateTileCrops(newTileCrops);
+  const newEnv = { ...env, crops: newCrops, tileCrops: newTileCrops };
+  const simulation = createSimulation(newEnv, state.greenhouse);
+  return { state: { simulation, greenhouse: state.greenhouse }, totalYieldKg };
 }

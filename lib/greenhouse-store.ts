@@ -31,18 +31,23 @@ import {
   harvestTile as harvestTileTransform,
   plantTile as plantTileTransform,
   clearTile as clearTileTransform,
+  batchTileActions,
 } from "@/greenhouse/implementations/multi-crop/transformation";
+import type { BatchTileOp } from "@/greenhouse/implementations/multi-crop/transformation";
 
 export type { CropType, GrowthStage, SeasonName, DustStormRisk, ManualOverrides };
 
 // ─── Agent Decision Log ──────────────────────────────────────────────────────────
 
 export interface AgentAction {
-  type: "greenhouse" | "crop" | "harvest" | "replant" | "harvest-tile" | "plant-tile" | "clear-tile";
+  type: "greenhouse" | "crop" | "harvest" | "replant" | "harvest-tile" | "plant-tile" | "clear-tile" | "batch-tile";
   param?: string;
   value?: number;
   crop?: string;
   tileId?: string;
+  harvests?: string[];
+  plants?: Array<{ tileId: string; crop: string }>;
+  clears?: string[];
 }
 
 export interface AgentDecision {
@@ -163,7 +168,7 @@ const P: TileData = { kind: "path", growth: 0, water: 0, status: null };
 const PS: TileData = { kind: "path", growth: 0, water: 0, status: null, sensor: true };
 
 function ct(crop: CropType, row: number, col: number, growth: number, water: number, status: Status = "ok"): TileData {
-  return { kind: "crop", growth, water, status, crop, tileId: `${crop}_${row}_${col}` };
+  return { kind: "crop", growth, water, status, crop, tileId: `${row}_${col}` };
 }
 
 const INITIAL_GRID: TileData[][] = [
@@ -386,6 +391,7 @@ export interface GreenhouseState {
   doHarvestTile: (tileId: string) => void;
   doPlantTile: (tileId: string, crop: CropType) => void;
   doClearTile: (tileId: string) => void;
+  doBatchTile: (ops: { harvests: string[]; plants: Array<{ tileId: string; crop: string }>; clears: string[] }) => void;
   setAutonomousEnabled: (enabled: boolean) => void;
   autonomousTick: () => Promise<void>;
 }
@@ -908,6 +914,63 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     });
   },
 
+  doBatchTile: (ops) => {
+    const { simState, elapsedMinutes, events, totalHarvestKg } = get();
+    const typedOps: BatchTileOp = {
+      harvests: ops.harvests,
+      plants: ops.plants.map(p => ({ tileId: p.tileId, crop: p.crop as CropType })),
+      clears: ops.clears,
+    };
+    const { state: newState, totalYieldKg } = batchTileActions(simState, typedOps, elapsedMinutes);
+    const env = newState.simulation.getEnvironment(0);
+
+    // Update grid tiles' crop types for any plants that changed crop
+    let newGrid = get().grid;
+    if (ops.plants.length > 0) {
+      newGrid = newGrid.map((row) =>
+        row.map((tile) => {
+          const planted = ops.plants.find(p => p.tileId === tile.tileId);
+          if (planted) return { ...tile, crop: planted.crop as CropType };
+          return tile;
+        }),
+      );
+    }
+
+    const newEvents: SimEvent[] = [...get().events];
+    if (ops.harvests.length > 0) {
+      newEvents.push({
+        sol: env.missionSol, type: "harvest", severity: "info",
+        message: `Batch harvested ${ops.harvests.length} tile(s): ${totalYieldKg.toFixed(1)} kg`,
+        data: { yieldKg: totalYieldKg },
+      });
+    }
+    if (ops.plants.length > 0) {
+      newEvents.push({
+        sol: env.missionSol, type: "replant", severity: "info",
+        message: `Batch planted ${ops.plants.length} tile(s)`,
+      });
+    }
+    if (ops.clears.length > 0) {
+      newEvents.push({
+        sol: env.missionSol, type: "harvest", severity: "info",
+        message: `Batch cleared ${ops.clears.length} tile(s)`,
+      });
+    }
+
+    set({
+      simState: newState,
+      elapsedMinutes: 0,
+      environment: env,
+      temperature: env.airTemperature,
+      humidity: env.humidity,
+      co2Level: env.co2Level,
+      lightLevel: env.lightLevel,
+      grid: syncGridFromEnv(newGrid, env),
+      events: newEvents,
+      totalHarvestKg: totalHarvestKg + totalYieldKg,
+    });
+  },
+
   setAutonomousEnabled: (enabled) => set({ autonomousEnabled: enabled }),
 
   autonomousTick: async () => {
@@ -950,11 +1013,14 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
         summary?: string;
         reasoning?: string;
         actions?: Array<{
-          type: "greenhouse" | "crop" | "harvest" | "replant" | "harvest-tile" | "plant-tile" | "clear-tile";
+          type: "greenhouse" | "crop" | "harvest" | "replant" | "harvest-tile" | "plant-tile" | "clear-tile" | "batch-tile";
           param?: string;
           value?: number;
           crop?: string;
           tileId?: string;
+          harvests?: string[];
+          plants?: Array<{ tileId: string; crop: string }>;
+          clears?: string[];
         }>;
         conflictType?: string;
         winningAgent?: string;
@@ -999,18 +1065,31 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       });
 
       // Apply harvests, replants, and tile-level actions first, then parameter changes
+      // Collect ALL tile-level actions into a single batch for O(1) simulation rebuild
+      const batchOps = { harvests: [] as string[], plants: [] as { tileId: string; crop: string }[], clears: [] as string[] };
+
       for (const action of data.actions) {
-        if (action.type === "harvest" && action.crop) {
+        if (action.type === "batch-tile") {
+          // Merge batch-tile action
+          if (action.harvests) batchOps.harvests.push(...action.harvests);
+          if (action.plants) batchOps.plants.push(...action.plants);
+          if (action.clears) batchOps.clears.push(...action.clears);
+        } else if (action.type === "harvest" && action.crop) {
           get().doHarvest(action.crop as CropType);
         } else if (action.type === "replant" && action.crop) {
           get().doReplant(action.crop as CropType);
         } else if (action.type === "harvest-tile" && action.tileId) {
-          get().doHarvestTile(action.tileId);
+          batchOps.harvests.push(action.tileId);
         } else if (action.type === "plant-tile" && action.tileId && action.crop) {
-          get().doPlantTile(action.tileId, action.crop as CropType);
+          batchOps.plants.push({ tileId: action.tileId, crop: action.crop });
         } else if (action.type === "clear-tile" && action.tileId) {
-          get().doClearTile(action.tileId);
+          batchOps.clears.push(action.tileId);
         }
+      }
+
+      // Apply all tile operations in one batch (one simulation rebuild)
+      if (batchOps.harvests.length > 0 || batchOps.plants.length > 0 || batchOps.clears.length > 0) {
+        get().doBatchTile(batchOps);
       }
 
       const paramChanges = data.actions

@@ -44,6 +44,57 @@ function digestPreamble(agentName: 'survival' | 'wellbeing' | 'arbiter'): string
   return `[PERFORMANCE DIGEST — calibration signal from Secretary, last 10 sols]\n${text}\n`;
 }
 
+/** Build a concise human-readable summary of resolved actions. */
+function summarizeActions(actions: z.infer<typeof ActionSchema>[]): string {
+  if (actions.length === 0) return 'No actions';
+
+  const parts: string[] = [];
+
+  // Aggregate batch-tile and loose tile actions into counts per crop
+  const plantCounts: Record<string, number> = {};
+  const harvestCounts: Record<string, number> = {};
+  let clearCount = 0;
+
+  for (const a of actions) {
+    if (a.type === 'batch-tile') {
+      for (const p of a.plants ?? []) {
+        plantCounts[p.crop] = (plantCounts[p.crop] ?? 0) + 1;
+      }
+      harvestCounts['tiles'] = (harvestCounts['tiles'] ?? 0) + (a.harvests?.length ?? 0);
+      clearCount += a.clears?.length ?? 0;
+    } else if (a.type === 'plant-tile' && a.crop) {
+      plantCounts[a.crop] = (plantCounts[a.crop] ?? 0) + 1;
+    } else if (a.type === 'harvest-tile') {
+      harvestCounts['tiles'] = (harvestCounts['tiles'] ?? 0) + 1;
+    } else if (a.type === 'clear-tile') {
+      clearCount++;
+    } else if (a.type === 'harvest' && a.crop) {
+      parts.push(`harvested all ${a.crop}`);
+    } else if (a.type === 'replant' && a.crop) {
+      parts.push(`replanted all ${a.crop}`);
+    } else if (a.type === 'greenhouse' && a.param != null && a.value != null) {
+      const label = a.param === 'globalHeatingPower' ? 'heating'
+        : a.param === 'lightingPower' ? 'lighting'
+        : a.param === 'co2InjectionRate' ? 'CO2 injection'
+        : a.param === 'ventilationRate' ? 'ventilation'
+        : a.param;
+      parts.push(`set ${label} to ${a.value}`);
+    } else if (a.type === 'crop' && a.crop && a.param != null && a.value != null) {
+      parts.push(`set ${a.crop} ${a.param} to ${a.value}`);
+    }
+  }
+
+  // Summarize tile operations
+  for (const [crop, count] of Object.entries(plantCounts)) {
+    parts.push(`planted ${count} ${crop}`);
+  }
+  const totalHarvests = harvestCounts['tiles'] ?? 0;
+  if (totalHarvests > 0) parts.push(`harvested ${totalHarvests} tile${totalHarvests > 1 ? 's' : ''}`);
+  if (clearCount > 0) parts.push(`cleared ${clearCount} tile${clearCount > 1 ? 's' : ''}`);
+
+  return parts.join(', ');
+}
+
 /** Apply preferenceUpdates array from wellbeing agent JSON to the secretary store. */
 function applyPreferenceUpdates(
   updates: Array<{ crop: string; delta: number }> | undefined,
@@ -57,14 +108,120 @@ function applyPreferenceUpdates(
   }
 }
 
+// ─── Snapshot Compression ────────────────────────────────────────────────────
+// The full snapshot includes 108 tiles × 15 fields (~12K tokens). Agents only
+// need per-crop aggregates + tiles with problems. This cuts prompt size by ~60%.
+
+interface CompactSnapshot {
+  environment: Record<string, unknown>;
+  greenhouseControls: Record<string, unknown>;
+  crops: Record<string, unknown>;
+  resources: Record<string, unknown>;
+  /** Only tiles with health < 0.7, bolting, disease > 0.3, or freshly harvested. */
+  flaggedTiles: Record<string, unknown>;
+  tileSummary: string;
+}
+
+/**
+ * Build a compact snapshot for agent prompts. Keeps full environment + controls +
+ * per-crop aggregates but replaces 108 tiles with only flagged ones (~5-10 vs 108).
+ */
+function compactSnapshot(snapshot: Record<string, unknown>): CompactSnapshot {
+  const snap = snapshot as Record<string, unknown>;
+  const tileCrops = (snap.tileCrops ?? {}) as Record<string, Record<string, unknown>>;
+
+  // Extract flagged tiles only (health < 0.7, bolting, disease > 0.3, or harvested with recent yield)
+  const flaggedTiles: Record<string, unknown> = {};
+  let totalTiles = 0;
+  let flaggedCount = 0;
+  for (const [tileId, tile] of Object.entries(tileCrops)) {
+    totalTiles++;
+    const health = (tile.healthScore as number) ?? 1;
+    const bolting = (tile.isBolting as boolean) ?? false;
+    const disease = (tile.diseaseRisk as number) ?? 0;
+    if (health < 0.7 || bolting || disease > 0.3) {
+      flaggedTiles[tileId] = tile;
+      flaggedCount++;
+    }
+  }
+
+  return {
+    environment: {
+      missionSol: snap.missionSol,
+      totalMissionSols: snap.totalMissionSols,
+      currentLs: snap.currentLs,
+      seasonName: snap.seasonName,
+      atmosphericPressure: snap.atmosphericPressure,
+      dustStormRisk: snap.dustStormRisk,
+      airTemperature: snap.airTemperature,
+      humidity: snap.humidity,
+      co2Level: snap.co2Level,
+      lightLevel: snap.lightLevel,
+      o2Level: snap.o2Level,
+      externalTemp: snap.externalTemp,
+      solarRadiation: snap.solarRadiation,
+      dustStormFactor: snap.dustStormFactor,
+      dustStormActive: snap.dustStormActive,
+      waterRecyclingEfficiency: snap.waterRecyclingEfficiency,
+      solarGenerationKW: snap.solarGenerationKW,
+      batteryStorageKWh: snap.batteryStorageKWh,
+      batteryCapacityKWh: snap.batteryCapacityKWh,
+      energyDeficit: snap.energyDeficit,
+      co2SafetyAlert: snap.co2SafetyAlert,
+      nutritionalCoverage: snap.nutritionalCoverage,
+      foodReservesSols: snap.foodReservesSols,
+    },
+    greenhouseControls: (snap.greenhouseControls as Record<string, unknown>) ?? {},
+    crops: (snap.crops as Record<string, unknown>) ?? {},
+    resources: (snap.resources as Record<string, unknown>) ?? {},
+    flaggedTiles,
+    tileSummary: `${totalTiles} tiles total, ${flaggedCount} flagged (health<0.7 / bolting / disease>0.3)`,
+  };
+}
+
+/**
+ * Build a compact environment summary for the Arbiter (~500 tokens instead of ~5000).
+ * The Arbiter gets agent briefs with full justifications, so it only needs key metrics
+ * to cross-reference — not the full crop/tile dump.
+ */
+function envSummaryForArbiter(snapshot: Record<string, unknown>): string {
+  const s = snapshot as Record<string, unknown>;
+  const controls = (s.greenhouseControls ?? {}) as Record<string, number>;
+  const resources = (s.resources ?? {}) as Record<string, number>;
+  const crops = (s.crops ?? {}) as Record<string, Record<string, unknown>>;
+
+  // Build one-line per crop: name, stage, health, yield
+  const cropLines = Object.entries(crops).map(([name, c]) => {
+    const health = ((c.healthScore as number) ?? 1).toFixed(2);
+    const yieldKg = ((c.estimatedYieldKg as number) ?? 0).toFixed(1);
+    return `  ${name}: stage=${c.stage}, health=${health}, yield=${yieldKg}kg, bolting=${c.isBolting ?? false}`;
+  }).join('\n');
+
+  return `KEY METRICS:
+  Sol ${s.missionSol}/${s.totalMissionSols}, Ls ${s.currentLs}°, Season: ${s.seasonName}
+  Temp: ${s.airTemperature}°C, Humidity: ${s.humidity}%, CO₂: ${s.co2Level}ppm, O₂: ${s.o2Level}%
+  Light: ${s.lightLevel}, Solar: ${s.solarGenerationKW}kW, Battery: ${s.batteryStorageKWh}/${s.batteryCapacityKWh}kWh
+  Dust factor: ${s.dustStormFactor}, Storm active: ${s.dustStormActive}, Energy deficit: ${s.energyDeficit}
+  Water recycling: ${s.waterRecyclingEfficiency}, Nutritional coverage: ${s.nutritionalCoverage}
+  Food reserves: ${s.foodReservesSols} sols
+  Controls: heat=${controls.globalHeatingPower}W, light=${controls.lightingPower}W, CO₂=${controls.co2InjectionRate}ppm/h, vent=${controls.ventilationRate}
+  Resources: water=${resources.waterConsumedL}L, energy=${resources.energyUsedKWh}kWh, O₂=${resources.o2ProducedKg}kg, harvest=${resources.totalHarvestKg}kg
+CROPS:
+${cropLines}`;
+}
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const ActionSchema = z.object({
-  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'harvest-tile', 'plant-tile', 'clear-tile']),
+  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'harvest-tile', 'plant-tile', 'clear-tile', 'batch-tile']),
   param: z.string().optional(),
   value: z.number().optional(),
   crop: z.string().optional(),
   tileId: z.string().optional(),
+  // batch-tile fields
+  harvests: z.array(z.string()).optional(),
+  plants: z.array(z.object({ tileId: z.string(), crop: z.string() })).optional(),
+  clears: z.array(z.string()).optional(),
 });
 
 const DispatcherInputSchema = z.object({
@@ -242,7 +399,8 @@ const dispatchStep = createStep({
     const secretaryContext = secretaryStore.getAgentContext(5);
     const crewProfile = secretaryStore.getCrewPreferenceProfile();
 
-    const snapshotJson = JSON.stringify(snapshot, null, 2);
+    const compactSnap = compactSnapshot(snapshot as Record<string, unknown>);
+    const compactSnapJson = JSON.stringify(compactSnap, null, 2);
     const crewStatusBlock = crewProfilesForAgent();
     const contextBlock = `
 ${crewStatusBlock}
@@ -260,7 +418,7 @@ Mission sol: ${missionSol}
       const reason = playbookReason ?? 'Severity-1 emergency: hardcoded playbook executed.';
 
       // Log incident
-      const incident = secretaryStore.addIncident({
+      secretaryStore.addIncident({
         missionSol,
         emergencyType: reason.split(':')[0],
         severity: 1,
@@ -294,19 +452,27 @@ Mission sol: ${missionSol}
         survivalJustification: reason,
         wellbeingJustification: 'Not consulted — severity-1 emergency',
         reasoning: reason,
-        summary: `⚠️ EMERGENCY (severity 1): ${reason}`,
+        summary: `EMERGENCY: ${summarizeActions(actions)}`,
         decisionId: decisionEntry.id,
       };
     }
 
-    // ── CREW QUESTION: Wellbeing only, direct answer from snapshot ─────────
+    // ── CREW TRIGGER: Classify intent, then route ─────────────────────────
+    // Wellbeing state is hoisted so crew-request results can be carried
+    // forward into the Both + Arbiter pipeline without a redundant LLM call.
+    let crewIntent = 'question';
+    let wbScore = 0.7;
+    let wbActions: z.infer<typeof ActionSchema>[] = [];
+    let wbJustification = '';
+    let wbCrewResponse = '';
+
     if (triggerType === 'crew' && crewMessage) {
-      // First classify intent using wellbeing agent
+      // Classify intent using wellbeing agent
       const intentClassificationPrompt = `[ARBITER_MODE]
 ${contextBlock}
 
 Current greenhouse sensor readings:
-${snapshotJson}
+${compactSnapJson}
 
 Crew message: "${crewMessage}"
 
@@ -314,17 +480,11 @@ Classify this message as "question", "request", or "override" and respond accord
 For questions: answer directly from the sensor data.
 For requests or overrides: classify intent and provide your proposal.`;
 
-      let crewIntent = 'question';
-      let crewResponse = '';
-      let wellbeingScore = 0.7;
-      let wellbeingProposal: z.infer<typeof ActionSchema>[] = [];
-      let wellbeingJustification = '';
-
       if (wellbeingAgent) {
         try {
           const wResult = await wellbeingAgent.generate(
             [{ role: 'user', content: intentClassificationPrompt }],
-            { maxSteps: 3 },
+            { maxSteps: 1 },
           );
           const wText = wResult.text ?? '';
 
@@ -334,25 +494,25 @@ For requests or overrides: classify intent and provide your proposal.`;
             try {
               const parsed = JSON.parse(jsonMatch[0]);
               crewIntent = parsed.intent ?? 'question';
-              wellbeingScore = parsed.wellbeingScore ?? 0.7;
+              wbScore = parsed.wellbeingScore ?? 0.7;
 
               // Apply preference updates from any crew interaction
               applyPreferenceUpdates(parsed.preferenceUpdates, missionSol);
               secretaryStore.addCrewRequest(crewMessage, missionSol);
 
               if (crewIntent === 'question') {
-                crewResponse = parsed.response ?? wText;
+                wbCrewResponse = parsed.response ?? wText;
                 const decisionEntry = secretaryStore.addDecision({
                   missionSol,
                   triggerType: 'crew_question',
                   riskScore: 0,
-                  wellbeingScore,
+                  wellbeingScore: wbScore,
                   conflictType: 'none',
                   winningAgent: 'wellbeing',
                   survivalProposalSummary: 'Not consulted (question)',
-                  wellbeingProposalSummary: crewResponse.slice(0, 100),
+                  wellbeingProposalSummary: wbCrewResponse.slice(0, 100),
                   actionsEnacted: [],
-                  reasoning: crewResponse,
+                  reasoning: wbCrewResponse,
                 });
 
                 return {
@@ -362,20 +522,20 @@ For requests or overrides: classify intent and provide your proposal.`;
                   conflictType: 'none',
                   winningAgent: 'wellbeing',
                   riskScore: 0,
-                  wellbeingScore,
+                  wellbeingScore: wbScore,
                   survivalJustification: '',
                   wellbeingJustification: 'Direct question answered from snapshot',
-                  crewResponse,
-                  reasoning: crewResponse,
-                  summary: crewResponse.slice(0, 150),
+                  crewResponse: wbCrewResponse,
+                  reasoning: wbCrewResponse,
+                  summary: wbCrewResponse.slice(0, 150),
                   decisionId: decisionEntry.id,
                 };
               }
 
               // For request or override
-              wellbeingProposal = parsed.proposal?.actions ?? [];
-              wellbeingJustification = parsed.proposal?.justification ?? '';
-              crewResponse = parsed.crewResponse ?? '';
+              wbActions = parsed.proposal?.actions ?? [];
+              wbJustification = parsed.proposal?.justification ?? '';
+              wbCrewResponse = parsed.crewResponse ?? '';
               // preferenceUpdates already applied above
             } catch { /* continue with empty proposal */ }
           }
@@ -393,10 +553,10 @@ For requests or overrides: classify intent and provide your proposal.`;
 ${contextBlock}
 
 Current greenhouse sensor readings:
-${snapshotJson}
+${compactSnapJson}
 
 The crew is attempting an OVERRIDE: "${crewMessage}"
-Proposed override actions: ${JSON.stringify(wellbeingProposal)}
+Proposed override actions: ${JSON.stringify(wbActions)}
 
 Evaluate this override. If risk score > 0.85, issue a hard veto with explanation.
 Otherwise, permit the override and log it.`;
@@ -404,7 +564,7 @@ Otherwise, permit the override and log it.`;
           try {
             const sResult = await survivalAgent.generate(
               [{ role: 'user', content: vetoPrompt }],
-              { maxSteps: 3 },
+              { maxSteps: 1 },
             );
             const sText = sResult.text ?? '';
             const jsonMatch = sText.match(/\{[\s\S]*\}/);
@@ -419,11 +579,11 @@ Otherwise, permit the override and log it.`;
                   missionSol,
                   triggerType: 'crew_override',
                   riskScore,
-                  wellbeingScore,
+                  wellbeingScore: wbScore,
                   conflictType: 'hard_veto',
                   winningAgent: 'survival',
                   survivalProposalSummary: parsed.vetoReason ?? 'Veto issued',
-                  wellbeingProposalSummary: wellbeingJustification,
+                  wellbeingProposalSummary: wbJustification,
                   actionsEnacted: [],
                   reasoning: parsed.vetoReason ?? 'Override vetoed for safety',
                 });
@@ -435,12 +595,12 @@ Otherwise, permit the override and log it.`;
                   conflictType: 'hard_veto',
                   winningAgent: 'survival',
                   riskScore,
-                  wellbeingScore,
+                  wellbeingScore: wbScore,
                   survivalJustification: parsed.vetoReason ?? 'Override vetoed',
-                  wellbeingJustification,
+                  wellbeingJustification: wbJustification,
                   crewResponse: `Override denied: ${parsed.vetoReason ?? 'Safety threshold exceeded.'}`,
                   reasoning: parsed.vetoReason ?? 'Override vetoed for safety',
-                  summary: `Override vetoed — risk score ${riskScore.toFixed(2)} > 0.85`,
+                  summary: `Override vetoed (risk ${riskScore.toFixed(2)})`,
                   decisionId: decisionEntry.id,
                 };
               }
@@ -451,28 +611,28 @@ Otherwise, permit the override and log it.`;
                 missionSol,
                 triggerType: 'crew_override',
                 riskScore,
-                wellbeingScore,
+                wellbeingScore: wbScore,
                 conflictType: 'none',
                 winningAgent: 'wellbeing',
                 survivalProposalSummary: `Risk score ${riskScore.toFixed(2)} — permitted`,
-                wellbeingProposalSummary: wellbeingJustification,
-                actionsEnacted: wellbeingProposal,
+                wellbeingProposalSummary: wbJustification,
+                actionsEnacted: wbActions,
                 reasoning: `Crew override permitted — risk score ${riskScore.toFixed(2)} < 0.85`,
               });
 
               return {
                 triggerType: 'crew_override',
                 crewIntent: 'override',
-                resolvedActions: wellbeingProposal,
+                resolvedActions: wbActions,
                 conflictType: 'none',
                 winningAgent: 'wellbeing',
                 riskScore,
-                wellbeingScore,
+                wellbeingScore: wbScore,
                 survivalJustification: `Permitted — risk ${riskScore.toFixed(2)}`,
-                wellbeingJustification,
-                crewResponse: crewResponse || 'Override approved.',
+                wellbeingJustification: wbJustification,
+                crewResponse: wbCrewResponse || 'Override approved.',
                 reasoning: `Crew override permitted`,
-                summary: `Override approved — risk score ${riskScore.toFixed(2)}`,
+                summary: `Override approved: ${summarizeActions(wbActions)}`,
                 decisionId: decisionEntry.id,
               };
             }
@@ -486,34 +646,35 @@ Otherwise, permit the override and log it.`;
           missionSol,
           triggerType: 'crew_override',
           riskScore: 0.3,
-          wellbeingScore,
+          wellbeingScore: wbScore,
           conflictType: 'none',
           winningAgent: 'wellbeing',
           survivalProposalSummary: 'No survival check (agent unavailable)',
-          wellbeingProposalSummary: wellbeingJustification,
-          actionsEnacted: wellbeingProposal,
+          wellbeingProposalSummary: wbJustification,
+          actionsEnacted: wbActions,
           reasoning: 'Override permitted — survival check unavailable',
         });
 
         return {
           triggerType: 'crew_override',
           crewIntent: 'override',
-          resolvedActions: wellbeingProposal,
+          resolvedActions: wbActions,
           conflictType: 'none',
           winningAgent: 'wellbeing',
           riskScore: 0.3,
-          wellbeingScore,
+          wellbeingScore: wbScore,
           survivalJustification: '',
-          wellbeingJustification,
-          crewResponse: crewResponse || 'Override accepted.',
+          wellbeingJustification: wbJustification,
+          crewResponse: wbCrewResponse || 'Override accepted.',
           reasoning: 'Override permitted',
-          summary: 'Crew override accepted',
+          summary: `Override accepted: ${summarizeActions(wbActions)}`,
           decisionId: decisionEntry.id,
         };
       }
 
-      // Crew request → fall through to full Both + Arbiter pipeline below
-      // (handled by mini routine cycle)
+      // Crew request → fall through to full Both + Arbiter pipeline below.
+      // Carry forward the wellbeing result from intent classification to avoid
+      // a redundant second wellbeing LLM call (saves 3-8s on the critical path).
     }
 
     // ── BOTH AGENTS + ARBITER (Routine, Crew Request, Severity-2 Emergency) ──
@@ -528,7 +689,7 @@ Otherwise, permit the override and log it.`;
 ${contextBlock}
 
 Current greenhouse sensor readings:
-${snapshotJson}
+${compactSnapJson}
 
 ${crewMessage ? `Crew message (context for this decision): "${crewMessage}"` : ''}
 Mission sol: ${missionSol}
@@ -541,26 +702,39 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
     let survivalVeto = false;
     let survivalVetoReason = '';
 
-    let wellbeingScore = 0.7;
-    let wellbeingActions: z.infer<typeof ActionSchema>[] = [];
-    let wellbeingJustification = 'No proposal';
-    let crewResponseText = '';
+    // For crew requests, reuse the wellbeing result from intent classification above
+    // instead of calling the wellbeing agent a second time.
+    let arbWbScore = isCrewRequest ? wbScore : 0.7;
+    let arbWbActions: z.infer<typeof ActionSchema>[] = isCrewRequest ? wbActions : [];
+    let arbWbJustification = isCrewRequest ? wbJustification : 'No proposal';
+    let arbWbCrewResponse = isCrewRequest ? wbCrewResponse : '';
 
-    const [survivalResult, wellbeingResult] = await Promise.allSettled([
+    // For crew requests, only run survival (wellbeing already done).
+    // For routine/sev-2, run both in parallel.
+    // Use maxSteps: 1 — agents get full context in the prompt and don't need
+    // tool calls in dispatcher mode. This eliminates the KB round-trip (~2-4s).
+    const agentCalls: Promise<unknown>[] = [
       survivalAgent?.generate(
         [{ role: 'user', content: `${digestPreamble('survival')}${basePrompt}\n\nProvide your risk assessment and conservative action proposal.` }],
-        { maxSteps: isEmergencySev2 ? 2 : 5 },
-      ),
-      wellbeingAgent?.generate(
-        [{ role: 'user', content: `[ARBITER_MODE]\n${digestPreamble('wellbeing')}${basePrompt}\n\nProvide your wellbeing assessment and crew-centred action proposal.` }],
-        { maxSteps: isEmergencySev2 ? 2 : 5 },
-        // Memory only for crew-facing interactions
-      ),
-    ]);
+        { maxSteps: 1 },
+      ) ?? Promise.resolve(null),
+    ];
+    if (!isCrewRequest) {
+      agentCalls.push(
+        wellbeingAgent?.generate(
+          [{ role: 'user', content: `[ARBITER_MODE]\n${digestPreamble('wellbeing')}${basePrompt}\n\nProvide your wellbeing assessment and crew-centred action proposal.` }],
+          { maxSteps: 1 },
+        ) ?? Promise.resolve(null),
+      );
+    }
+
+    const agentResults = await Promise.allSettled(agentCalls);
+    const survivalResult = agentResults[0];
+    const wellbeingResult = agentResults[1]; // undefined for crew requests
 
     // Parse survival agent output
     if (survivalResult.status === 'fulfilled' && survivalResult.value) {
-      const sText = survivalResult.value.text ?? '';
+      const sText = (survivalResult.value as { text?: string }).text ?? '';
       const jsonMatch = sText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
@@ -572,25 +746,25 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
           survivalVetoReason = parsed.vetoReason ?? '';
         } catch { survivalJustification = sText.slice(0, 200); }
       } else {
-        survivalJustification = sText.slice(0, 200);
+        survivalJustification = (survivalResult.value as { text?: string }).text?.slice(0, 200) ?? 'No proposal';
       }
     }
 
-    // Parse wellbeing agent output
-    if (wellbeingResult.status === 'fulfilled' && wellbeingResult.value) {
-      const wText = wellbeingResult.value.text ?? '';
+    // Parse wellbeing agent output (only for non-crew-request paths)
+    if (!isCrewRequest && wellbeingResult?.status === 'fulfilled' && wellbeingResult.value) {
+      const wText = (wellbeingResult.value as { text?: string }).text ?? '';
       const jsonMatch = wText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[0]);
-          wellbeingScore = parsed.wellbeingScore ?? 0.7;
-          wellbeingActions = parsed.proposal?.actions ?? [];
-          wellbeingJustification = parsed.proposal?.justification ?? wText.slice(0, 200);
-          crewResponseText = parsed.crewResponse ?? '';
+          arbWbScore = parsed.wellbeingScore ?? 0.7;
+          arbWbActions = parsed.proposal?.actions ?? [];
+          arbWbJustification = parsed.proposal?.justification ?? wText.slice(0, 200);
+          arbWbCrewResponse = parsed.crewResponse ?? '';
           applyPreferenceUpdates(parsed.preferenceUpdates, missionSol);
-        } catch { wellbeingJustification = wText.slice(0, 200); }
+        } catch { arbWbJustification = wText.slice(0, 200); }
       } else {
-        wellbeingJustification = wText.slice(0, 200);
+        arbWbJustification = wText.slice(0, 200);
       }
     }
 
@@ -608,10 +782,25 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
       conflictType = 'hard_veto';
       winningAgent = 'survival';
       resolvedActions = survivalActions;
-      crewResponseText = survivalVetoReason
+      arbWbCrewResponse = survivalVetoReason
         ? `⚠️ Mission commander veto: ${survivalVetoReason}`
         : `⚠️ Safety threshold exceeded — survival plan enacted.`;
       arbiterReasoning = `Hard veto invoked (risk ${survivalRiskScore.toFixed(2)} > 0.85). Survival plan enacted without deliberation. ${survivalVetoReason}`;
+
+    } else if (survivalRiskScore < 0.5 && !isEmergencySev2) {
+      // ── FAST PATH: Agents agree, low risk — skip Arbiter entirely ───────
+      // When risk is below 0.5 and it's not an emergency, there's no conflict
+      // to resolve. Merge both proposals and proceed without a Sonnet call.
+      const mergedMap = new Map<string, z.infer<typeof ActionSchema>>();
+      for (const a of survivalActions) mergedMap.set(`${a.type}:${a.param ?? a.crop ?? 'tile'}`, a);
+      for (const a of arbWbActions) {
+        const key = `${a.type}:${a.param ?? a.crop ?? 'tile'}`;
+        if (!mergedMap.has(key)) mergedMap.set(key, a);
+      }
+      resolvedActions = [...mergedMap.values()];
+      conflictType = 'none';
+      winningAgent = 'both';
+      arbiterReasoning = `Low risk (${survivalRiskScore.toFixed(2)}) — agents agreed, arbiter skipped.`;
 
     } else {
       // ── Run simulations before calling Arbiter so it has the data ────────
@@ -625,7 +814,7 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
           Promise.resolve(runSimulation({ snapshot, proposedActions: survivalActions, horizonSols, scenarioCount })),
           isEmergencySev2
             ? Promise.resolve(null) // sev-2: only sim survival plan
-            : Promise.resolve(runSimulation({ snapshot, proposedActions: wellbeingActions, horizonSols, scenarioCount })),
+            : Promise.resolve(runSimulation({ snapshot, proposedActions: arbWbActions, horizonSols, scenarioCount })),
         ]);
         simSurvivalResult = ss;
         simWellbeingResult = sw ?? undefined;
@@ -648,7 +837,7 @@ SECRETARY CONTEXT (recent mission history):
 ${secretaryContext || 'No prior decisions.'}
 
 CURRENT GREENHOUSE STATE:
-${snapshotJson}
+${envSummaryForArbiter(snapshot as Record<string, unknown>)}
 ${crewMessage ? `\nCREW MESSAGE: "${crewMessage}"` : ''}
 
 SURVIVAL AGENT BRIEF:
@@ -657,10 +846,10 @@ Justification: ${survivalJustification}
 Proposed actions: ${JSON.stringify(survivalActions, null, 2)}
 
 WELLBEING AGENT BRIEF:
-Wellbeing score: ${wellbeingScore.toFixed(3)}
-Justification: ${wellbeingJustification}
-Proposed actions: ${JSON.stringify(wellbeingActions, null, 2)}
-${crewResponseText ? `Crew-facing message from Wellbeing: "${crewResponseText}"` : ''}
+Wellbeing score: ${arbWbScore.toFixed(3)}
+Justification: ${arbWbJustification}
+Proposed actions: ${JSON.stringify(arbWbActions, null, 2)}
+${arbWbCrewResponse ? `Crew-facing message from Wellbeing: "${arbWbCrewResponse}"` : ''}
 
 SIMULATION RESULTS (P10 = worst-case 10th percentile):
 ${simSurvivalResult ? `Survival plan — P10: ${simSurvivalResult.p10YieldKg.toFixed(2)} kg, P90: ${simSurvivalResult.p90YieldKg.toFixed(2)} kg` : 'Survival plan: not simulated'}
@@ -672,7 +861,7 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
         try {
           const arbiterResult = await arbiterAgent.generate(
             [{ role: 'user', content: arbiterPrompt }],
-            { maxSteps: 3 },
+            { maxSteps: 1 },
           );
           const aText = arbiterResult.text ?? '';
           const jsonMatch = aText.match(/\{[\s\S]*\}/);
@@ -681,7 +870,7 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
             const parsed = JSON.parse(jsonMatch[0]);
             conflictType = (parsed.conflictType as ConflictType) ?? 'none';
             arbiterReasoning = parsed.reasoning ?? aText.slice(0, 400);
-            if (parsed.crewMessage) crewResponseText = parsed.crewMessage;
+            if (parsed.crewMessage) arbWbCrewResponse = parsed.crewMessage;
 
             // Resolve actions based on Arbiter decision
             const rawActions: z.infer<typeof ActionSchema>[] = parsed.actions ?? [];
@@ -696,12 +885,12 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
             } else if (winningAgent === 'survival') {
               resolvedActions = survivalActions;
             } else if (winningAgent === 'wellbeing') {
-              resolvedActions = wellbeingActions;
+              resolvedActions = arbWbActions;
             } else {
               // Fallback merge for agreement
               const mergedMap = new Map<string, z.infer<typeof ActionSchema>>();
               for (const a of survivalActions) mergedMap.set(`${a.type}:${a.param ?? a.crop}`, a);
-              for (const a of wellbeingActions) {
+              for (const a of arbWbActions) {
                 const key = `${a.type}:${a.param ?? a.crop}`;
                 if (!mergedMap.has(key)) mergedMap.set(key, a);
               }
@@ -727,7 +916,7 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       } else {
         // No arbiter available — deterministic fallback
         winningAgent = survivalRiskScore >= 0.5 ? 'survival' : 'both';
-        resolvedActions = survivalRiskScore >= 0.5 ? survivalActions : [...survivalActions, ...wellbeingActions];
+        resolvedActions = survivalRiskScore >= 0.5 ? survivalActions : [...survivalActions, ...arbWbActions];
         arbiterReasoning = 'Arbiter unavailable — deterministic fallback applied.';
       }
     }
@@ -740,6 +929,7 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       if (a.type === 'harvest-tile') return !!a.tileId;
       if (a.type === 'plant-tile') return !!a.tileId && !!a.crop;
       if (a.type === 'clear-tile') return !!a.tileId;
+      if (a.type === 'batch-tile') return !!(a.harvests?.length || a.plants?.length || a.clears?.length);
       return false;
     });
 
@@ -753,11 +943,11 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       missionSol,
       triggerType: logTriggerType,
       riskScore: survivalRiskScore,
-      wellbeingScore,
+      wellbeingScore: arbWbScore,
       conflictType,
       winningAgent,
       survivalProposalSummary: survivalJustification.slice(0, 150),
-      wellbeingProposalSummary: wellbeingJustification.slice(0, 150),
+      wellbeingProposalSummary: arbWbJustification.slice(0, 150),
       actionsEnacted: resolvedActions,
       simulationP10,
       simulationP90,
@@ -777,20 +967,20 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       conflictType,
       winningAgent,
       riskScore: survivalRiskScore,
-      wellbeingScore,
+      wellbeingScore: arbWbScore,
       survivalJustification,
-      wellbeingJustification,
-      crewResponse: crewResponseText || undefined,
+      wellbeingJustification: arbWbJustification,
+      crewResponse: arbWbCrewResponse || undefined,
       simulationP10,
       simulationP90,
       reasoning: arbiterReasoning,
       summary: conflictType === 'hard_veto'
-        ? `Safety veto (risk ${survivalRiskScore.toFixed(2)}) — survival plan enacted`
+        ? `Safety veto (risk ${survivalRiskScore.toFixed(2)}): ${summarizeActions(resolvedActions)}`
         : conflictType === 'soft_conflict'
-        ? `Conflict resolved — ${winningAgent} plan selected`
+        ? `Conflict resolved (${winningAgent}): ${summarizeActions(resolvedActions)}`
         : isEmergencySev2
-        ? `Severity-2 emergency — ${resolvedActions.length} action(s) enacted`
-        : `${resolvedActions.length} action(s) enacted — agents agreed`,
+        ? `Severity-2 emergency: ${summarizeActions(resolvedActions)}`
+        : summarizeActions(resolvedActions),
       decisionId: decisionEntry.id,
     };
   },

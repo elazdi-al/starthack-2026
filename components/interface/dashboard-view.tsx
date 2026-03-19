@@ -196,6 +196,200 @@ function CrewRadarCard({ member }: { member: CrewMember }) {
   );
 }
 
+/* ── Season / storm display helpers ─────────────────────────────── */
+
+const SEASON_LABELS: Record<string, string> = {
+  northern_spring: "Spring",
+  northern_summer: "Summer",
+  northern_autumn: "Autumn",
+  northern_winter: "Winter",
+};
+
+const STORM_RISK_COLOR: Record<string, string> = {
+  low: "text-emerald-500",
+  moderate: "text-amber-500",
+  high: "text-orange-500",
+  extreme: "text-red-500",
+};
+
+const STORM_RISK_BG: Record<string, string> = {
+  low: "bg-emerald-500/15",
+  moderate: "bg-amber-500/15",
+  high: "bg-orange-500/15",
+  extreme: "bg-red-500/15",
+};
+
+/* ── Greenhouse State card ──────────────────────────────────────── */
+
+function GreenhouseStateCard({
+  sol,
+  totalSols,
+  foodReservesSols,
+  totalHarvestKg,
+  nutritionalCoverage,
+}: {
+  sol: number;
+  totalSols: number;
+  foodReservesSols: number;
+  totalHarvestKg: number;
+  nutritionalCoverage: number;
+}) {
+  const pct = Math.min(100, (sol / totalSols) * 100);
+  const foodPct = Math.min(100, (foodReservesSols / totalSols) * 100);
+  const foodColor =
+    foodReservesSols > 200 ? "bg-emerald-500" : foodReservesSols > 100 ? "bg-amber-500" : "bg-red-500";
+  const foodText =
+    foodReservesSols > 200 ? "text-emerald-500" : foodReservesSols > 100 ? "text-amber-500" : "text-red-500";
+  const covPct = Math.round(nutritionalCoverage * 1000) / 10;
+  const covColor = covPct >= 80 ? "text-emerald-500" : covPct >= 40 ? "text-amber-500" : "text-red-500";
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-2.5 h-full min-h-0 justify-center">
+      {/* Header: Mission sol */}
+      <div className="flex items-baseline justify-between px-0.5">
+        <span className="text-[9px] font-medium tracking-wide uppercase text-muted-foreground">
+          Greenhouse
+        </span>
+        <span className="tabular-nums text-xs font-semibold text-foreground">
+          Sol {Math.floor(sol)}
+          <span className="ml-0.5 text-[9px] font-normal text-muted-foreground">/ {totalSols}</span>
+        </span>
+      </div>
+
+      {/* Mission progress bar */}
+      <div className="flex flex-col gap-0.5 px-0.5">
+        <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-blue-500 transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="text-[8px] text-muted-foreground tabular-nums text-right">
+          {pct.toFixed(1)}% complete
+        </span>
+      </div>
+
+      {/* Food reserves bar */}
+      <div className="flex flex-col gap-0.5 px-0.5">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[9px] font-medium tracking-wide uppercase text-muted-foreground">
+            Food Reserves
+          </span>
+          <span className={`tabular-nums text-xs font-semibold ${foodText}`}>
+            {Math.round(foodReservesSols)}
+            <span className="ml-0.5 text-[9px] font-normal text-muted-foreground">sols</span>
+          </span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
+          <div
+            className={`h-full rounded-full ${foodColor} transition-all duration-500`}
+            style={{ width: `${foodPct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Harvest + Coverage stats row */}
+      <div className="grid grid-cols-2 gap-3 px-0.5 pt-0.5">
+        <div className="flex flex-col">
+          <span className="text-[8px] text-muted-foreground">Total Harvest</span>
+          <span className="tabular-nums text-[11px] font-semibold text-foreground">
+            {totalHarvestKg.toFixed(1)}
+            <span className="text-[9px] font-normal text-muted-foreground"> kg</span>
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[8px] text-muted-foreground">Nutritional Coverage</span>
+          <span className={`tabular-nums text-[11px] font-semibold ${covColor}`}>
+            {covPct.toFixed(1)}
+            <span className="text-[9px] font-normal text-muted-foreground"> %</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Mars Info card ────────────────────────────────────────────── */
+
+function MarsInfoCard({
+  season,
+  dustStormRisk,
+  dustStormActive,
+  externalTemp,
+  solarRadiation,
+  dustStormFactor,
+}: {
+  season: string;
+  dustStormRisk: string;
+  dustStormActive: boolean;
+  externalTemp: number;
+  solarRadiation: number;
+  dustStormFactor: number;
+}) {
+  const riskColor = STORM_RISK_COLOR[dustStormRisk] ?? "text-muted-foreground";
+  const riskBg = STORM_RISK_BG[dustStormRisk] ?? "bg-muted/50";
+  const opacity = Math.round(dustStormFactor * 100);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-2.5 h-full min-h-0 justify-center">
+      {/* Header */}
+      <div className="flex items-baseline justify-between px-0.5">
+        <span className="text-[9px] font-medium tracking-wide uppercase text-muted-foreground">
+          Mars Environment
+        </span>
+        <span className="text-[10px] font-semibold text-foreground">
+          {SEASON_LABELS[season] ?? season}
+        </span>
+      </div>
+
+      {/* Dust storm row */}
+      <div className="flex items-center justify-between px-0.5">
+        <span className="text-[9px] text-muted-foreground">Dust Storm Risk</span>
+        <div className="flex items-center gap-1.5">
+          {dustStormActive && (
+            <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-medium">
+              ACTIVE
+            </span>
+          )}
+          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium capitalize ${riskColor} ${riskBg}`}>
+            {dustStormRisk}
+          </span>
+        </div>
+      </div>
+
+      {/* Solar transparency bar */}
+      <div className="flex flex-col gap-0.5 px-0.5">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[8px] text-muted-foreground">Solar Transparency</span>
+          <span className="tabular-nums text-[10px] font-semibold text-foreground">{opacity}%</span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${opacity > 80 ? "bg-emerald-500" : opacity > 50 ? "bg-amber-500" : "bg-red-500"}`}
+            style={{ width: `${opacity}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 gap-3 px-0.5 pt-0.5">
+        <div className="flex flex-col">
+          <span className="text-[8px] text-muted-foreground">Surface Temp</span>
+          <span className="tabular-nums text-[11px] font-semibold text-foreground">
+            {externalTemp.toFixed(0)}<span className="text-[9px] font-normal text-muted-foreground">{"\u00b0C"}</span>
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[8px] text-muted-foreground">Solar Irrad.</span>
+          <span className="tabular-nums text-[11px] font-semibold text-foreground">
+            {Math.round(solarRadiation)}<span className="text-[9px] font-normal text-muted-foreground"> W/m{"\u00b2"}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Crop card ─────────────────────────────────────────────────── */
 
 const STAGE_LABELS: Record<string, string> = {
@@ -280,6 +474,16 @@ export function DashboardView() {
   const nutritionalCoverage = useGreenhouseStore((s) => s.environment.nutritionalCoverage);
   const env = useGreenhouseStore((s) => s.environment);
 
+  const missionSol = env.missionSol;
+  const totalMissionSols = 450;
+  const foodReservesSols = env.foodReservesSols;
+  const seasonName = env.seasonName;
+  const dustStormRisk = env.dustStormRisk;
+  const dustStormActive = env.dustStormFactor < 0.9;
+  const dustStormFactor = env.dustStormFactor;
+  const externalTemp = env.externalTemp;
+  const solarRadiation = env.solarRadiation;
+
   const cropEntries = useMemo(() => {
     return (Object.entries(env.crops) as [string, { plantGrowth: number; healthScore: number; stage: string; estimatedYieldKg: number; biomassKg: number }][])
       .map(([key, crop]) => ({
@@ -328,25 +532,22 @@ export function DashboardView() {
           />
         </div>
 
-        {/* Row 2: Production — 2 columns, wide */}
+        {/* Row 2: Greenhouse state + Mars — 2 columns */}
         <div className="grid grid-cols-2 gap-3 flex-[2] min-h-0">
-          <LiveParamCard
-            label="Total Harvest"
-            unit="kg"
-            color={C.harvest}
-            value={totalHarvestKg}
-            fmtVal={(v) => v.toFixed(1)}
-            fmtAxis={(v) => `${v.toFixed(0)}`}
-            window={120}
+          <GreenhouseStateCard
+            sol={missionSol}
+            totalSols={totalMissionSols}
+            foodReservesSols={foodReservesSols}
+            totalHarvestKg={totalHarvestKg}
+            nutritionalCoverage={nutritionalCoverage}
           />
-          <LiveParamCard
-            label="Nutritional Coverage"
-            unit="%"
-            color={C.nutrition}
-            value={Math.round(nutritionalCoverage * 1000) / 10}
-            fmtVal={(v) => v.toFixed(1)}
-            fmtAxis={(v) => `${v.toFixed(0)}%`}
-            window={120}
+          <MarsInfoCard
+            season={seasonName}
+            dustStormRisk={dustStormRisk}
+            dustStormActive={dustStormActive}
+            externalTemp={externalTemp}
+            solarRadiation={solarRadiation}
+            dustStormFactor={dustStormFactor}
           />
         </div>
 

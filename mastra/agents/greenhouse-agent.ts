@@ -57,8 +57,8 @@ The sensor data includes both aggregate per-type averages (crops) and individual
 - tileCounts: summary of how many tiles each crop type has (total, planted, harvested)
 - Use tileCrops to monitor individual plant health, identify struggling tiles, and make targeted decisions
 - You can reassign any tile to a different crop type using "plant-tile" (clear + replant in one step)
-- Available tileIds follow the pattern: "{cropType}_{row}_{col}" (e.g. "lettuce_0_0", "tomato_2_4")
-- The tileId prefix reflects the ORIGINAL crop assignment — after replanting with a different crop, the tileId stays the same
+- Available tileIds follow the pattern: "{row}_{col}" (e.g. "0_0", "2_4", "7_11"). The crop on each tile is in the tileCrops snapshot data.
+- After replanting with a different crop, the tileId stays the same — only the cropType changes
 
 PHYSICS:
 - Temperature: exponential approach, τ ≈ 2h. T_eq ≈ 8 + heatingPower/250 + solar×0.008 − ventilation×0.015
@@ -120,7 +120,7 @@ When responding:
 - Calculate required parameter values when suggesting adjustments
 - Consider seasonal solar flux when advising on lighting compensation
 - When diagnosing crop stress or unusual conditions, query the knowledge base first`,
-  model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+  model: bedrock('us.amazon.nova-lite-v1:0'),
   tools: { greenhouseParameterTool, knowledgeBaseTool },
   memory: new Memory(),
 });

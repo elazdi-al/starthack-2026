@@ -18,11 +18,14 @@ import type { CropProfile } from '../../greenhouse/implementations/multi-crop/pr
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface SimAction {
-  type: 'greenhouse' | 'crop' | 'harvest' | 'replant' | 'harvest-tile' | 'plant-tile' | 'clear-tile';
+  type: 'greenhouse' | 'crop' | 'harvest' | 'replant' | 'harvest-tile' | 'plant-tile' | 'clear-tile' | 'batch-tile';
   param?: string;
   value?: number;
   crop?: string;
   tileId?: string;
+  harvests?: string[];
+  plants?: Array<{ tileId: string; crop: string }>;
+  clears?: string[];
 }
 
 export interface SimulationParams {
@@ -375,6 +378,42 @@ function runScenario(
       if (tileCrop) {
         const idx = cropStates.findIndex(cs => cs.cropType === tileCrop && cs.stage !== 'harvested');
         if (idx >= 0) cropStates.splice(idx, 1);
+      }
+    }
+    if (action.type === 'batch-tile') {
+      // Harvest: mark one non-harvested individual per entry
+      for (const _tileId of action.harvests ?? []) {
+        const target = cropStates.find(cs => cs.stage !== 'harvested');
+        if (target) target.stage = 'harvested';
+      }
+      // Clear
+      for (const _tileId of action.clears ?? []) {
+        const idx = cropStates.findIndex(cs => cs.stage !== 'harvested');
+        if (idx >= 0) cropStates.splice(idx, 1);
+      }
+      // Plant
+      for (const { tileId, crop } of action.plants ?? []) {
+        const profile = CROP_PROFILES[crop as keyof typeof CROP_PROFILES];
+        if (profile) {
+          let plantSeed = (scenarioSeed * 0x85ebca6b) >>> 0;
+          for (let ci = 0; ci < tileId.length; ci++) {
+            plantSeed ^= tileId.charCodeAt(ci);
+            plantSeed = Math.imul(plantSeed, 16777619) >>> 0;
+          }
+          const genetics = generateGeneticIdentity(plantSeed, profile.geneticVariance);
+          cropStates.push({
+            cropType: crop,
+            instanceId: `${crop}#planted_${cropStates.length}`,
+            genetics,
+            stageProgress: 0,
+            healthScore: 1.0,
+            accumulatedStress: 0,
+            soilMoisture: profile.optimalMoisture ?? 65,
+            waterPumpRate: 8,
+            isBolting: false,
+            stage: 'seed',
+          });
+        }
       }
     }
   }

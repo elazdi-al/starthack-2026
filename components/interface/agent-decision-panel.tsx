@@ -222,8 +222,15 @@ function DecisionCard({ decision, defaultOpen }: { decision: AgentDecision; defa
                 Actions taken
               </p>
               <div className="flex flex-col gap-1">
-                {decision.actions.map((action, i) => (
-                  <ActionRow key={i} action={action} />
+                {summarizeActionList(decision.actions).map((item, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border ${item.color}`}
+                    style={{ fontSize: "10px" }}
+                  >
+                    {item.icon && <span className="shrink-0">{item.icon}</span>}
+                    <span className="font-medium truncate">{item.label}</span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -429,34 +436,81 @@ const ACTION_COLORS: Record<string, string> = {
   replant:    "text-violet-500 bg-violet-500/10 border-violet-500/25",
 };
 
-function ActionRow({ action }: { action: AgentAction }) {
-  const color = ACTION_COLORS[action.type] ?? "text-neutral-500 bg-neutral-500/10 border-neutral-500/25";
-  const icon = action.param
-    ? ACTION_ICON[action.param] ?? null
-    : ACTION_ICON[action.type] ?? null;
+/** Collapse raw actions into human-readable summary rows. */
+function summarizeActionList(actions: AgentAction[]): Array<{ label: string; icon: React.ReactNode; color: string }> {
+  const rows: Array<{ label: string; icon: React.ReactNode; color: string }> = [];
 
-  let label = "";
-  if (action.type === "harvest") {
-    label = `Harvest ${action.crop}`;
-  } else if (action.type === "replant") {
-    label = `Replant ${action.crop}`;
-  } else if (action.type === "greenhouse" && action.param) {
-    const paramLabel = PARAM_LABELS[action.param] ?? action.param;
-    label = `${paramLabel} → ${formatValue(action.param, action.value)}`;
-  } else if (action.type === "crop" && action.param && action.crop) {
-    const paramLabel = PARAM_LABELS[action.param] ?? action.param;
-    label = `${action.crop} ${paramLabel} → ${formatValue(action.param, action.value)}`;
+  // Collect tile operations by crop
+  const plantCounts: Record<string, number> = {};
+  let harvestTileCount = 0;
+  let clearTileCount = 0;
+
+  for (const a of actions) {
+    if (a.type === "batch-tile") {
+      for (const p of a.plants ?? []) {
+        plantCounts[p.crop] = (plantCounts[p.crop] ?? 0) + 1;
+      }
+      harvestTileCount += a.harvests?.length ?? 0;
+      clearTileCount += a.clears?.length ?? 0;
+    } else if (a.type === "plant-tile" && a.crop) {
+      plantCounts[a.crop] = (plantCounts[a.crop] ?? 0) + 1;
+    } else if (a.type === "harvest-tile") {
+      harvestTileCount++;
+    } else if (a.type === "clear-tile") {
+      clearTileCount++;
+    } else if (a.type === "harvest" && a.crop) {
+      rows.push({
+        label: `Harvested all ${a.crop}`,
+        icon: <Leaf size={10} weight="fill" />,
+        color: ACTION_COLORS.harvest,
+      });
+    } else if (a.type === "replant" && a.crop) {
+      rows.push({
+        label: `Replanted all ${a.crop}`,
+        icon: <Plant size={10} weight="fill" />,
+        color: ACTION_COLORS.replant,
+      });
+    } else if (a.type === "greenhouse" && a.param) {
+      const paramLabel = PARAM_LABELS[a.param] ?? a.param;
+      rows.push({
+        label: `${paramLabel} → ${formatValue(a.param, a.value)}`,
+        icon: ACTION_ICON[a.param] ?? null,
+        color: ACTION_COLORS.greenhouse,
+      });
+    } else if (a.type === "crop" && a.param && a.crop) {
+      const paramLabel = PARAM_LABELS[a.param] ?? a.param;
+      rows.push({
+        label: `${a.crop} ${paramLabel} → ${formatValue(a.param, a.value)}`,
+        icon: ACTION_ICON[a.param] ?? null,
+        color: ACTION_COLORS.crop,
+      });
+    }
   }
 
-  return (
-    <div
-      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border ${color}`}
-      style={{ fontSize: "10px" }}
-    >
-      {icon && <span className="shrink-0">{icon}</span>}
-      <span className="font-medium truncate">{label}</span>
-    </div>
-  );
+  // Emit aggregated tile rows
+  for (const [crop, count] of Object.entries(plantCounts)) {
+    rows.push({
+      label: `Planted ${count} ${crop}`,
+      icon: <Plant size={10} weight="fill" />,
+      color: ACTION_COLORS.replant,
+    });
+  }
+  if (harvestTileCount > 0) {
+    rows.push({
+      label: `Harvested ${harvestTileCount} tile${harvestTileCount > 1 ? "s" : ""}`,
+      icon: <Leaf size={10} weight="fill" />,
+      color: ACTION_COLORS.harvest,
+    });
+  }
+  if (clearTileCount > 0) {
+    rows.push({
+      label: `Cleared ${clearTileCount} tile${clearTileCount > 1 ? "s" : ""}`,
+      icon: <Leaf size={10} weight="fill" />,
+      color: ACTION_COLORS.harvest,
+    });
+  }
+
+  return rows;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────────

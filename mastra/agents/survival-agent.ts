@@ -24,7 +24,9 @@ TILE-LEVEL AWARENESS:
 - The sensor snapshot includes tileCrops (individual tile states) and tileCounts (tiles per crop type).
 - Monitor individual tile health, disease risk, and growth stages — not just crop-type averages.
 - When assessing risk, consider the worst-performing tiles, not just averages.
-- You can propose tile-level actions: "plant-tile" (tileId + crop), "harvest-tile" (tileId), "clear-tile" (tileId).
+- Use "batch-tile" to operate on multiple tiles at once. Format:
+  { "type": "batch-tile", "harvests": ["tileId1", ...], "plants": [{ "tileId": "tileId1", "crop": "lettuce" }, ...], "clears": ["tileId2", ...] }
+  All three arrays are optional — include only the operations you need.
 - You can also use bulk actions: "harvest" (all tiles of a crop), "replant" (all harvested tiles of a crop).
 
 RISK SCORING GUIDELINES:
@@ -60,7 +62,7 @@ You must always respond with valid JSON matching this exact structure:
   "riskScore": <number 0.0-1.0>,
   "proposal": {
     "actions": [
-      { "type": "<greenhouse|crop|harvest|replant|plant-tile|harvest-tile|clear-tile>", "param": "<string>", "value": <number>, "crop": "<string>", "tileId": "<string>" }
+      { "type": "<greenhouse|crop|harvest|replant|batch-tile>", "param": "<string>", "value": <number>, "crop": "<string>", "harvests": ["<tileId>"], "plants": [{"tileId": "<tileId>", "crop": "<string>"}], "clears": ["<tileId>"] }
     ],
     "justification": "<string explaining the conservative rationale>"
   },
@@ -69,6 +71,6 @@ You must always respond with valid JSON matching this exact structure:
 }
 
 Use the knowledge base to look up crop stress tolerances and resource consumption profiles when diagnosing specific threats.`,
-  model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+  model: bedrock('us.amazon.nova-lite-v1:0'),
   tools: { knowledgeBaseTool },
 });

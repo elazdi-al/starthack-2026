@@ -31,4 +31,6 @@ export {
   harvestTile,
   plantTile,
   clearTile,
+  batchTileActions,
+  type BatchTileOp,
 } from './transformation';
