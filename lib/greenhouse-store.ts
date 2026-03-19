@@ -407,14 +407,15 @@ function syncGridFromEnv(grid: TileData[][], env: ConcreteEnvironment): TileData
       const c: CropEnvironment = tileCrop ?? env.crops[tile.crop];
       // Update crop type if tile has been reassigned to a different crop
       const effectiveCrop = tileCrop ? tileCrop.cropType : tile.crop;
-      const growth = STAGE_TO_GROWTH_INDEX[c.stage];
+      const stage = c.stage;
+      const growth = STAGE_TO_GROWTH_INDEX[stage];
       const water = Math.round(c.soilMoisture);
       const status: Status = c.healthScore > 0.7 ? "ok" : c.healthScore > 0 ? "warn" : null;
-      if (tile.crop === effectiveCrop && tile.growth === growth && tile.water === water && tile.status === status) {
+      if (tile.crop === effectiveCrop && tile.stage === stage && tile.growth === growth && tile.water === water && tile.status === status) {
         return tile; // unchanged — reuse reference
       }
       rowChanged = true;
-      return { ...tile, crop: effectiveCrop, growth, water, status };
+      return { ...tile, crop: effectiveCrop, stage, growth, water, status };
     });
     if (rowChanged) { gridChanged = true; return nextRow; }
     return row; // unchanged row — reuse reference

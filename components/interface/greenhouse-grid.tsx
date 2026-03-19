@@ -725,12 +725,17 @@ export function GreenhouseGrid({
     const crossedRevealThreshold =
       zoomRef.current >= ZOOM_SHOW_THRESHOLD &&
       nextZoom < ZOOM_SHOW_THRESHOLD;
+    const crossedHideThreshold =
+      zoomRef.current < ZOOM_SHOW_THRESHOLD &&
+      nextZoom >= ZOOM_SHOW_THRESHOLD;
 
     zoomRef.current = nextZoom;
     setZoom(nextZoom);
 
     if (!greenhouseVisible && crossedRevealThreshold) {
       onGreenhouseVisibleChange?.(true);
+    } else if (greenhouseVisible && crossedHideThreshold) {
+      onGreenhouseVisibleChange?.(false);
     }
   }, [greenhouseVisible, onGreenhouseVisibleChange]);
 

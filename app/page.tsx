@@ -220,6 +220,8 @@ export default function Home() {
               >
                 <GreenhouseView
                   introStage={introStage}
+                  greenhouseVisible={greenhouseVisible}
+                  onGreenhouseVisibleChange={setGreenhouseVisible}
                 />
               </motion.section>
             )}
@@ -345,12 +347,21 @@ export default function Home() {
 
 const GreenhouseView = React.memo(function GreenhouseView({
   introStage,
+  greenhouseVisible,
+  onGreenhouseVisibleChange,
 }: {
   introStage: IntroStage;
+  greenhouseVisible: boolean;
+  onGreenhouseVisibleChange?: (next: boolean) => void;
 }) {
   return (
     <div className="absolute inset-0">
-      <GreenhouseGrid introStage={introStage} showBackdrop={false} />
+      <GreenhouseGrid
+        introStage={introStage}
+        greenhouseVisible={greenhouseVisible}
+        onGreenhouseVisibleChange={onGreenhouseVisibleChange}
+        showBackdrop={false}
+      />
     </div>
   );
 });
