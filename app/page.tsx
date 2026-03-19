@@ -4,7 +4,7 @@ import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { CentralControlExample } from "@/components/examples/central-control-example";
-import { GreenhouseGrid } from "@/components/interface/greenhouse-grid";
+import { GreenhouseGrid, MarsBackdrop } from "@/components/interface/greenhouse-grid";
 import { CentralControlPanel } from "@/components/interface/central-control-panel";
 import { useGreenhouseStore, type CropType } from "@/lib/greenhouse-store";
 import { DialStore } from "@/components/ui/central-control";
@@ -21,16 +21,56 @@ import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
 import { SquaresFour, Leaf, Gavel, Robot } from "@phosphor-icons/react";
 
 type IntroStage = "sealed" | "opening" | "open";
+type MainView = "greenhouse" | "dashboard";
+
+const VIEW_ORDER: Record<MainView, number> = {
+  greenhouse: 0,
+  dashboard: 1,
+};
+
+const VIEWPORT_TRANSITION = {
+  duration: 0.44,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
+
+const GREENHOUSE_PANEL_TRANSITION = {
+  duration: 0.42,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
+
+const GREENHOUSE_PANEL_VARIANTS = {
+  enter: (direction: number) => ({
+    x: direction < 0 ? 88 : -88,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? -120 : 120,
+    opacity: 0,
+  }),
+};
+
+const GREENHOUSE_BLEND_VARIANTS = {
+  enter: { opacity: 0.65 },
+  center: { opacity: 0 },
+  exit: { opacity: 0.82 },
+};
 
 export default function Home() {
   const tickInFlight      = useGreenhouseStore((s) => s.tickInFlight);
   const autonomousEnabled = useGreenhouseStore((s) => s.autonomousEnabled);
   const decisionCount     = useGreenhouseStore((s) => s.agentDecisions.length);
+  const dustStormActive   = useGreenhouseStore((s) => s.dustStormActive);
   const shouldReduceMotion = useReducedMotion();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [controlOpen, setControlOpen] = React.useState(false);
   const [agentOpen, setAgentOpen]     = React.useState(false);
   const [activeTab, setActiveTab]     = React.useState("greenhouse");
+  const [activeView, setActiveView]   = React.useState<MainView>("greenhouse");
+  const [viewDirection, setViewDirection] = React.useState(1);
   const [introStage, setIntroStage] = React.useState<IntroStage>("sealed");
   const setFocusedCrop = useGreenhouseStore((s) => s.setFocusedCrop);
 
@@ -79,18 +119,58 @@ export default function Home() {
 
   const handleTabChange = React.useCallback((tab: string) => {
     setActiveTab(tab);
-  }, []);
+
+    if (tab !== "greenhouse" && tab !== "dashboard") {
+      return;
+    }
+
+    const nextView = tab as MainView;
+    if (nextView === activeView) {
+      return;
+    }
+
+    setViewDirection(VIEW_ORDER[nextView] > VIEW_ORDER[activeView] ? 1 : -1);
+    setActiveView(nextView);
+  }, [activeView]);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
       <main
         aria-hidden={false}
-        className="relative min-h-screen transition-[margin-right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+        className="relative min-h-screen overflow-hidden transition-[margin-right] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
         style={{ marginRight: sidebarOpen ? 360 : 0 }}
       >
         <CentralControlExample />
         <SimulationOverrides />
-        <GreenhouseGrid introStage={introStage} />
+        <div className="absolute inset-0 isolate overflow-hidden">
+          <DashboardView />
+
+          <motion.div
+            aria-hidden="true"
+            animate={{ opacity: activeView === "greenhouse" ? 1 : 0 }}
+            transition={shouldReduceMotion ? { duration: 0 } : VIEWPORT_TRANSITION}
+            className="absolute inset-0 z-0"
+          >
+            <MarsBackdrop dustStormActive={dustStormActive} />
+          </motion.div>
+
+          <AnimatePresence initial={false} custom={viewDirection}>
+            {activeView === "greenhouse" && (
+              <motion.section
+                key="greenhouse"
+                custom={viewDirection}
+                initial={shouldReduceMotion ? false : "enter"}
+                animate="center"
+                exit={shouldReduceMotion ? { opacity: 0 } : "exit"}
+                variants={GREENHOUSE_PANEL_VARIANTS}
+                transition={shouldReduceMotion ? { duration: 0 } : GREENHOUSE_PANEL_TRANSITION}
+                className="absolute inset-0 z-10 will-change-transform"
+              >
+                <GreenhouseView introStage={introStage} />
+              </motion.section>
+            )}
+          </AnimatePresence>
+        </div>
 
         <AnimatePresence>
           {interfaceVisible && (
@@ -182,6 +262,28 @@ export default function Home() {
       </AnimatePresence>
     </div>
   );
+}
+
+function GreenhouseView({
+  introStage,
+}: {
+  introStage: IntroStage;
+}) {
+  return (
+    <div className="absolute inset-0">
+      <GreenhouseGrid introStage={introStage} showBackdrop={false} />
+      <motion.div
+        aria-hidden="true"
+        variants={GREENHOUSE_BLEND_VARIANTS}
+        transition={GREENHOUSE_PANEL_TRANSITION}
+        className="pointer-events-none absolute inset-0 bg-background"
+      />
+    </div>
+  );
+}
+
+function DashboardView() {
+  return <section aria-label="Dashboard view" className="absolute inset-0 bg-background" />;
 }
 
 function AgentToggleButton({

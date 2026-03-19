@@ -325,7 +325,7 @@ const CropTooltip = memo(function CropTooltip({
   );
 });
 
-function MarsBackdrop({ dustStormActive }: { dustStormActive: boolean }) {
+export function MarsBackdrop({ dustStormActive }: { dustStormActive: boolean }) {
   const baseGlow = dustStormActive ? 0.26 : 0.18;
   const accentGlow = dustStormActive ? 0.2 : 0.14;
   const dustSweep = dustStormActive ? 0.12 : 0.08;
@@ -485,8 +485,10 @@ function MarsPreparedPad() {
 
 export function GreenhouseGrid({
   introStage = "open",
+  showBackdrop = true,
 }: {
   introStage?: GreenhouseIntroStage;
+  showBackdrop?: boolean;
 }) {
   const grid = useGreenhouseStore((s) => s.grid);
   const dustStormActive = useGreenhouseStore((s) => s.dustStormActive);
@@ -498,7 +500,7 @@ export function GreenhouseGrid({
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-      <MarsBackdrop dustStormActive={dustStormActive} />
+      {showBackdrop && <MarsBackdrop dustStormActive={dustStormActive} />}
 
       <TooltipProvider delay={120} closeDelay={0}>
         <div
