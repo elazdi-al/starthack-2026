@@ -26,7 +26,7 @@ export function EnvWidgetShells() {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         title={expanded ? "Hide readings" : "Show readings"}
-        className="h-10 w-10 rounded-lg flex items-center justify-center bg-neutral-900 text-white/40 dark:bg-white/8 dark:text-white/40 hover:text-white hover:bg-neutral-700 dark:hover:bg-white/15 transition-colors"
+        className="h-10 w-10 rounded-lg flex items-center justify-center bg-neutral-900 text-white/40 dark:bg-white/8 dark:text-white/80 hover:text-white hover:bg-neutral-700 dark:hover:bg-white/15 transition-colors"
       >
         <motion.span
           animate={{ rotate: expanded ? 90 : 0 }}
@@ -87,7 +87,7 @@ function EnvShell({
       title={label}
       className="h-10 rounded-lg flex items-center gap-1.5 px-3 bg-neutral-900 text-white dark:bg-white/8 dark:text-white/90 whitespace-nowrap"
     >
-      <span className="text-white/40 dark:text-white/40">{icon}</span>
+      <span className="text-white/40 dark:text-white/80">{icon}</span>
       <span className="text-base font-mono tabular-nums leading-5">{value}</span>
     </div>
   );

@@ -133,56 +133,101 @@ export interface TileData {
   tileId?: string;  // unique tile identifier for per-tile crop state (e.g. "lettuce_0_0")
 }
 
+// ─── 12×9 Greenhouse Layout ─────────────────────────────────────────────────
+// Organised into 8 crop rectangles separated by clear paths.
+//
+//  Cols:  0  1  2  3  4  5 |6| 7  8  9  10 11
+//  Row 0: Lettuce (3×3)    |p| Tomato (3×3)         Potato (3×2 right)
+//  Row 1:                  |p|                       ...
+//  Row 2:                  |p|                       ...
+//  Row 3: p  p  p  p  p  p  p  p  p  p  p  p       <- horizontal path
+//  Row 4: Soybean (3×2)    |p| Spinach (3×2)        Wheat (3×2 right)
+//  Row 5:                  |p|                       ...
+//  Row 6: p  p  p  p  p  p  p  p  p  p  p  p       <- horizontal path
+//  Row 7: Radish (3×2)     |p| Kale (3×2)           (more Soybean 3×2)
+//  Row 8:                  |p|                       ...
+
+const P: TileData = { kind: "path", growth: 0, water: 0, status: null };
+const PS: TileData = { kind: "path", growth: 0, water: 0, status: null, sensor: true };
+
+function ct(crop: CropType, row: number, col: number, growth: number, water: number, status: Status = "ok"): TileData {
+  return { kind: "crop", growth, water, status, crop, tileId: `${crop}_${row}_${col}` };
+}
+
 const INITIAL_GRID: TileData[][] = [
+  // Row 0: Lettuce | path | Tomato | path | Potato
   [
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "lettuce", tileId: "lettuce_0_0" },
-    { kind: "crop", growth: 4, water: 92, status: "ok", crop: "tomato", tileId: "tomato_0_1" },
-    { kind: "crop", growth: 2, water: 65, status: "ok", crop: "spinach", tileId: "spinach_0_2" },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "path", growth: 0, water: 0, status: null, sensor: true },
-    { kind: "crop", growth: 5, water: 88, status: "ok", crop: "soybean", tileId: "soybean_0_5" },
-    { kind: "crop", growth: 3, water: 72, status: "ok", crop: "wheat", tileId: "wheat_0_6" },
-    { kind: "crop", growth: 4, water: 95, status: "ok", crop: "kale", tileId: "kale_0_7" },
+    ct("lettuce",0,0, 3,78), ct("lettuce",0,1, 4,82), ct("lettuce",0,2, 3,75),
+    P,
+    ct("tomato",0,4, 4,92), ct("tomato",0,5, 3,88),
+    P,
+    ct("potato",0,7, 5,95), ct("potato",0,8, 4,90), ct("potato",0,9, 3,85),
+    P,
+    ct("wheat",0,11, 2,72),
   ],
+  // Row 1
   [
-    { kind: "crop", growth: 5, water: 95, status: "ok", crop: "potato", tileId: "potato_1_0" },
-    { kind: "crop", growth: 3, water: 80, status: "ok", crop: "lettuce", tileId: "lettuce_1_1" },
-    { kind: "crop", growth: 0, water: 0, status: null, crop: "radish", tileId: "radish_1_2" },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 2, water: 60, status: "ok", crop: "radish", tileId: "radish_1_5" },
-    { kind: "crop", growth: 5, water: 90, status: "ok", crop: "tomato", tileId: "tomato_1_6" },
-    { kind: "crop", growth: 1, water: 82, status: "ok", crop: "spinach", tileId: "spinach_1_7" },
+    ct("lettuce",1,0, 4,80), ct("lettuce",1,1, 5,85), ct("lettuce",1,2, 3,76),
+    P,
+    ct("tomato",1,4, 5,95), ct("tomato",1,5, 4,90),
+    PS,
+    ct("potato",1,7, 3,80), ct("potato",1,8, 5,92), ct("potato",1,9, 4,88),
+    P,
+    ct("wheat",1,11, 3,68),
   ],
+  // Row 2
   [
-    { kind: "crop", growth: 2, water: 55, status: "ok", crop: "wheat", tileId: "wheat_2_0" },
-    { kind: "crop", growth: 5, water: 70, status: "warn", crop: "soybean", tileId: "soybean_2_1" },
-    { kind: "crop", growth: 1, water: 90, status: "ok", crop: "kale", tileId: "kale_2_2" },
-    { kind: "path", growth: 0, water: 0, status: null, sensor: true },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 4, water: 75, status: "ok", crop: "lettuce", tileId: "lettuce_2_5" },
-    { kind: "crop", growth: 0, water: 0, status: null, crop: "potato", tileId: "potato_2_6" },
-    { kind: "crop", growth: 5, water: 70, status: "warn", crop: "potato", tileId: "potato_2_7" },
+    ct("lettuce",2,0, 2,70), ct("lettuce",2,1, 3,78), ct("lettuce",2,2, 4,82),
+    P,
+    ct("tomato",2,4, 3,85), ct("tomato",2,5, 4,88),
+    P,
+    ct("potato",2,7, 4,85), ct("potato",2,8, 2,72), ct("potato",2,9, 5,70,"warn"),
+    P,
+    ct("wheat",2,11, 4,75),
   ],
+  // Row 3: horizontal path
+  [P, P, P, P, P, P, PS, P, P, P, P, P],
+  // Row 4: Soybean | path | Spinach | path | Wheat
   [
-    { kind: "crop", growth: 4, water: 82, status: "ok", crop: "tomato", tileId: "tomato_3_0" },
-    { kind: "crop", growth: 1, water: 65, status: "ok", crop: "spinach", tileId: "spinach_3_1" },
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "potato", tileId: "potato_3_2" },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "crop", growth: 3, water: 80, status: "ok", crop: "wheat", tileId: "wheat_3_5" },
-    { kind: "crop", growth: 4, water: 55, status: "warn", crop: "radish", tileId: "radish_3_6" },
-    { kind: "crop", growth: 1, water: 88, status: "ok", crop: "soybean", tileId: "soybean_3_7" },
+    ct("soybean",4,0, 5,88), ct("soybean",4,1, 3,80), ct("soybean",4,2, 4,82),
+    P,
+    ct("spinach",4,4, 2,65), ct("spinach",4,5, 1,82),
+    P,
+    ct("wheat",4,7, 3,72), ct("wheat",4,8, 2,68), ct("wheat",4,9, 4,78),
+    P,
+    ct("kale",4,11, 3,80),
   ],
+  // Row 5
   [
-    { kind: "crop", growth: 3, water: 90, status: "ok", crop: "kale", tileId: "kale_4_0" },
-    { kind: "crop", growth: 5, water: 85, status: "ok", crop: "kale", tileId: "kale_4_1" },
-    { kind: "crop", growth: 4, water: 72, status: "ok", crop: "tomato", tileId: "tomato_4_2" },
-    { kind: "path", growth: 0, water: 0, status: null },
-    { kind: "path", growth: 0, water: 0, status: null, sensor: true },
-    { kind: "crop", growth: 1, water: 92, status: "ok", crop: "spinach", tileId: "spinach_4_5" },
-    { kind: "crop", growth: 3, water: 78, status: "ok", crop: "soybean", tileId: "soybean_4_6" },
-    { kind: "crop", growth: 2, water: 65, status: "ok", crop: "wheat", tileId: "wheat_4_7" },
+    ct("soybean",5,0, 4,75), ct("soybean",5,1, 5,70,"warn"), ct("soybean",5,2, 3,78),
+    P,
+    ct("spinach",5,4, 3,70), ct("spinach",5,5, 4,78),
+    P,
+    ct("wheat",5,7, 5,80), ct("wheat",5,8, 3,65), ct("wheat",5,9, 2,60),
+    PS,
+    ct("kale",5,11, 5,85),
+  ],
+  // Row 6: horizontal path
+  [P, P, P, P, P, P, P, PS, P, P, P, P],
+  // Row 7: Radish | path | Kale | path | extra Soybean
+  [
+    ct("radish",7,0, 2,60), ct("radish",7,1, 3,72), ct("radish",7,2, 4,78),
+    P,
+    ct("kale",7,4, 3,80), ct("kale",7,5, 5,85),
+    P,
+    ct("soybean",7,7, 1,88), ct("radish",7,8, 4,55,"warn"), ct("spinach",7,9, 3,78),
+    P,
+    ct("tomato",7,11, 4,82),
+  ],
+  // Row 8
+  [
+    ct("radish",8,0, 3,65), ct("radish",8,1, 5,80), ct("radish",8,2, 2,58),
+    P,
+    ct("kale",8,4, 4,90), ct("kale",8,5, 3,82),
+    P,
+    ct("soybean",8,7, 3,75), ct("radish",8,8, 1,62), ct("spinach",8,9, 5,90),
+    P,
+    ct("tomato",8,11, 2,78),
   ],
 ];
 

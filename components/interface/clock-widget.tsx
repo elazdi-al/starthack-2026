@@ -43,12 +43,12 @@ export function ClockWidget() {
   return (
     <div className="relative flex items-center gap-1">
       <div className="rounded-lg flex justify-center items-center h-10 px-3 gap-2 bg-neutral-900 text-white dark:bg-white/8 dark:text-white/90">
-        <span className="text-[11px] font-medium text-white/50 whitespace-nowrap font-mono">
+        <span className="text-[11px] font-medium text-white/50 dark:text-white/70 whitespace-nowrap font-mono">
           {isHydrated ? (
             <AnimatedParameterValue value={`Sol ${missionSol}`} debounceMs={72} />
           ) : "Sol --"}
         </span>
-        <span className="text-white/20">|</span>
+        <span className="text-white/20 dark:text-white/40">|</span>
         <p className="text-base whitespace-nowrap leading-5 font-mono tabular-nums tracking-wide">
           <AnimatedParameterValue value={timeDisplay} debounceMs={72} />
         </p>
@@ -59,7 +59,7 @@ export function ClockWidget() {
           type="button"
           onClick={() => skipTime(opt.minutes)}
           title={`Skip ${opt.label}`}
-          className="rounded-lg flex items-center justify-center h-10 px-2.5 bg-neutral-900 text-white/60 dark:bg-white/8 dark:text-white/60 hover:text-white hover:bg-neutral-700 dark:hover:bg-white/15 transition-colors text-[11px] font-medium font-mono"
+          className="rounded-lg flex items-center justify-center h-10 px-2.5 bg-neutral-900 text-white/60 dark:bg-white/8 dark:text-white/80 hover:text-white hover:bg-neutral-700 dark:hover:bg-white/15 transition-colors text-[11px] font-medium font-mono"
         >
           +{opt.label}
         </button>

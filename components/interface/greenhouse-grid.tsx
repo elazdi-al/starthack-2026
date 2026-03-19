@@ -22,10 +22,10 @@ import {
 import { CropVideoPreview } from "@/components/interface/crop-video-preview";
 import { useAnimationConfig } from "@/lib/use-animation-config";
 
-const TILE = 120;
+const TILE = 80;
 const GAP = 3;
-const COLS = 8;
-const ROWS = 5;
+const COLS = 12;
+const ROWS = 9;
 const STEP = TILE + GAP;
 const GRID_WIDTH = COLS * TILE + (COLS - 1) * GAP;
 const GRID_HEIGHT = ROWS * TILE + (ROWS - 1) * GAP;
@@ -559,7 +559,7 @@ export function GreenhouseGrid({
         >
           <div
             className={interactive ? "pointer-events-auto relative" : "pointer-events-none relative"}
-            style={{ transform: "scaleY(0.58) rotate(-45deg)" }}
+            style={{ transform: "scaleY(0.54) rotate(-45deg)" }}
           >
             <MarsGroundShadow dustStormActive={dustStormActive} />
             <MarsPreparedPad />
@@ -632,8 +632,8 @@ export function GreenhouseGrid({
 
 function GreenhouseOverlay({ introStage }: { introStage: GreenhouseIntroStage }) {
   const inset = 6;
-  const rise = 128;
-  const roofPeak = 64;
+  const rise = 110;
+  const roofPeak = 56;
   const shadowOffsetX = 16;
   const shadowOffsetY = 20;
   const startCol = 0;
@@ -1021,13 +1021,14 @@ const GROWTH_TO_COUNT: Record<number, number> = {
 /**
  * Three fixed size tiers per growth stage: [small, medium, large].
  * Each plant in a tile gets a different tier, shuffled procedurally.
+ * Scaled down for 80px tiles (from 120px).
  */
 const SIZE_TIERS: Record<number, [number, number, number]> = {
-  1: [20, 26, 34],
-  2: [22, 30, 38],
-  3: [24, 32, 42],
-  4: [26, 34, 44],
-  5: [28, 36, 46],
+  1: [14, 18, 24],
+  2: [16, 22, 28],
+  3: [18, 24, 30],
+  4: [20, 26, 32],
+  5: [22, 28, 34],
 };
 
 const TIER_PERMS: [number, number, number][] = [
