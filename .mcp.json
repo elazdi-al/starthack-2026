@@ -3,6 +3,10 @@
     "mars-crop-knowledge-base": {
       "type": "url",
       "url": "https://kb-start-hack-gateway-buyjtibfpg.gateway.bedrock-agentcore.us-east-2.amazonaws.com/mcp"
+    },
+    "mars-greenhouse": {
+      "type": "url",
+      "url": "http://localhost:3000/api/mcp"
     }
   }
 }

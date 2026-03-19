@@ -40,7 +40,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [activeSection, setActiveSection] = React.useState<Section>("appearance")
   const anim = useAnimationConfig()
 
-  const handleClose = React.useCallback(() => onOpenChange(false), [onOpenChange])
+  const handleClose = React.useCallback(() => {
+    triggerHaptic("soft")
+    onOpenChange(false)
+  }, [onOpenChange])
   const handleSetAppearance = React.useCallback(() => setActiveSection("appearance"), [])
   const handleSetDisplay = React.useCallback(() => setActiveSection("display"), [])
 
@@ -311,12 +314,7 @@ function AppearanceSectionContent() {
           />
         </div>
 
-        <p className="type-caption text-[var(--dial-text-tertiary)]">
-          Current system appearance: {systemTheme === "dark" ? "Dark" : "Light"}
-        </p>
-        <p className="type-caption text-[var(--dial-text-tertiary)]">
-          Active app appearance: {effectiveTheme === "dark" ? "Dark" : "Light"}
-        </p>
+       
       </div>
     </>
   )

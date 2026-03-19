@@ -17,7 +17,7 @@ export function EnvWidgetShells() {
   const humidity = useGreenhouseStore((s) => s.humidity);
   const co2Level = useGreenhouseStore((s) => s.co2Level);
   const lightLevel = useGreenhouseStore((s) => s.lightLevel);
-  const env = useGreenhouseStore((s) => s.environment);
+  const o2Level = useGreenhouseStore((s) => s.environment.o2Level);
   const anim = useAnimationConfig();
 
   return (
@@ -59,7 +59,7 @@ export function EnvWidgetShells() {
             <EnvShell
               icon={<Wind size={14} weight="fill" />}
               label="O₂"
-              value={`${Math.round(env.o2Level * 10) / 10}%`}
+              value={`${Math.round(o2Level * 10) / 10}%`}
             />
             <EnvShell
               icon={<Sun size={14} weight="fill" />}

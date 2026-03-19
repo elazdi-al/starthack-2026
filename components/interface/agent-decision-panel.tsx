@@ -9,6 +9,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
 import type { AgentDecision, AgentAction } from "@/lib/greenhouse-store";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface Props {
   onClose: () => void;
@@ -58,7 +59,10 @@ export function AgentDecisionPanel({ onClose }: Props) {
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              triggerHaptic("soft");
+              onClose();
+            }}
             className="w-5 h-5 rounded-full flex items-center justify-center text-[var(--dial-text-tertiary)] hover:text-[var(--dial-text-primary)] hover:bg-black/6 dark:hover:bg-white/10 transition-colors"
           >
             <X size={11} weight="bold" />
@@ -74,7 +78,10 @@ export function AgentDecisionPanel({ onClose }: Props) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setAutonomousEnabled(!autonomousEnabled)}
+            onClick={() => {
+              setAutonomousEnabled(!autonomousEnabled);
+              triggerHaptic("selection");
+            }}
             className={[
               "relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none shrink-0",
               autonomousEnabled ? "bg-blue-500" : "bg-neutral-300 dark:bg-neutral-600",
@@ -138,7 +145,10 @@ function DecisionCard({ decision, defaultOpen }: { decision: AgentDecision; defa
       {/* Card header row */}
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => !v);
+          triggerHaptic("selection");
+        }}
         className="w-full flex items-start gap-2 text-left"
       >
         <div className="mt-0.5 shrink-0 text-[var(--dial-text-tertiary)]">

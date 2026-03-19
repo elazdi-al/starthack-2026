@@ -68,7 +68,7 @@ export interface AgentDecision {
 export type TileKind = "crop" | "path";
 export type Status = "ok" | "warn" | null;
 export type SpeedKey = "x1" | "x2" | "x5" | "x10" | "x20" | "x50" | "x100" | "x1000" | "x5000" | "x10000";
-export const TICK_INTERVAL_MS = 16; // ~60fps
+export const TICK_INTERVAL_MS = 200; // ~5fps — simulation compensates via larger time steps
 export const TOTAL_MISSION_SOLS = 450;
 
 export interface CropInfo {
@@ -397,24 +397,29 @@ function round1(n: number): number {
 }
 
 function syncGridFromEnv(grid: TileData[][], env: ConcreteEnvironment): TileData[][] {
-  return grid.map((row) =>
-    row.map((tile) => {
+  let gridChanged = false;
+  const nextGrid = grid.map((row) => {
+    let rowChanged = false;
+    const nextRow = row.map((tile) => {
       if (tile.kind !== "crop" || !tile.crop) return tile;
       // Prefer per-tile state if available; fall back to aggregate per-type
       const tileCrop = tile.tileId ? env.tileCrops?.[tile.tileId] : undefined;
       const c: CropEnvironment = tileCrop ?? env.crops[tile.crop];
       // Update crop type if tile has been reassigned to a different crop
       const effectiveCrop = tileCrop ? tileCrop.cropType : tile.crop;
-      return {
-        ...tile,
-        crop: effectiveCrop,
-        growth: STAGE_TO_GROWTH_INDEX[c.stage],
-        stage: c.stage,
-        water: Math.round(c.soilMoisture),
-        status: c.healthScore > 0.7 ? ("ok" as const) : c.healthScore > 0 ? ("warn" as const) : null,
-      };
-    }),
-  );
+      const growth = STAGE_TO_GROWTH_INDEX[c.stage];
+      const water = Math.round(c.soilMoisture);
+      const status: Status = c.healthScore > 0.7 ? "ok" : c.healthScore > 0 ? "warn" : null;
+      if (tile.crop === effectiveCrop && tile.growth === growth && tile.water === water && tile.status === status) {
+        return tile; // unchanged — reuse reference
+      }
+      rowChanged = true;
+      return { ...tile, crop: effectiveCrop, growth, water, status };
+    });
+    if (rowChanged) { gridChanged = true; return nextRow; }
+    return row; // unchanged row — reuse reference
+  });
+  return gridChanged ? nextGrid : grid;
 }
 
 function buildSnapshot(
@@ -621,62 +626,70 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     // Freeze time while the agent is thinking so a speed change mid-tick
     // doesn't cause the simulation to jump when actions are applied.
     if (get().tickInFlight) return;
-    const { elapsedMinutes, speed, simState, grid, events, missionSol: prevSol } = get();
+    const state = get();
+    const { elapsedMinutes, speed, simState, grid, events } = state;
     const mult = SPEED_MULTIPLIER[speed];
     const nextMinutes = elapsedMinutes + mult * TICK_INTERVAL_MS / 60000;
     const env = simState.simulation.getEnvironment(nextMinutes);
     const simTime = new Date(env.timestamp);
     const newGrid = syncGridFromEnv(grid, env);
 
-    const newEvents = [...events];
     const nowDust = env.dustStormFactor < 0.9;
-    const wasDust = get().dustStormActive;
+    const wasDust = state.dustStormActive;
+    let newEvents = events;
     if (nowDust && !wasDust) {
-      newEvents.push({
-        sol: env.missionSol, type: "dust_storm_start", severity: "warning",
+      newEvents = [...events, {
+        sol: env.missionSol, type: "dust_storm_start" as const, severity: "warning" as const,
         message: `Dust storm detected — solar output reduced to ${Math.round(env.dustStormFactor * 100)}%`,
-      });
+      }];
     } else if (!nowDust && wasDust) {
-      newEvents.push({
-        sol: env.missionSol, type: "dust_storm_end", severity: "info",
+      newEvents = [...events, {
+        sol: env.missionSol, type: "dust_storm_end" as const, severity: "info" as const,
         message: "Dust storm has cleared — solar output returning to normal",
-      });
+      }];
     }
-    if (env.energyDeficit && !get().environment.energyDeficit) {
+    if (env.energyDeficit && !state.environment.energyDeficit) {
+      newEvents = newEvents === events ? [...events] : newEvents;
       newEvents.push({
-        sol: env.missionSol, type: "resource_warning", severity: "critical",
+        sol: env.missionSol, type: "resource_warning" as const, severity: "critical" as const,
         message: "Energy deficit — battery depleted, non-critical systems throttled",
       });
     }
-    if (env.co2SafetyAlert && !get().environment.co2SafetyAlert) {
+    if (env.co2SafetyAlert && !state.environment.co2SafetyAlert) {
+      newEvents = newEvents === events ? [...events] : newEvents;
       newEvents.push({
-        sol: env.missionSol, type: "resource_warning", severity: "critical",
+        sol: env.missionSol, type: "resource_warning" as const, severity: "critical" as const,
         message: `CO₂ safety threshold exceeded: ${Math.round(env.co2Level)} ppm — crew health at risk`,
       });
     }
-    if (env.waterRecyclingEfficiency < 0.75 && get().environment.waterRecyclingEfficiency >= 0.75) {
+    if (env.waterRecyclingEfficiency < 0.75 && state.environment.waterRecyclingEfficiency >= 0.75) {
+      newEvents = newEvents === events ? [...events] : newEvents;
       newEvents.push({
-        sol: env.missionSol, type: "resource_warning", severity: "warning",
+        sol: env.missionSol, type: "resource_warning" as const, severity: "warning" as const,
         message: `Water recycling efficiency dropped to ${Math.round(env.waterRecyclingEfficiency * 100)}% — irrigation compromised`,
       });
     }
 
-    set({
+    // Build a minimal update — only include properties whose values changed
+    const update: Record<string, unknown> = {
       elapsedMinutes: nextMinutes,
       environment: env,
       simulationTime: simTime,
-      grid: newGrid,
-      temperature: env.airTemperature,
-      humidity: env.humidity,
-      co2Level: env.co2Level,
-      lightLevel: env.lightLevel,
-      missionSol: env.missionSol,
-      currentLs: env.currentLs,
-      seasonName: env.seasonName,
-      dustStormRisk: env.dustStormRisk,
-      dustStormActive: nowDust,
-      events: newEvents,
-    });
+    };
+    if (newGrid !== grid) update.grid = newGrid;
+    const temp = env.airTemperature;
+    if (temp !== state.temperature) update.temperature = temp;
+    if (env.humidity !== state.humidity) update.humidity = env.humidity;
+    if (env.co2Level !== state.co2Level) update.co2Level = env.co2Level;
+    if (env.lightLevel !== state.lightLevel) update.lightLevel = env.lightLevel;
+    if (env.missionSol !== state.missionSol) update.missionSol = env.missionSol;
+    if (env.currentLs !== state.currentLs) update.currentLs = env.currentLs;
+    if (env.seasonName !== state.seasonName) update.seasonName = env.seasonName;
+    if (env.dustStormRisk !== state.dustStormRisk) update.dustStormRisk = env.dustStormRisk;
+    if (nowDust !== wasDust) update.dustStormActive = nowDust;
+    if (newEvents !== events) update.events = newEvents;
+
+    set(update as Partial<GreenhouseState>);
 
     // Fire autonomous agent tick every 2 simulation hours (120 minutes)
     const { lastTickSimMinutes, tickInFlight, autonomousEnabled } = get();

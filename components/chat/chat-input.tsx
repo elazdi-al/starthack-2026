@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ArrowUp } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface ChatInputProps {
   value: string;
@@ -25,7 +26,10 @@ export function ChatInput({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (canSend) onSubmit();
+      if (canSend) {
+        triggerHaptic("light");
+        onSubmit();
+      }
     }
   };
 
@@ -64,7 +68,12 @@ export function ChatInput({
 
       <button
         type="button"
-        onClick={onSubmit}
+        onClick={() => {
+          if (canSend) {
+            triggerHaptic("light");
+            onSubmit();
+          }
+        }}
         disabled={!canSend}
         aria-label="Send message"
         className={cn(

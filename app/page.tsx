@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useReducedAnimations } from "@/lib/use-animation-config";
 
 import { CentralControlExample } from "@/components/examples/central-control-example";
+import { SnapshotSync } from "@/components/interface/snapshot-sync";
 import { GreenhouseGrid, MarsBackdrop } from "@/components/interface/greenhouse-grid";
 import { CentralControlPanel } from "@/components/interface/central-control-panel";
 import { useGreenhouseStore, type CropType } from "@/lib/greenhouse-store";
@@ -15,12 +16,15 @@ import { ClockWidget } from "@/components/interface/clock-widget";
 import { SettingsButton } from "@/components/interface/settings-button";
 import { TemperatureWidget } from "@/components/interface/temperature-widget";
 import { SidebarToggle } from "@/components/interface/sidebar-toggle";
+import { McpSetupButton } from "@/components/interface/mcp-setup-button";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { AgentDecisionPanel } from "@/components/interface/agent-decision-panel";
 import { SimulationOverrides } from "@/components/interface/simulation-overrides";
 import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
 import { ReportsView } from "@/components/interface/reports-view";
+import { DashboardView } from "@/components/interface/dashboard-view";
 import { SquaresFour, Leaf, Robot, FileText } from "@phosphor-icons/react";
+import { triggerHaptic } from "@/lib/haptics";
 
 type IntroStage = "sealed" | "opening" | "open";
 type MainView = "greenhouse" | "dashboard" | "reports";
@@ -32,34 +36,25 @@ const VIEW_ORDER: Record<MainView, number> = {
 };
 
 const VIEWPORT_TRANSITION = {
-  duration: 0.44,
-  ease: [0.22, 1, 0.36, 1] as const,
+  duration: 0.55,
+  ease: [0.32, 0.72, 0, 1] as const,
 };
 
 const GREENHOUSE_PANEL_TRANSITION = {
-  duration: 0.42,
-  ease: [0.22, 1, 0.36, 1] as const,
+  duration: 0.5,
+  ease: [0.32, 0.72, 0, 1] as const,
 };
 
 const GREENHOUSE_PANEL_VARIANTS = {
   enter: (direction: number) => ({
-    x: direction < 0 ? 88 : -88,
-    opacity: 0,
+    x: direction > 0 ? "-60%" : "-100%",
   }),
   center: {
     x: 0,
-    opacity: 1,
   },
   exit: (direction: number) => ({
-    x: direction > 0 ? -120 : 120,
-    opacity: 0,
+    x: direction > 0 ? "-100%" : "-60%",
   }),
-};
-
-const GREENHOUSE_BLEND_VARIANTS = {
-  enter: { opacity: 0.65 },
-  center: { opacity: 0 },
-  exit: { opacity: 0.82 },
 };
 
 export default function Home() {
@@ -97,8 +92,15 @@ export default function Home() {
     };
   }, [shouldReduceMotion]);
 
+  const handleSidebarOpenChange = React.useCallback((next: boolean) => {
+    setSidebarOpen(next);
+    if (next) setControlOpen(false);
+  }, []);
+
   const handleControlOpenChange = (next: boolean) => {
     setControlOpen(next);
+    if (next) setSidebarOpen(false);
+    triggerHaptic("selection");
     if (!next) {
       setFocusedCrop(null);
     } else {
@@ -120,6 +122,11 @@ export default function Home() {
     ],
     []
   );
+
+  const handleAgentToggle = React.useCallback(() => {
+    triggerHaptic("selection");
+    setAgentOpen((v) => !v);
+  }, []);
 
   const handleTabChange = React.useCallback((tab: string) => {
     setActiveTab(tab);
@@ -145,6 +152,7 @@ export default function Home() {
         style={{ marginRight: sidebarOpen ? 360 : 0 }}
       >
         <CentralControlExample />
+        <SnapshotSync />
         <SimulationOverrides />
         <div className="absolute inset-0 isolate overflow-hidden">
           <DashboardView />
@@ -172,8 +180,6 @@ export default function Home() {
               >
                 <GreenhouseView
                   introStage={introStage}
-                  greenhouseVisible={greenhouseVisible}
-                  onGreenhouseVisibleChange={setGreenhouseVisible}
                 />
               </motion.section>
             )}
@@ -217,6 +223,7 @@ export default function Home() {
                 transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.42, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
                 className={`absolute right-6 top-6 flex items-center gap-3 ${controlOpen ? "z-50" : ""}`}
               >
+                <McpSetupButton />
                 <CentralControlPanel
                   open={controlOpen}
                   onOpenChange={handleControlOpenChange}
@@ -261,7 +268,7 @@ export default function Home() {
                   running={tickInFlight}
                   autonomousEnabled={autonomousEnabled}
                   decisionCount={decisionCount}
-                  onClick={() => setAgentOpen((v) => !v)}
+                  onClick={handleAgentToggle}
                 />
               </motion.div>
             </>
@@ -281,11 +288,11 @@ export default function Home() {
             >
               <SidebarToggle
                 pressed={sidebarOpen}
-                onPressedChange={setSidebarOpen}
+                onPressedChange={handleSidebarOpenChange}
               />
             </motion.div>
 
-            <ChatSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
+            <ChatSidebar open={sidebarOpen} onOpenChange={handleSidebarOpenChange} />
           </>
         )}
       </AnimatePresence>
@@ -295,27 +302,12 @@ export default function Home() {
 
 function GreenhouseView({
   introStage,
-  greenhouseVisible,
-  onGreenhouseVisibleChange,
 }: {
   introStage: IntroStage;
-  greenhouseVisible: boolean;
-  onGreenhouseVisibleChange: (next: boolean) => void;
 }) {
   return (
     <div className="absolute inset-0">
-      <GreenhouseGrid
-        introStage={introStage}
-        greenhouseVisible={greenhouseVisible}
-        onGreenhouseVisibleChange={onGreenhouseVisibleChange}
-        showBackdrop={false}
-      />
-      <motion.div
-        aria-hidden="true"
-        variants={GREENHOUSE_BLEND_VARIANTS}
-        transition={GREENHOUSE_PANEL_TRANSITION}
-        className="pointer-events-none absolute inset-0 bg-background"
-      />
+      <GreenhouseGrid introStage={introStage} showBackdrop={false} />
     </div>
   );
 }
@@ -365,10 +357,6 @@ function GreenhouseIcon({ active }: { active: boolean }) {
       {!active && <path d="M5.15 5.4L14.85 15.1" opacity="0.72" />}
     </svg>
   );
-}
-
-function DashboardView() {
-  return <section aria-label="Dashboard view" className="absolute inset-0 bg-background" />;
 }
 
 function AgentToggleButton({

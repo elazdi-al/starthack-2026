@@ -50,7 +50,8 @@ function r2(n: number) { return Math.round(n * 100) / 100; }
 function ri(n: number) { return Math.round(n); }
 
 export function CentralControlExample() {
-  const env = useGreenhouseStore((s) => s.environment);
+  const externalTemp = useGreenhouseStore((s) => s.environment.externalTemp);
+  const solarRadiation = useGreenhouseStore((s) => s.environment.solarRadiation);
   const simState = useGreenhouseStore((s) => s.simState);
   const applyParameterChanges = useGreenhouseStore((s) => s.applyParameterChanges);
   const applyOverrides = useGreenhouseStore((s) => s.applyOverrides);
@@ -62,13 +63,14 @@ export function CentralControlExample() {
   // ── Register all three panels on mount ──────────────────────────────────
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount with initial snapshot
   React.useEffect(() => {
+    const initEnv = useGreenhouseStore.getState().environment;
     const gh = simState.greenhouse;
     const overrides = gh.overrides;
 
     // ─ External Parameters ─
     const extInitial: Record<string, number> = {
-      externalTemp:   r1(env.externalTemp),
-      solarRadiation: ri(env.solarRadiation),
+      externalTemp:   r1(initEnv.externalTemp),
+      solarRadiation: ri(initEnv.solarRadiation),
       dustStorm:      r2(overrides.dustStormSeverity),
       pressure:       ri(overrides.atmosphericPressure),
       timeOfDay:      r2(overrides.timeOfDayFraction),
@@ -128,12 +130,12 @@ export function CentralControlExample() {
     };
 
     // Only push natural sim values for params whose override is NOT active
-    if (!o.externalTempEnabled)   push("externalTemp", r1(env.externalTemp));
-    if (!o.solarRadiationEnabled) push("solarRadiation", ri(env.solarRadiation));
+    if (!o.externalTempEnabled)   push("externalTemp", r1(externalTemp));
+    if (!o.solarRadiationEnabled) push("solarRadiation", ri(solarRadiation));
     // dustStorm, pressure, timeOfDay are control inputs — no natural sim push
 
     pushingFromSim = false;
-  }, [env]);
+  }, [externalTemp, solarRadiation]);
 
   // ── External params → overrides (auto-enable on user change) ───────────
   React.useEffect(() => {

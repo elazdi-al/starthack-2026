@@ -3,6 +3,9 @@ import { motion, useMotionValue, useTransform, animate } from 'motion/react';
 import { AnimatedParameterValue } from '@/components/ui/animated-parameter-value';
 import { triggerHaptic } from '@/lib/haptics';
 
+// Tiny tick for slider detent — very short, very subtle
+const SLIDER_TICK = { pattern: [{ duration: 4, intensity: 0.15 }] };
+
 interface SliderProps {
   label: string;
   value: number;
@@ -67,6 +70,8 @@ export const Slider = memo(function Slider({
   const animRef = useRef<ReturnType<typeof animate> | null>(null);
   const wrapperRectRef = useRef<DOMRect | null>(null);
   const scaleRef = useRef(1);
+  const lastTickValueRef = useRef(value);
+  const lastTickTimeRef = useRef(0);
 
   const percentage = ((value - min) / (max - min)) * 100;
   const isActive = isInteracting || isHovered;
@@ -161,6 +166,8 @@ export const Slider = memo(function Slider({
       if (isClickRef.current && distance > CLICK_THRESHOLD) {
         isClickRef.current = false;
         setIsDragging(true);
+        lastTickValueRef.current = value;
+        triggerHaptic(SLIDER_TICK);
       }
 
       if (!isClickRef.current) {
@@ -183,7 +190,16 @@ export const Slider = memo(function Slider({
           animRef.current = null;
         }
         fillPercent.jump(newPct);
-        onChange(roundValue(newValue, step));
+        const rounded = roundValue(newValue, step);
+        if (rounded !== lastTickValueRef.current) {
+          lastTickValueRef.current = rounded;
+          const now = performance.now();
+          if (now - lastTickTimeRef.current > 20) {
+            lastTickTimeRef.current = now;
+            triggerHaptic(SLIDER_TICK);
+          }
+        }
+        onChange(rounded);
       }
     },
     [
@@ -228,6 +244,7 @@ export const Slider = memo(function Slider({
 
       // Spring rubber band back
       if (rubberStretchPx.get() !== 0) {
+        triggerHaptic('soft');
         animate(rubberStretchPx, 0, {
           type: 'spring',
           visualDuration: 0.35,
@@ -288,6 +305,7 @@ export const Slider = memo(function Slider({
     if (!isNaN(parsed)) {
       const clamped = Math.max(min, Math.min(max, parsed));
       onChange(roundValue(clamped, step));
+      triggerHaptic('selection');
     }
     setShowInput(false);
     setIsValueHovered(false);

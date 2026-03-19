@@ -133,6 +133,19 @@ export function CentralControlPanel({
   const showPanel = open && mounted && panels.length > 0;
   const anim = useAnimationConfig();
 
+  // Close on click outside
+  React.useEffect(() => {
+    if (!showPanel) return;
+    const handler = (e: MouseEvent) => {
+      const wrapper = wrapperRef.current;
+      if (wrapper && !wrapper.contains(e.target as Node)) {
+        onOpenChange(false);
+      }
+    };
+    window.addEventListener("pointerdown", handler);
+    return () => window.removeEventListener("pointerdown", handler);
+  }, [showPanel, onOpenChange]);
+
   return (
     <div
       ref={wrapperRef}
