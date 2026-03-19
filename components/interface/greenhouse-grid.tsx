@@ -82,22 +82,6 @@ const GROWTH_LABEL: Record<number, string> = {
   5: "Harvest ready",
 };
 
-const DOT_SIZE: Record<number, string> = {
-  1: "w-[3px] h-[3px]",
-  2: "w-1 h-1",
-  3: "w-[6px] h-[6px]",
-  4: "w-2 h-2",
-  5: "w-2.5 h-2.5",
-};
-
-const DOT_OPACITY: Record<number, string> = {
-  1: "opacity-20",
-  2: "opacity-35",
-  3: "opacity-50",
-  4: "opacity-65",
-  5: "opacity-80",
-};
-
 const PREVIEW_COLORS = {
   leaf1: "#5c865c",
   leaf2: "#79a26f",
@@ -128,131 +112,152 @@ const PREVIEW_COLORS = {
   kale3: "#456048",
 } as const;
 
-function Poly({ points, fill }: { points: string; fill: string }) {
-  return <polygon points={points} fill={fill} />;
+function DepthPoly({
+  points,
+  fill,
+  shadow,
+}: {
+  points: string;
+  fill: string;
+  shadow: string;
+}) {
+  return (
+    <>
+      <polygon points={points} fill={shadow} transform="translate(2 4)" />
+      <polygon points={points} fill={fill} />
+    </>
+  );
 }
 
-function CropPreview({ crop }: { crop: CropType }) {
+function CropPreview({
+  crop,
+  className,
+}: {
+  crop: CropType;
+  className?: string;
+}) {
+  const svgClassName = className ? `crop-preview-svg ${className}` : "crop-preview-svg";
+
   if (crop === "radish") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-        <Poly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} />
-        <Poly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} />
-        <Poly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} />
-        <Poly points="44,28 59,41 29,41" fill={PREVIEW_COLORS.leaf4} />
-        <Poly points="44,31 64,39 51,69" fill={PREVIEW_COLORS.radish1} />
-        <Poly points="44,31 38,73 24,40" fill={PREVIEW_COLORS.radish2} />
-        <Poly points="39,56 44,76 30,65" fill={PREVIEW_COLORS.radish3} />
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+        <DepthPoly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
+        <DepthPoly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
+        <DepthPoly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
+        <DepthPoly points="44,28 59,41 29,41" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
+        <DepthPoly points="44,31 64,39 51,69" fill={PREVIEW_COLORS.radish1} shadow="#8c3f55" />
+        <DepthPoly points="44,31 38,73 24,40" fill={PREVIEW_COLORS.radish2} shadow="#b45e7a" />
+        <DepthPoly points="39,56 44,76 30,65" fill={PREVIEW_COLORS.radish3} shadow="#763245" />
       </svg>
     );
   }
 
   if (crop === "potato") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-        <Poly points="44,14 54,30 34,30" fill={PREVIEW_COLORS.leaf1} />
-        <Poly points="28,28 44,38 24,46" fill={PREVIEW_COLORS.leaf2} />
-        <Poly points="60,28 64,46 44,38" fill={PREVIEW_COLORS.leaf3} />
-        <Poly points="41,28 47,54 37,54" fill={PREVIEW_COLORS.stem} />
-        <Poly points="28,46 42,42 44,60 31,66 22,58" fill={PREVIEW_COLORS.potato1} />
-        <Poly points="45,43 58,45 62,58 51,66 40,60" fill={PREVIEW_COLORS.potato2} />
-        <Poly points="38,54 49,56 50,67 40,73 31,67" fill={PREVIEW_COLORS.potato3} />
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+        <DepthPoly points="44,14 54,30 34,30" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
+        <DepthPoly points="28,28 44,38 24,46" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
+        <DepthPoly points="60,28 64,46 44,38" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
+        <DepthPoly points="41,28 47,54 37,54" fill={PREVIEW_COLORS.stem} shadow="#556847" />
+        <DepthPoly points="28,46 42,42 44,60 31,66 22,58" fill={PREVIEW_COLORS.potato1} shadow="#6e5239" />
+        <DepthPoly points="45,43 58,45 62,58 51,66 40,60" fill={PREVIEW_COLORS.potato2} shadow="#826748" />
+        <DepthPoly points="38,54 49,56 50,67 40,73 31,67" fill={PREVIEW_COLORS.potato3} shadow="#60452e" />
       </svg>
     );
   }
 
   if (crop === "wheat") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-        <Poly points="37,18 43,72 34,72" fill={PREVIEW_COLORS.stem} />
-        <Poly points="49,14 55,70 46,70" fill={PREVIEW_COLORS.stem} />
-        <Poly points="43,9 54,17 42,24" fill={PREVIEW_COLORS.grain1} />
-        <Poly points="51,18 63,26 50,34" fill={PREVIEW_COLORS.grain2} />
-        <Poly points="39,18 29,26 40,34" fill={PREVIEW_COLORS.grain2} />
-        <Poly points="44,26 55,34 43,42" fill={PREVIEW_COLORS.grain1} />
-        <Poly points="50,34 61,42 49,50" fill={PREVIEW_COLORS.grain2} />
-        <Poly points="38,35 28,43 39,49" fill={PREVIEW_COLORS.grain1} />
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+        <DepthPoly points="37,18 43,72 34,72" fill={PREVIEW_COLORS.stem} shadow="#556847" />
+        <DepthPoly points="49,14 55,70 46,70" fill={PREVIEW_COLORS.stem} shadow="#556847" />
+        <DepthPoly points="43,9 54,17 42,24" fill={PREVIEW_COLORS.grain1} shadow="#a18d57" />
+        <DepthPoly points="51,18 63,26 50,34" fill={PREVIEW_COLORS.grain2} shadow="#8f7a45" />
+        <DepthPoly points="39,18 29,26 40,34" fill={PREVIEW_COLORS.grain2} shadow="#8f7a45" />
+        <DepthPoly points="44,26 55,34 43,42" fill={PREVIEW_COLORS.grain1} shadow="#a18d57" />
+        <DepthPoly points="50,34 61,42 49,50" fill={PREVIEW_COLORS.grain2} shadow="#8f7a45" />
+        <DepthPoly points="38,35 28,43 39,49" fill={PREVIEW_COLORS.grain1} shadow="#a18d57" />
       </svg>
     );
   }
 
   if (crop === "tomato") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-        <Poly points="44,10 53,26 35,26" fill={PREVIEW_COLORS.leaf1} />
-        <Poly points="28,24 47,39 20,43" fill={PREVIEW_COLORS.leaf2} />
-        <Poly points="60,24 68,43 41,39" fill={PREVIEW_COLORS.leaf3} />
-        <Poly points="44,26 50,64 38,64" fill={PREVIEW_COLORS.stem} />
-        <Poly points="44,39 61,51 48,70" fill={PREVIEW_COLORS.fruit1} />
-        <Poly points="29,50 44,39 40,68" fill={PREVIEW_COLORS.fruit2} />
-        <Poly points="43,50 58,59 45,77" fill={PREVIEW_COLORS.fruit3} />
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+        <DepthPoly points="44,10 53,26 35,26" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
+        <DepthPoly points="28,24 47,39 20,43" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
+        <DepthPoly points="60,24 68,43 41,39" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
+        <DepthPoly points="44,26 50,64 38,64" fill={PREVIEW_COLORS.stem} shadow="#556847" />
+        <DepthPoly points="44,39 61,51 48,70" fill={PREVIEW_COLORS.fruit1} shadow="#8f3b33" />
+        <DepthPoly points="29,50 44,39 40,68" fill={PREVIEW_COLORS.fruit2} shadow="#a64d40" />
+        <DepthPoly points="43,50 58,59 45,77" fill={PREVIEW_COLORS.fruit3} shadow="#80312a" />
       </svg>
     );
   }
 
   if (crop === "soybean") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-        <Poly points="44,12 55,29 33,29" fill={PREVIEW_COLORS.leaf1} />
-        <Poly points="28,24 49,39 24,46" fill={PREVIEW_COLORS.leaf2} />
-        <Poly points="60,24 64,46 40,39" fill={PREVIEW_COLORS.leaf3} />
-        <Poly points="44,27 50,63 38,63" fill={PREVIEW_COLORS.stem} />
-        <Poly points="28,45 41,41 48,49 37,58 25,54" fill={PREVIEW_COLORS.pod1} />
-        <Poly points="42,49 55,45 63,53 52,62 40,58" fill={PREVIEW_COLORS.pod2} />
-        <Poly points="35,56 45,54 50,61 42,68 33,65" fill={PREVIEW_COLORS.pod3} />
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+        <DepthPoly points="44,12 55,29 33,29" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
+        <DepthPoly points="28,24 49,39 24,46" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
+        <DepthPoly points="60,24 64,46 40,39" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
+        <DepthPoly points="44,27 50,63 38,63" fill={PREVIEW_COLORS.stem} shadow="#556847" />
+        <DepthPoly points="28,45 41,41 48,49 37,58 25,54" fill={PREVIEW_COLORS.pod1} shadow="#52693d" />
+        <DepthPoly points="42,49 55,45 63,53 52,62 40,58" fill={PREVIEW_COLORS.pod2} shadow="#67824e" />
+        <DepthPoly points="35,56 45,54 50,61 42,68 33,65" fill={PREVIEW_COLORS.pod3} shadow="#485f35" />
       </svg>
     );
   }
 
   if (crop === "spinach") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-        <Poly points="44,14 57,34 31,34" fill={PREVIEW_COLORS.leaf1} />
-        <Poly points="26,30 46,41 23,56" fill={PREVIEW_COLORS.leaf2} />
-        <Poly points="62,30 65,55 42,41" fill={PREVIEW_COLORS.leaf3} />
-        <Poly points="43,29 60,57 29,57" fill={PREVIEW_COLORS.leaf4} />
-        <Poly points="44,42 51,71 37,71" fill={PREVIEW_COLORS.stem} />
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+        <DepthPoly points="44,14 57,34 31,34" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
+        <DepthPoly points="26,30 46,41 23,56" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
+        <DepthPoly points="62,30 65,55 42,41" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
+        <DepthPoly points="43,29 60,57 29,57" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
+        <DepthPoly points="44,42 51,71 37,71" fill={PREVIEW_COLORS.stem} shadow="#556847" />
       </svg>
     );
   }
 
   if (crop === "kale") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-        <Poly points="44,12 57,28 31,28" fill={PREVIEW_COLORS.leaf1} />
-        <Poly points="23,30 46,40 22,55" fill={PREVIEW_COLORS.leaf2} />
-        <Poly points="65,30 66,55 42,40" fill={PREVIEW_COLORS.leaf3} />
-        <Poly points="44,24 61,54 27,54" fill={PREVIEW_COLORS.leaf4} />
-        <Poly points="31,41 45,63 23,66" fill={PREVIEW_COLORS.kale1} />
-        <Poly points="57,41 65,67 43,63" fill={PREVIEW_COLORS.kale2} />
-        <Poly points="44,39 54,73 34,73" fill={PREVIEW_COLORS.kale3} />
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+        <DepthPoly points="44,12 57,28 31,28" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
+        <DepthPoly points="23,30 46,40 22,55" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
+        <DepthPoly points="65,30 66,55 42,40" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
+        <DepthPoly points="44,24 61,54 27,54" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
+        <DepthPoly points="31,41 45,63 23,66" fill={PREVIEW_COLORS.kale1} shadow="#45614d" />
+        <DepthPoly points="57,41 65,67 43,63" fill={PREVIEW_COLORS.kale2} shadow="#3e5541" />
+        <DepthPoly points="44,39 54,73 34,73" fill={PREVIEW_COLORS.kale3} shadow="#304338" />
       </svg>
     );
   }
 
   if (crop === "lettuce") {
     return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-        <Poly points="44,16 56,34 32,34" fill={PREVIEW_COLORS.leaf1} />
-        <Poly points="23,31 47,44 21,54" fill={PREVIEW_COLORS.leaf2} />
-        <Poly points="65,31 67,54 41,44" fill={PREVIEW_COLORS.leaf3} />
-        <Poly points="44,30 58,57 30,57" fill={PREVIEW_COLORS.leaf4} />
-        <Poly points="32,42 48,62 24,64" fill={PREVIEW_COLORS.lettuce1} />
-        <Poly points="56,42 64,63 41,61" fill={PREVIEW_COLORS.lettuce2} />
-        <Poly points="44,42 52,71 36,71" fill={PREVIEW_COLORS.stem} />
+      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+        <DepthPoly points="44,16 56,34 32,34" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
+        <DepthPoly points="23,31 47,44 21,54" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
+        <DepthPoly points="65,31 67,54 41,44" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
+        <DepthPoly points="44,30 58,57 30,57" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
+        <DepthPoly points="32,42 48,62 24,64" fill={PREVIEW_COLORS.lettuce1} shadow="#658258" />
+        <DepthPoly points="56,42 64,63 41,61" fill={PREVIEW_COLORS.lettuce2} shadow="#54714b" />
+        <DepthPoly points="44,42 52,71 36,71" fill={PREVIEW_COLORS.stem} shadow="#556847" />
       </svg>
     );
   }
 
   return (
-    <svg viewBox="0 0 88 88" aria-hidden="true" className="crop-preview-svg">
-      <Poly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} />
-      <Poly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} />
-      <Poly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} />
-      <Poly points="44,28 59,41 29,41" fill={PREVIEW_COLORS.leaf4} />
-      <Poly points="44,31 63,39 50,73" fill={PREVIEW_COLORS.root1} />
-      <Poly points="44,31 38,75 25,39" fill={PREVIEW_COLORS.root2} />
-      <Poly points="37,55 44,75 31,64" fill={PREVIEW_COLORS.root3} />
+    <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName}>
+      <DepthPoly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
+      <DepthPoly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
+      <DepthPoly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
+      <DepthPoly points="44,28 59,41 29,41" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
+      <DepthPoly points="44,31 63,39 50,73" fill={PREVIEW_COLORS.root1} shadow="#93481f" />
+      <DepthPoly points="44,31 38,75 25,39" fill={PREVIEW_COLORS.root2} shadow="#a96431" />
+      <DepthPoly points="37,55 44,75 31,64" fill={PREVIEW_COLORS.root3} shadow="#7e3c18" />
     </svg>
   );
 }
@@ -412,14 +417,11 @@ function GridTile({
         />
       )}
 
-      {planted && (
-        <div className="pointer-events-none absolute inset-0 grid grid-cols-2 grid-rows-2 place-items-center p-8">
-          {["a", "b", "c", "d"].map((id) => (
-            <span
-              key={id}
-              className={`block rounded-full bg-green-800/40 ${DOT_SIZE[data.growth]} ${DOT_OPACITY[data.growth]}`}
-            />
-          ))}
+      {planted && data.crop && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="crop-tile-plant">
+            <CropPreview crop={data.crop} className="crop-preview-svg--tile" />
+          </div>
         </div>
       )}
 

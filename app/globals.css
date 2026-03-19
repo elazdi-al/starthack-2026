@@ -720,6 +720,28 @@
     filter: drop-shadow(0 8px 12px rgb(0 0 0 / 0.08));
   }
 
+  .crop-tile-plant {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 0;
+    height: 0;
+    transform: rotate(45deg) scaleY(1.78) perspective(120px) rotateX(-14deg);
+    transform-origin: center center;
+  }
+
+  .crop-preview-svg--tile {
+    width: 46px;
+    height: 46px;
+    transform: translate(-50%, 0);
+    filter:
+      drop-shadow(0 14px 10px rgb(0 0 0 / 0.18))
+      drop-shadow(0 2px 3px rgb(255 255 255 / 0.08));
+  }
+
   .crop-preview-leaf-1 {
     fill: #446f4b;
   }
