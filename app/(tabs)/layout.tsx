@@ -168,6 +168,11 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
     };
   }, [shouldReduceMotion]);
 
+  /* ── Keep focusedCrop in sync with toolbar visibility ──────────────── */
+  React.useEffect(() => {
+    if (!controlOpen) setFocusedCrop(null);
+  }, [controlOpen, setFocusedCrop]);
+
   /* ── Callbacks ────────────────────────────────────────────────────────── */
   const handleSidebarOpenChange = React.useCallback((next: boolean) => {
     setSidebarOpen(next);

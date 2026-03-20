@@ -46,47 +46,82 @@ function digestPreamble(agentName: 'survival' | 'wellbeing' | 'arbiter'): string
 
 /** Build a concise human-readable summary of resolved actions. */
 function summarizeActions(actions: z.infer<typeof ActionSchema>[]): string {
-  if (actions.length === 0) return 'No actions';
+  if (actions.length === 0) return 'Routine monitoring — no changes needed';
 
-  const parts: string[] = [];
+  // Categorise all actions
+  let hasClimate = false;
+  let hasPlanting = false;
+  let hasHarvesting = false;
+  let hasClearing = false;
+  let hasReplanting = false;
+  let hasCropConfig = false;
 
-  // Aggregate batch-tile and loose tile actions into counts per crop
-  const plantCounts: Record<string, number> = {};
-  const harvestCounts: Record<string, number> = {};
-  let clearCount = 0;
+  const climateParams = new Set<string>();
+  const cropNames = new Set<string>();
 
   for (const a of actions) {
     if (a.type === 'batch-tile') {
-      for (const p of a.plants ?? []) {
-        plantCounts[p.crop] = (plantCounts[p.crop] ?? 0) + 1;
+      if (a.plants && a.plants.length > 0) {
+        hasPlanting = true;
+        for (const p of a.plants) cropNames.add(p.crop);
       }
-      harvestCounts['tiles'] = (harvestCounts['tiles'] ?? 0) + (a.harvests?.length ?? 0);
-      clearCount += a.clears?.length ?? 0;
-    } else if (a.type === 'harvest' && a.crop) {
-      parts.push(`harvested all ${a.crop}`);
-    } else if (a.type === 'replant' && a.crop) {
-      parts.push(`replanted all ${a.crop}`);
-    } else if (a.type === 'greenhouse' && a.param != null && a.value != null) {
-      const label = a.param === 'globalHeatingPower' ? 'heating'
-        : a.param === 'lightingPower' ? 'lighting'
-        : a.param === 'co2InjectionRate' ? 'CO2 injection'
-        : a.param === 'ventilationRate' ? 'ventilation'
-        : a.param;
-      parts.push(`set ${label} to ${a.value}`);
-    } else if (a.type === 'crop' && a.crop && a.param != null && a.value != null) {
-      parts.push(`set ${a.crop} ${a.param} to ${a.value}`);
+      if (a.harvests && a.harvests.length > 0) hasHarvesting = true;
+      if (a.clears && a.clears.length > 0) hasClearing = true;
+    } else if (a.type === 'harvest') {
+      hasHarvesting = true;
+      if (a.crop) cropNames.add(a.crop);
+    } else if (a.type === 'replant') {
+      hasReplanting = true;
+      if (a.crop) cropNames.add(a.crop);
+    } else if (a.type === 'greenhouse') {
+      hasClimate = true;
+      if (a.param) {
+        const label = a.param === 'globalHeatingPower' ? 'heating'
+          : a.param === 'lightingPower' ? 'lighting'
+          : a.param === 'co2InjectionRate' ? 'CO2'
+          : a.param === 'ventilationRate' ? 'ventilation'
+          : a.param === 'waterPump' ? 'irrigation'
+          : a.param;
+        climateParams.add(label);
+      }
+    } else if (a.type === 'crop') {
+      hasCropConfig = true;
+      if (a.crop) cropNames.add(a.crop);
     }
   }
 
-  // Summarize tile operations
-  for (const [crop, count] of Object.entries(plantCounts)) {
-    parts.push(`planted ${count} ${crop}`);
-  }
-  const totalHarvests = harvestCounts['tiles'] ?? 0;
-  if (totalHarvests > 0) parts.push(`harvested ${totalHarvests} tile${totalHarvests > 1 ? 's' : ''}`);
-  if (clearCount > 0) parts.push(`cleared ${clearCount} tile${clearCount > 1 ? 's' : ''}`);
+  const hasCropWork = hasPlanting || hasHarvesting || hasClearing || hasReplanting || hasCropConfig;
 
-  return parts.join(', ');
+  // Build a concise, title-style headline
+  if (hasClimate && hasCropWork) {
+    const params = [...climateParams].slice(0, 2).join(' & ');
+    return params
+      ? `Adjusted ${params} and managed crop operations`
+      : 'Climate adjustment and crop management';
+  }
+
+  if (hasClimate) {
+    const params = [...climateParams];
+    if (params.length === 1) return `Adjusted ${params[0]} for greenhouse`;
+    if (params.length === 2) return `Tuned ${params[0]} and ${params[1]}`;
+    return `Updated greenhouse climate controls`;
+  }
+
+  if (hasCropWork) {
+    const activities: string[] = [];
+    if (hasHarvesting) activities.push('harvested');
+    if (hasPlanting) activities.push('planted');
+    if (hasReplanting) activities.push('replanted');
+    if (hasClearing) activities.push('cleared');
+    if (hasCropConfig) activities.push('reconfigured');
+    const crops = [...cropNames].slice(0, 2);
+    const cropSuffix = crops.length > 0 ? ` ${crops.join(' & ')}` : ' crops';
+    const verb = activities.length <= 2 ? activities.join(' and ') : activities.slice(0, 2).join(' and ');
+    // Capitalise first letter
+    return (verb.charAt(0).toUpperCase() + verb.slice(1)) + cropSuffix;
+  }
+
+  return `Greenhouse maintenance update`;
 }
 
 /** Apply preferenceUpdates array from wellbeing agent JSON to the secretary store. */

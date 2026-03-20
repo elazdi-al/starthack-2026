@@ -569,7 +569,6 @@ interface PersistedGreenhouseData {
   speed: SpeedKey;
   events: SimEvent[];
   totalHarvestKg: number;
-  focusedCrop: CropType | null;
   agentDecisions: AgentDecision[];
   autonomousEnabled: boolean;
   grid: TileData[][];
@@ -586,7 +585,6 @@ function saveGreenhouseState(state: GreenhouseState): void {
     speed: state.speed,
     events: state.events.slice(-500), // cap to avoid bloating storage
     totalHarvestKg: state.totalHarvestKg,
-    focusedCrop: state.focusedCrop,
     agentDecisions: state.agentDecisions,
     autonomousEnabled: state.autonomousEnabled,
     grid: state.grid,
@@ -1233,7 +1231,6 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
       speed: persisted.speed,
       events: persisted.events,
       totalHarvestKg: persisted.totalHarvestKg,
-      focusedCrop: persisted.focusedCrop,
       agentDecisions: persisted.agentDecisions,
       autonomousEnabled: persisted.autonomousEnabled,
       temperature: env.airTemperature,
