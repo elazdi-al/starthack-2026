@@ -1,10 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
-
-const bedrock = createAmazonBedrock({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
-});
+import { google } from '@ai-sdk/google';
 import { knowledgeBaseTool } from '../tools/knowledge-base-tool';
 import { greenhouseParameterTool } from '../tools/greenhouse-tool';
 import { secretaryVectorTool } from '../tools/secretary-vector-tool';
@@ -108,7 +104,7 @@ ARBITER MODE JSON FORMAT for question-type crew interactions:
   "response": "<plain-language answer to the crew's question, warm and direct>",
   "preferenceUpdates": []
 }`,
-  model: bedrock('us.anthropic.claude-opus-4-5-20251101-v1:0'),
+  model: google('gemini-3-flash-preview'),
   tools: { knowledgeBaseTool, greenhouseParameterTool, secretaryVectorTool },
   memory: new Memory(),
 });
