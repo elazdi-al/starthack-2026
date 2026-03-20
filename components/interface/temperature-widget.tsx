@@ -12,7 +12,7 @@ export function TemperatureWidget() {
   const isHydrated = useHydrated();
 
   return (
-    <div className="rounded-lg flex justify-center items-center h-10 px-3 gap-1.5 bg-neutral-900 dark:bg-white/8">
+    <div className="rounded-lg flex justify-center items-center h-10 px-3 gap-1.5 bg-[var(--dial-surface)]">
       <ThermometerSimple size={16} weight="fill" className="text-[var(--dial-text-primary)]" />
       <p className="type-ui text-[var(--dial-text-primary)] font-medium whitespace-nowrap">
         {isHydrated ? (

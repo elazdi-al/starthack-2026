@@ -46,7 +46,7 @@ export function ClockWidget() {
 
   return (
     <div className="relative flex items-center gap-1">
-      <div className="rounded-lg flex justify-center items-center h-10 px-3 bg-neutral-900 dark:bg-white/8">
+      <div className="rounded-lg flex justify-center items-center h-10 px-3 bg-[var(--dial-surface)]">
         <p className="type-ui text-[var(--dial-text-primary)] font-medium whitespace-nowrap">
           <AnimatedParameterValue
             value={isHydrated ? `Sol ${missionSol} ${timeDisplay}` : "Sol -- --:--"}
@@ -60,7 +60,7 @@ export function ClockWidget() {
           type="button"
           onClick={() => skipTime(opt.minutes)}
           title={`Skip ${opt.label}`}
-          className="rounded-lg flex items-center justify-center h-10 px-2.5 bg-neutral-900 dark:bg-white/8 hover:bg-neutral-700 dark:hover:bg-white/15 transition-colors type-ui text-[var(--dial-text-primary)] font-medium"
+          className="rounded-lg flex items-center justify-center h-10 px-2.5 bg-[var(--dial-surface)] hover:bg-[var(--dial-surface-hover)] transition-colors type-ui text-[var(--dial-text-primary)] font-medium"
         >
           +{opt.label}
         </button>

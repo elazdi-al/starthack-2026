@@ -329,7 +329,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_A}
                 className="absolute left-6 top-6 flex items-center gap-2"
               >
-                <div className="rounded-lg flex items-center h-10 px-3 bg-neutral-900 dark:bg-white/8">
+                <div className="rounded-lg flex items-center h-10 px-3 bg-[var(--dial-surface)]">
                   <span className="type-ui text-[var(--dial-text-primary)] font-medium whitespace-nowrap">
                     {SEASON_LABEL[seasonName]}
                   </span>

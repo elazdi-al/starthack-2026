@@ -26,7 +26,7 @@ export function EnvWidgetShells() {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         title={expanded ? "Hide readings" : "Show readings"}
-        className="h-10 w-10 rounded-lg flex items-center justify-center bg-neutral-900 text-white/40 dark:bg-white/8 dark:text-white/80 hover:text-white hover:bg-neutral-700 dark:hover:bg-white/15 transition-colors"
+        className="h-10 w-10 rounded-lg flex items-center justify-center bg-[var(--dial-surface)] text-[var(--dial-text-tertiary)] hover:text-[var(--dial-text-primary)] hover:bg-[var(--dial-surface-hover)] transition-colors"
       >
         <motion.span
           animate={{ rotate: expanded ? 90 : 0 }}
@@ -85,7 +85,7 @@ function EnvShell({
   return (
     <div
       title={label}
-      className="h-10 rounded-lg flex items-center gap-1.5 px-3 bg-neutral-900 dark:bg-white/8 whitespace-nowrap"
+      className="h-10 rounded-lg flex items-center gap-1.5 px-3 bg-[var(--dial-surface)] whitespace-nowrap"
     >
       <span className="text-[var(--dial-text-primary)]">{icon}</span>
       <span className="type-ui text-[var(--dial-text-primary)] font-medium">{value}</span>
