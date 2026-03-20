@@ -216,7 +216,7 @@ const CrewRadarCard = memo(function CrewRadarCard({ member }: { member: CrewMemb
       </div>
     </div>
   );
-}
+});
 
 /* ── Season / storm display helpers ─────────────────────────────── */
 
