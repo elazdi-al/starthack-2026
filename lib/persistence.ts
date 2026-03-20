@@ -50,10 +50,19 @@ export function isResetInProgress(): boolean {
 }
 
 /**
- * Wipe all persisted application data and reload the page to reset in-memory state.
+ * Wipe **all** application data — both client-side (localStorage) and
+ * server-side (in-memory singletons like the secretary decision log and
+ * snapshot cache) — then reload the page so every store re-initialises
+ * from scratch.
+ *
+ * Must stay **synchronous** so that localStorage is cleared and the reload
+ * is triggered in the same microtask — before any beforeunload handler or
+ * Zustand subscriber can re-persist state.
  */
 export function resetAllData(): void {
   _resetInProgress = true;
+
+  // 1. Clear all localStorage keys
   for (const key of Object.values(STORAGE_KEYS)) {
     try {
       localStorage.removeItem(key);
@@ -61,5 +70,15 @@ export function resetAllData(): void {
       // ignore
     }
   }
+
+  // 2. Fire server-side reset (decision log, incident log, snapshot cache, etc.)
+  //    Using keepalive so the request survives the page reload.
+  try {
+    fetch("/api/reset", { method: "POST", keepalive: true }).catch(() => {});
+  } catch {
+    // fetch itself threw (e.g. SSR) — ignore
+  }
+
+  // 3. Reload to re-initialise all in-memory Zustand stores
   window.location.reload();
 }

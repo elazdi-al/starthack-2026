@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { saveJSON, loadJSON, STORAGE_KEYS } from "@/lib/persistence";
+import { saveJSON, loadJSON, STORAGE_KEYS, isResetInProgress as isPersistenceResetInProgress } from "@/lib/persistence";
 import { useSettingsStore } from "@/lib/settings-store";
 import {
   createInitialCrew,
@@ -612,8 +612,9 @@ let _autonomousTickLock = false;
 
 // Prevents the auto-persist subscriber from saving a half-initialized state
 // while the store is being reset. Set to `true` before a reset and `false` after.
+// Also checks the persistence module's flag, which is set by resetAllData().
 let _resetInProgress = false;
-export function isResetInProgress() { return _resetInProgress; }
+export function isResetInProgress() { return _resetInProgress || isPersistenceResetInProgress(); }
 export function setResetInProgress(v: boolean) { _resetInProgress = v; }
 
 function buildInitialSimulation() {

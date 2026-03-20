@@ -460,6 +460,24 @@ class SecretaryStore {
     return this.missionMemory;
   }
 
+  // ─── Reset ─────────────────────────────────────────────────────────────────
+
+  /** Wipe all in-memory state back to a fresh mission start. */
+  reset(): void {
+    this.decisionLog = [];
+    this.incidentLog = [];
+    this.crewPreferenceProfile = {
+      preferences: {},
+      aversions: [],
+      recentRequests: [],
+      overrideAttempts: [],
+      lastUpdatedSol: 0,
+    };
+    this.weeklyReports = [];
+    this.missionMemory = null;
+    this.performanceDigests = null;
+  }
+
   // ─── Aggregated context for agents ────────────────────────────────────────
 
   getAgentContext(maxDecisions = 5): string {

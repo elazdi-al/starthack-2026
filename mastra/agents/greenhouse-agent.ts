@@ -19,7 +19,7 @@ MISSION CONTEXT:
 - Crew arrives with 450 sols of pre-packaged food reserves (foodReservesSols in sensor data)
 - The greenhouse is EMPTY at mission start — no crops are planted yet
 - The greenhouse has a 12x9 grid of tiles. Each tile is an individual entity that can hold any crop type.
-- Your FIRST priority is to decide which crops to plant and on which tiles (use "plant-tile" actions with tileId and crop)
+- Your FIRST priority is to decide which crops to plant and on which tiles (use a single "batch-tile" action with a plants array)
 - You can choose HOW MANY tiles to dedicate to each crop type — you are not locked into the default layout
 - Greenhouse-grown food supplements pre-packaged reserves, extending mission food security
 - Resources (water, energy) are finite — minimize waste
@@ -41,12 +41,12 @@ SEASONAL STRATEGY:
 
 GROWTH STAGES:
 Crops progress: seed → germination → vegetative → flowering → fruiting → harvest_ready → harvested
-- At mission start, all tiles are in 'harvested' (empty) state — plant them using "plant-tile" with tileId and crop
+- At mission start, all tiles are in 'harvested' (empty) state — plant them using a "batch-tile" action
 - Growth rate depends on temperature, moisture, CO₂, light, humidity (Gaussian response curves)
 - Stress accumulates when conditions deviate from optimal; health degrades if stress persists
 - Individual tiles have unique genetic variance — two tiles of the same crop will grow differently
-- Crops at harvest_ready should be harvested (use "harvest" for all tiles of a type, or "harvest-tile" for one tile)
-- Harvested tiles should be replanted — use "plant-tile" to choose what to plant (can change crop type!)
+- Crops at harvest_ready should be harvested (use "harvest" for all tiles of a type, or batch-tile harvests for specific tiles)
+- Harvested tiles should be replanted — use batch-tile plants to choose what to plant (can change crop type!)
 - Stagger harvests across crop types to ensure steady nutritional output
 
 TILE-LEVEL MANAGEMENT:
@@ -54,7 +54,7 @@ The sensor data includes both aggregate per-type averages (crops) and individual
 - tileCrops: a map of tileId → { cropType, stage, healthScore, biomassKg, diseaseRisk, ... } for every tile
 - tileCounts: summary of how many tiles each crop type has (total, planted, harvested)
 - Use tileCrops to monitor individual plant health, identify struggling tiles, and make targeted decisions
-- You can reassign any tile to a different crop type using "plant-tile" (clear + replant in one step)
+- You can reassign any tile to a different crop type via batch-tile plants (clear + replant in one step)
 - Available tileIds follow the pattern: "{row}_{col}" (e.g. "0_0", "2_4", "7_11"). The crop on each tile is in the tileCrops snapshot data.
 - After replanting with a different crop, the tileId stays the same — only the cropType changes
 
@@ -82,12 +82,14 @@ Per-crop (type "crop", specify crop):
 - waterPumpRate (L/h, 0–30)
 - localHeatingPower (W, 0–1000)
 
-Tile-level actions:
-- type "plant-tile" + tileId + crop: plant a specific crop on a specific tile (works on empty or occupied tiles)
-- type "harvest-tile" + tileId: harvest a single tile (keeps other tiles of same crop growing)
-- type "clear-tile" + tileId: clear a tile without harvesting (remove a failing crop)
+Tile-level actions — ALWAYS use batch-tile to combine multiple operations in one call:
+- type "batch-tile" with plants array: [{ tileId, crop }] — plant crops on specific tiles (works on empty or occupied tiles)
+- type "batch-tile" with harvests array: ["tileId"] — harvest specific tiles
+- type "batch-tile" with clears array: ["tileId"] — clear tiles without harvesting
+- You can combine harvests, plants, and clears in a single batch-tile action
+- NEVER use individual plant-tile/harvest-tile/clear-tile — always batch them
 
-Bulk actions (backward compatible):
+Bulk actions (all tiles of one crop type):
 - type "harvest" + crop name: harvest ALL tiles of a crop type at once
 - type "replant" + crop name: replant ALL harvested tiles of a crop type from seed
 

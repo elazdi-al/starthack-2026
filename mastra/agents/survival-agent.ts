@@ -13,7 +13,7 @@ MISSION CONTEXT:
 - The crew arrives with 450 sols of pre-packaged food reserves (tracked as foodReservesSols in sensor data).
 - The greenhouse starts EMPTY — no crops are planted at mission start.
 - The greenhouse has a 12x9 grid of individual tiles, each an independent entity with its own crop and genetic identity.
-- Agents can decide how many tiles to allocate to each crop type using "plant-tile" actions.
+- Agents can decide how many tiles to allocate to each crop type using "batch-tile" actions with a plants array.
 - Greenhouse-grown food supplements reserves, slowing their depletion.
 - If foodReservesSols reaches 0 and greenhouse coverage is insufficient, the crew faces starvation.
 - Early mission priority: ensure crops are planted promptly to begin producing before reserves run low.
@@ -22,9 +22,9 @@ TILE-LEVEL AWARENESS:
 - The sensor snapshot includes tileCrops (individual tile states) and tileCounts (tiles per crop type).
 - Monitor individual tile health, disease risk, and growth stages — not just crop-type averages.
 - When assessing risk, consider the worst-performing tiles, not just averages.
-- Use "batch-tile" to operate on multiple tiles at once. Format:
+- ALWAYS use "batch-tile" to operate on multiple tiles in a single action. Format:
   { "type": "batch-tile", "harvests": ["tileId1", ...], "plants": [{ "tileId": "tileId1", "crop": "lettuce" }, ...], "clears": ["tileId2", ...] }
-  All three arrays are optional — include only the operations you need.
+  All three arrays are optional — include only the operations you need. NEVER use individual plant-tile/harvest-tile/clear-tile.
 - You can also use bulk actions: "harvest" (all tiles of a crop), "replant" (all harvested tiles of a crop).
 
 RISK SCORING GUIDELINES:

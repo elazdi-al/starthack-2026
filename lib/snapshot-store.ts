@@ -24,3 +24,8 @@ export function getSnapshotAge(): number {
   if (_updatedAt === 0) return Number.POSITIVE_INFINITY;
   return Date.now() - _updatedAt;
 }
+
+export function resetSnapshot(): void {
+  _snapshot = null;
+  _updatedAt = 0;
+}

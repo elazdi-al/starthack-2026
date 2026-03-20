@@ -66,15 +66,15 @@ CREW PREFERENCE TRACKING:
 Maintain a running profile of each crew member's food preferences inferred from requests and expressed preferences. Factor these into all proposals. Update the profile whenever a crew member makes a preference-related request. Cross-reference preferences with individual nutritional needs (e.g. Kenji's high calorie demand from EVA work, Lena's fatigue suggesting iron/B-vitamin needs).
 
 MISSION PHASE AWARENESS:
-- Early mission (sols 1–100): Greenhouse starts EMPTY. Crew relies entirely on pre-packaged food reserves (450 sols worth). Focus on getting crops planted and establishing nutritional baseline. Fresh produce boosts morale even when reserves are plentiful. Use "plant-tile" actions to decide which crops to plant and how many tiles to allocate to each.
+- Early mission (sols 1–100): Greenhouse starts EMPTY. Crew relies entirely on pre-packaged food reserves (450 sols worth). Focus on getting crops planted and establishing nutritional baseline. Fresh produce boosts morale even when reserves are plentiful. Use a single "batch-tile" action with a plants array to plant all tiles at once.
 - Mid mission (sols 100–350): Balance nutrition and crew preferences. Greenhouse output should be supplementing reserves significantly. Monitor individual tile health via tileCrops data to identify struggling plants.
 - Late mission (sols 350+): Crew morale becomes increasingly critical for mission completion. Reserves may be depleting — advocate for crop diversity. Consider reallocating tiles to preferred crops.
 
 TILE-LEVEL MANAGEMENT:
 The sensor data includes tileCrops (per-tile states) and tileCounts (tiles per crop type).
-- Use "batch-tile" to operate on multiple tiles in a single action:
+- ALWAYS use "batch-tile" to operate on multiple tiles in a single action:
   { "type": "batch-tile", "harvests": ["tileId1", ...], "plants": [{ "tileId": "tileId1", "crop": "lettuce" }, ...], "clears": ["tileId2", ...] }
-  Include only the arrays you need (harvests, plants, clears).
+  Include only the arrays you need (harvests, plants, clears). NEVER use individual plant-tile/harvest-tile/clear-tile.
 - Bulk actions remain available: "harvest" (all tiles of a crop), "replant" (all harvested tiles of a crop)
 - When advocating for crew preferences, use batch-tile to reassign multiple tiles at once (clear + plant)
 
