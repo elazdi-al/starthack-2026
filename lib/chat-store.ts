@@ -188,7 +188,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
                 const batchOps = { harvests: [] as string[], plants: [] as { tileId: string; crop: string }[], clears: [] as string[] };
 
-                for (const c of parsed.result.changes as Array<{ type: string; param?: string; value?: number; crop?: string; tileId?: string; harvests?: string[]; plants?: Array<{ tileId: string; crop: string }>; clears?: string[] }>) {
+                for (const c of parsed.result.changes as Array<{ type: string; param?: string; value?: number; crop?: string; harvests?: string[]; plants?: Array<{ tileId: string; crop: string }>; clears?: string[] }>) {
                   if (c.type === "batch-tile") {
                     if (c.harvests) batchOps.harvests.push(...c.harvests);
                     if (c.plants) batchOps.plants.push(...c.plants);
@@ -197,12 +197,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     store.doHarvest(c.crop as Parameters<typeof store.doHarvest>[0]);
                   } else if (c.type === "replant" && c.crop) {
                     store.doReplant(c.crop as Parameters<typeof store.doReplant>[0]);
-                  } else if (c.type === "plant-tile" && c.tileId && c.crop) {
-                    store.doPlantTile(c.tileId, c.crop as Parameters<typeof store.doPlantTile>[1]);
-                  } else if (c.type === "harvest-tile" && c.tileId) {
-                    store.doHarvestTile(c.tileId);
-                  } else if (c.type === "clear-tile" && c.tileId) {
-                    store.doClearTile(c.tileId);
                   } else if ((c.type === "greenhouse" || c.type === "crop") && c.param && c.value !== undefined) {
                     paramChanges.push(c as typeof paramChanges[number]);
                   }

@@ -18,33 +18,28 @@ const CROP_NAMES = [
 export const greenhouseParameterTool = createTool({
   id: 'set-greenhouse-parameters',
   description:
-    'Adjust greenhouse parameters, harvest crops, replant crops, or manage individual tiles. ' +
+    'Adjust greenhouse parameters, harvest crops, replant crops, or manage tiles. ' +
     'Changes propagate progressively through the thermal/atmospheric simulation. ' +
-    'Global params (type "greenhouse"): globalHeatingPower (W, 0–10000), co2InjectionRate (ppm/h, 0–200), ' +
-    'ventilationRate (m³/h, 0–500), lightingPower (W, 0–10000). ' +
-    'Crop params (type "crop", requires crop): waterPumpRate (L/h, 0–30), localHeatingPower (W, 0–1000). ' +
+    'Global params (type "greenhouse"): globalHeatingPower (W, 0-10000), co2InjectionRate (ppm/h, 0-200), ' +
+    'ventilationRate (m3/h, 0-500), lightingPower (W, 0-10000). ' +
+    'Crop params (type "crop", requires crop): waterPumpRate (L/h, 0-30), localHeatingPower (W, 0-1000). ' +
     'Harvest (type "harvest", requires crop): harvest ALL tiles of a crop type at once. ' +
     'Replant (type "replant", requires crop): replant ALL harvested tiles of a crop type from seed. ' +
-    'Plant tile (type "plant-tile", requires tileId + crop): plant a specific crop on a specific tile. ' +
-    'Harvest tile (type "harvest-tile", requires tileId): harvest one specific tile only. ' +
-    'Clear tile (type "clear-tile", requires tileId): remove a crop from a tile without harvesting. ' +
+    'Batch tile ops (type "batch-tile"): plant, harvest, or clear specific tiles. Use the plants array for planting ' +
+    '(even a single tile), harvests array for harvesting specific tiles, clears array for clearing tiles. ' +
     'Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale. ' +
-    'Available tileIds follow the pattern "{row}_{col}" (e.g. "0_0", "2_4", "7_11"). The crop planted on each tile is visible in the tileCrops snapshot.',
+    'Available tileIds follow the pattern "{row}_{col}" (e.g. "0_0", "2_4", "7_11").',
   inputSchema: z.object({
     changes: z
       .array(
         z.object({
-          type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'plant-tile', 'harvest-tile', 'clear-tile', 'batch-tile']),
+          type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'batch-tile']),
           param: z.string().optional().describe('Parameter name (for greenhouse/crop types)'),
           value: z.number().optional().describe('New value (for greenhouse/crop types)'),
           crop: z
             .enum(CROP_NAMES)
             .optional()
-            .describe('Required for crop/harvest/replant/plant-tile changes'),
-          tileId: z
-            .string()
-            .optional()
-            .describe('Required for plant-tile/harvest-tile/clear-tile — e.g. "lettuce_0_0"'),
+            .describe('Required for crop/harvest/replant changes'),
           harvests: z.array(z.string()).optional().describe('(batch-tile) Tile IDs to harvest'),
           plants: z.array(z.object({ tileId: z.string(), crop: z.string() })).optional().describe('(batch-tile) Tiles to plant with crop type'),
           clears: z.array(z.string()).optional().describe('(batch-tile) Tile IDs to clear'),
@@ -90,21 +85,6 @@ export const greenhouseParameterTool = createTool({
       } else if (change.type === 'replant') {
         if (!change.crop) {
           return { success: false, error: 'Crop name is required for replant' };
-        }
-      } else if (change.type === 'plant-tile') {
-        if (!change.tileId) {
-          return { success: false, error: 'tileId is required for plant-tile' };
-        }
-        if (!change.crop) {
-          return { success: false, error: 'crop is required for plant-tile (which crop to plant on the tile)' };
-        }
-      } else if (change.type === 'harvest-tile') {
-        if (!change.tileId) {
-          return { success: false, error: 'tileId is required for harvest-tile' };
-        }
-      } else if (change.type === 'clear-tile') {
-        if (!change.tileId) {
-          return { success: false, error: 'tileId is required for clear-tile' };
         }
       } else if (change.type === 'batch-tile') {
         if (!change.harvests?.length && !change.plants?.length && !change.clears?.length) {

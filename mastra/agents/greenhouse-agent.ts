@@ -82,12 +82,12 @@ Per-crop (type "crop", specify crop):
 - waterPumpRate (L/h, 0–30)
 - localHeatingPower (W, 0–1000)
 
-Tile-level actions — ALWAYS use batch-tile to combine multiple operations in one call:
+Tile-level actions — ALWAYS use "batch-tile" for ALL tile operations (even a single tile):
 - type "batch-tile" with plants array: [{ tileId, crop }] — plant crops on specific tiles (works on empty or occupied tiles)
 - type "batch-tile" with harvests array: ["tileId"] — harvest specific tiles
 - type "batch-tile" with clears array: ["tileId"] — clear tiles without harvesting
 - You can combine harvests, plants, and clears in a single batch-tile action
-- NEVER use individual plant-tile/harvest-tile/clear-tile — always batch them
+- "batch-tile" is the ONLY way to operate on individual tiles
 
 Bulk actions (all tiles of one crop type):
 - type "harvest" + crop name: harvest ALL tiles of a crop type at once

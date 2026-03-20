@@ -1,6 +1,10 @@
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
-import { google } from '@ai-sdk/google';
+import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+
+const bedrock = createAmazonBedrock({
+  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
+});
 import { knowledgeBaseTool } from '../tools/knowledge-base-tool';
 import { greenhouseParameterTool } from '../tools/greenhouse-tool';
 import { secretaryVectorTool } from '../tools/secretary-vector-tool';
@@ -37,7 +41,7 @@ CREW CONVERSATION MODE (default):
 By default you are talking directly to the crew in chat. In this mode:
 - Respond in plain, warm, direct natural language — NOT JSON.
 - Call the knowledge base tool directly when the crew asks about crops, nutrition, or growing conditions.
-- When the crew asks you to plant, harvest, clear, replant, or change any greenhouse parameter, you MUST call the set-greenhouse-parameters tool to execute the action. Do not just describe what you would do — actually call the tool so the action takes effect. For tile operations, use type "batch-tile" with harvests, plants, and/or clears arrays. For example, to plant lettuce on two tiles: { "type": "batch-tile", "plants": [{ "tileId": "0_0", "crop": "lettuce" }, { "tileId": "0_1", "crop": "lettuce" }] }. For bulk operations, use "harvest" or "replant" with the crop name.
+- When the crew asks you to plant, harvest, clear, replant, or change any greenhouse parameter, you MUST call the set-greenhouse-parameters tool to execute the action. Do not just describe what you would do — actually call the tool so the action takes effect. For ALL tile operations (even a single tile), use type "batch-tile" with harvests, plants, and/or clears arrays. For example, to plant tomato on one tile: { "type": "batch-tile", "plants": [{ "tileId": "0_0", "crop": "tomato" }] }. To plant on multiple tiles: { "type": "batch-tile", "plants": [{ "tileId": "0_0", "crop": "lettuce" }, { "tileId": "0_1", "crop": "lettuce" }] }. For bulk operations on ALL tiles of a crop type, use "harvest" or "replant" with the crop name.
 - Be helpful, conversational, and proactive about crew wellbeing.
 - You may reference sensor data, recent decisions, and crew preferences provided in the context.
 
@@ -72,9 +76,9 @@ MISSION PHASE AWARENESS:
 
 TILE-LEVEL MANAGEMENT:
 The sensor data includes tileCrops (per-tile states) and tileCounts (tiles per crop type).
-- ALWAYS use "batch-tile" to operate on multiple tiles in a single action:
+- ALWAYS use "batch-tile" for tile operations (even a single tile):
   { "type": "batch-tile", "harvests": ["tileId1", ...], "plants": [{ "tileId": "tileId1", "crop": "lettuce" }, ...], "clears": ["tileId2", ...] }
-  Include only the arrays you need (harvests, plants, clears). NEVER use individual plant-tile/harvest-tile/clear-tile.
+  Include only the arrays you need (harvests, plants, clears). "batch-tile" is the ONLY way to operate on individual tiles.
 - Bulk actions remain available: "harvest" (all tiles of a crop), "replant" (all harvested tiles of a crop)
 - When advocating for crew preferences, use batch-tile to reassign multiple tiles at once (clear + plant)
 
@@ -104,7 +108,7 @@ ARBITER MODE JSON FORMAT for question-type crew interactions:
   "response": "<plain-language answer to the crew's question, warm and direct>",
   "preferenceUpdates": []
 }`,
-  model: google('gemini-3-flash-preview'),
+  model: bedrock('us.anthropic.claude-opus-4-5-20251101-v1:0'),
   tools: { knowledgeBaseTool, greenhouseParameterTool, secretaryVectorTool },
   memory: new Memory(),
 });

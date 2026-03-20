@@ -53,10 +53,12 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallData }) {
     param: string;
     value: number;
     crop?: string;
-    tileId?: string;
+    harvests?: string[];
+    plants?: { tileId: string; crop: string }[];
+    clears?: string[];
   }>) ?? [];
 
-  // Group plant-tile changes by crop so we show "Plant tomato ×5" instead of 5 lines
+  // Unpack batch-tile entries and group plants by crop for concise display
   const displayChanges: Array<{
     type: string;
     param: string;
@@ -65,16 +67,30 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallData }) {
     count?: number;
   }> = [];
   const plantCounts = new Map<string, number>();
+  let harvestCount = 0;
+  let clearCount = 0;
 
   for (const c of rawChanges) {
-    if (c.type === "plant-tile" && c.crop) {
-      plantCounts.set(c.crop, (plantCounts.get(c.crop) ?? 0) + 1);
+    if (c.type === "batch-tile") {
+      if (c.plants) {
+        for (const p of c.plants) {
+          plantCounts.set(p.crop, (plantCounts.get(p.crop) ?? 0) + 1);
+        }
+      }
+      if (c.harvests) harvestCount += c.harvests.length;
+      if (c.clears) clearCount += c.clears.length;
     } else {
       displayChanges.push(c);
     }
   }
   for (const [crop, count] of plantCounts) {
-    displayChanges.push({ type: "plant-tile", param: "", value: 0, crop, count });
+    displayChanges.push({ type: "plant", param: "", value: 0, crop, count });
+  }
+  if (harvestCount > 0) {
+    displayChanges.push({ type: "harvest-tiles", param: "", value: 0, count: harvestCount });
+  }
+  if (clearCount > 0) {
+    displayChanges.push({ type: "clear-tiles", param: "", value: 0, count: clearCount });
   }
 
   const isCalling = toolCall.status === "calling";
@@ -106,10 +122,10 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallData }) {
           {displayChanges.map((c, i) => (
             <div key={`${c.param ?? c.type}-${c.crop ?? ""}-${i}`} className="flex items-center gap-1">
               <span className="opacity-50">→</span>
-              {c.type === "harvest" || c.type === "replant" || c.type === "plant-tile" ? (
+              {c.type === "harvest" || c.type === "replant" || c.type === "plant" || c.type === "harvest-tiles" || c.type === "clear-tiles" ? (
                 <span>
-                  {c.type === "harvest" ? "Harvest" : c.type === "replant" ? "Replant" : "Plant"}{" "}
-                  {c.crop}{c.count && c.count > 1 ? ` ×${c.count}` : ""}
+                  {c.type === "harvest" || c.type === "harvest-tiles" ? "Harvest" : c.type === "replant" ? "Replant" : c.type === "clear-tiles" ? "Clear" : "Plant"}{" "}
+                  {c.crop ?? (c.type === "harvest-tiles" ? "tiles" : c.type === "clear-tiles" ? "tiles" : "")}{c.count && c.count > 1 ? ` ×${c.count}` : ""}
                 </span>
               ) : (
                 <>

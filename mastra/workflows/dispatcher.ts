@@ -62,12 +62,6 @@ function summarizeActions(actions: z.infer<typeof ActionSchema>[]): string {
       }
       harvestCounts['tiles'] = (harvestCounts['tiles'] ?? 0) + (a.harvests?.length ?? 0);
       clearCount += a.clears?.length ?? 0;
-    } else if (a.type === 'plant-tile' && a.crop) {
-      plantCounts[a.crop] = (plantCounts[a.crop] ?? 0) + 1;
-    } else if (a.type === 'harvest-tile') {
-      harvestCounts['tiles'] = (harvestCounts['tiles'] ?? 0) + 1;
-    } else if (a.type === 'clear-tile') {
-      clearCount++;
     } else if (a.type === 'harvest' && a.crop) {
       parts.push(`harvested all ${a.crop}`);
     } else if (a.type === 'replant' && a.crop) {
@@ -213,11 +207,10 @@ ${cropLines}`;
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const ActionSchema = z.object({
-  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'harvest-tile', 'plant-tile', 'clear-tile', 'batch-tile']),
+  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'batch-tile']),
   param: z.string().optional(),
   value: z.number().optional(),
   crop: z.string().optional(),
-  tileId: z.string().optional(),
   // batch-tile fields
   harvests: z.array(z.string()).optional(),
   plants: z.array(z.object({ tileId: z.string(), crop: z.string() })).optional(),
@@ -913,9 +906,6 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       if (a.type === 'harvest' || a.type === 'replant') return !!a.crop;
       if (a.type === 'greenhouse') return !!a.param && a.value !== undefined;
       if (a.type === 'crop') return !!a.crop && !!a.param && a.value !== undefined;
-      if (a.type === 'harvest-tile') return !!a.tileId;
-      if (a.type === 'plant-tile') return !!a.tileId && !!a.crop;
-      if (a.type === 'clear-tile') return !!a.tileId;
       if (a.type === 'batch-tile') return !!(a.harvests?.length || a.plants?.length || a.clears?.length);
       return false;
     });

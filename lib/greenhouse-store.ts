@@ -48,11 +48,10 @@ export type { CropType, GrowthStage, SeasonName, DustStormRisk, ManualOverrides 
 // ─── Agent Decision Log ──────────────────────────────────────────────────────────
 
 export interface AgentAction {
-  type: "greenhouse" | "crop" | "harvest" | "replant" | "harvest-tile" | "plant-tile" | "clear-tile" | "batch-tile";
+  type: "greenhouse" | "crop" | "harvest" | "replant" | "batch-tile";
   param?: string;
   value?: number;
   crop?: string;
-  tileId?: string;
   harvests?: string[];
   plants?: Array<{ tileId: string; crop: string }>;
   clears?: string[];
@@ -1192,12 +1191,6 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
           get().doHarvest(action.crop as CropType);
         } else if (action.type === "replant" && action.crop) {
           get().doReplant(action.crop as CropType);
-        } else if (action.type === "harvest-tile" && action.tileId) {
-          batchOps.harvests.push(action.tileId);
-        } else if (action.type === "plant-tile" && action.tileId && action.crop) {
-          batchOps.plants.push({ tileId: action.tileId, crop: action.crop });
-        } else if (action.type === "clear-tile" && action.tileId) {
-          batchOps.clears.push(action.tileId);
         }
       }
 
