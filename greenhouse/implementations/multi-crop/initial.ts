@@ -236,15 +236,15 @@ export function createInitialEnvironment(): ConcreteEnvironment {
     currentLs: MISSION_START_LS,
     seasonName: 'northern_spring',
     seasonalSolarFlux: 564,  // W/m² at Ls 0° (spring equinox; aphelion is at Ls 71°)
-    atmosphericPressure: 600,
+    atmosphericPressure: 718, // Pa at Ls 0°: 650 * (1 + 0.12 * cos(toRad(0 - 330)))
     dustStormRisk: 'low',
     airTemperature: 20,
     humidity: 60,
     co2Level: 800,
     lightLevel: 5000,
     o2Level: 20.9,
-    externalTemp: -63,
-    solarRadiation: 590,
+    externalTemp: -38,       // °C at noon on Sol 0: -63 + seasonal(-4.9) + solar(30)
+    solarRadiation: 564,     // W/m² at noon on Sol 0 (= seasonalSolarFlux * solarFactor=1 * dustFactor=1)
     dustStormFactor: 1,
     waterConsumedL: 0,
     energyUsedKWh: 0,

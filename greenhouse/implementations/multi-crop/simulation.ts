@@ -309,7 +309,7 @@ function simulate(
 
   const externalTemp = ov.externalTempEnabled
     ? ov.externalTemp
-    : MARS_MEAN_TEMP + seasonalTempOffset + 30 * solarFactor + deterministicNoise(simulationMs, 3);
+    : MARS_MEAN_TEMP + seasonalTempOffset + 30 * solarFactor + deterministicNoise(simulationMs, 0.5);
 
   const solarRadiation = ov.solarRadiationEnabled
     ? ov.solarRadiation

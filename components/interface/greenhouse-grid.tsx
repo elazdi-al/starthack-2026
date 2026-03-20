@@ -550,7 +550,7 @@ export function GreenhouseGrid({
 
   // Crossing this threshold while the greenhouse is off restores the shell
   // and promotes that restored state into the explicit toggle.
-  const ZOOM_SHOW_THRESHOLD = 0.95;
+  const ZOOM_SHOW_THRESHOLD = 0.98;
   const zoomRef = useRef(1);
 
   const overlayVisible = introStage === "sealed" || greenhouseVisible;
