@@ -258,6 +258,12 @@
   --chart-marker-foreground: oklch(0.3 0.01 260);
   --chart-ring-background: oklch(0.9 0.005 260 / 0.25);
   --chart-label: oklch(0.45 0.01 260);
+  --call-overlay-bg: rgba(245, 242, 239, 0.8);
+  --call-overlay-shadow: rgba(78, 50, 23, 0.04) 0px 6px 16px 0px, rgba(0, 0, 0, 0.05) 0px 0px 0px 1px;
+  --call-overlay-btn: rgba(0, 0, 0, 0.06);
+  --call-overlay-btn-hover: rgba(0, 0, 0, 0.1);
+  --call-overlay-text: rgba(0, 0, 0, 0.5);
+  --call-overlay-text-strong: rgba(0, 0, 0, 0.85);
 }
 
 .dark {
@@ -390,6 +396,12 @@
   --chart-marker-foreground: oklch(0.9 0 0);
   --chart-ring-background: oklch(0.35 0.01 260 / 0.25);
   --chart-label: oklch(0.75 0.01 260);
+  --call-overlay-bg: rgba(30, 30, 30, 0.85);
+  --call-overlay-shadow: rgba(0, 0, 0, 0.3) 0px 6px 16px 0px, rgba(255, 255, 255, 0.06) 0px 0px 0px 1px;
+  --call-overlay-btn: rgba(255, 255, 255, 0.1);
+  --call-overlay-btn-hover: rgba(255, 255, 255, 0.16);
+  --call-overlay-text: rgba(255, 255, 255, 0.6);
+  --call-overlay-text-strong: rgba(255, 255, 255, 0.92);
 }
 
 @layer base {

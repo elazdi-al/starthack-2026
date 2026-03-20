@@ -21,6 +21,8 @@ import { TemperatureWidget } from "@/components/interface/temperature-widget";
 import { SidebarToggle } from "@/components/interface/sidebar-toggle";
 import { McpSetupButton } from "@/components/interface/mcp-setup-button";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { CallOverlay } from "@/components/call/call-overlay";
+import { ElevenLabsCallProvider } from "@/lib/eleven-labs-call-provider";
 import { AgentDecisionPanel } from "@/components/interface/agent-decision-panel";
 import { SimulationOverrides } from "@/components/interface/simulation-overrides";
 import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
@@ -240,6 +242,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
   /* ── Render ───────────────────────────────────────────────────────────── */
   return (
+    <ElevenLabsCallProvider>
     <div className="relative min-h-screen bg-background text-foreground">
       {/* Page outlet — kept in tree for Next.js routing; pages return null */}
       {children}
@@ -419,7 +422,10 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
           </>
         )}
       </AnimatePresence>
+
+      <CallOverlay />
     </div>
+    </ElevenLabsCallProvider>
   );
 }
 

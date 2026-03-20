@@ -282,10 +282,15 @@ async function main() {
   const agent = await elevenlabs.conversationalAi.agents.create({
     name: "FLORA — Mars Greenhouse Assistant",
     tags: ["greenhouse", "mars"],
+    
     conversationConfig: {
+      asr: {
+        provider: "scribe_realtime",
+      },
       tts: {
         voiceId: "EXAVITQu4vr4xnSDxMaL", // Bella — warm female voice
-        modelId: "eleven_flash_v2",
+        modelId: "eleven_v3_conversational",
+        expressiveMode:true
       },
       agent: {
         firstMessage:
@@ -293,13 +298,23 @@ async function main() {
         language: "en",
         prompt: {
           prompt,
-          llm: "gpt-4o-mini",
+          llm: "gemini-3-flash-preview",
+          reasoningEffort: "low",
           temperature: 0.4,
           maxTokens: 300,
+          
           // biome-ignore lint/suspicious/noExplicitAny: ElevenLabs SDK tool schema matches at runtime
           tools: clientTools as any,
         },
+        
       },
+      turn: {
+      
+    
+      speculativeTurn: true,
+   
+    },
+
     },
   });
 
