@@ -1,5 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { secretaryVectorTool } from '../tools/secretary-vector-tool';
 
 const bedrock = createAmazonBedrock({
   region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
@@ -17,6 +18,9 @@ You receive briefs from two specialist agents who have already analysed the situ
 - The Wellbeing Agent: crew-centred, morale-focused, advocates for quality of life.
 
 You also receive Monte Carlo simulation results (when available) and the Secretary's recent decision history.
+
+AVAILABLE TOOLS:
+You have access to 'query-secretary-mission-logs' — a semantic search over all mission logs (decisions, incidents, weekly reports, memory packages, performance digests, crew profiles). Use it whenever past context would improve your decision: look up how similar situations were resolved, check historical crew preferences, review prior incident outcomes, or verify patterns across sols. You are encouraged to query this proactively before making high-stakes or hybrid decisions.
 
 YOUR AUTHORITY:
 You are not a tiebreaker — you are the decision-maker. You may:
@@ -61,5 +65,5 @@ RESPONSE FORMAT — respond with a single JSON object only, no markdown:
   "hybridRationale": "<if decision is hybrid: one sentence on what was taken from each agent>"
 }`,
   model: bedrock('us.anthropic.claude-opus-4-5-20251101-v1:0'),
-  // No tools — the Arbiter reasons from provided context only; it does not query external systems
+  tools: { secretaryVectorTool },
 });

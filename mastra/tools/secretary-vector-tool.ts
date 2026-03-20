@@ -15,7 +15,7 @@ import { LibSQLVector } from '@mastra/libsql';
 import { MDocument } from '@mastra/rag';
 import { createVectorQueryTool } from '@mastra/rag';
 import { google } from '@ai-sdk/google';
-import { embedMany } from 'ai';
+import { embed, embedMany } from 'ai';
 import { getAllSecretaryDocuments, getSecretaryDocumentsSince } from '@/lib/secretary-rag';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -157,6 +157,41 @@ export async function ingestSecretaryReports(sinceTimestamp?: number): Promise<n
   }
 
   return totalChunks;
+}
+
+// ─── Direct vector search ────────────────────────────────────────────────────
+
+/**
+ * Query the secretary vector store directly with a natural-language question.
+ * Embeds the question, performs cosine similarity search, and returns the
+ * top-k most relevant chunks with metadata.
+ *
+ * @param question — natural language query
+ * @param topK — number of results to return (default 5)
+ * @returns array of { text, metadata, score }
+ */
+export async function querySecretaryVectorStore(
+  question: string,
+  topK = 5,
+): Promise<{ text: string; metadata: Record<string, unknown>; score: number }[]> {
+  await ensureIndex();
+
+  const { embedding } = await embed({
+    model: secretaryEmbeddingModel,
+    value: question,
+  });
+
+  const results = await secretaryVectorStore.query({
+    indexName: VECTOR_INDEX_NAME,
+    queryVector: embedding,
+    topK,
+  });
+
+  return results.map(r => ({
+    text: (r.metadata?.text as string) ?? '',
+    metadata: r.metadata ?? {},
+    score: r.score ?? 0,
+  }));
 }
 
 // ─── Mastra tool: query mission logs ─────────────────────────────────────────

@@ -7,10 +7,12 @@
  * GET /api/secretary?type=report               — latest weekly crew report
  * GET /api/secretary?type=memory               — mission memory package
  * POST /api/secretary?type=report              — generate a new weekly crew report (LLM)
+ * POST /api/secretary?type=search              — semantic search over mission logs (vector DB)
  */
 
 import { mastra } from '@/mastra';
 import { secretaryStore } from '@/lib/secretary-store';
+import { querySecretaryVectorStore } from '@/mastra/tools/secretary-vector-tool';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -50,6 +52,28 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const url = new URL(req.url);
   const type = url.searchParams.get('type') ?? 'report';
+
+  if (type === 'search') {
+    const { question, topK } = await req.json() as {
+      question: string;
+      topK?: number;
+    };
+
+    if (!question || typeof question !== 'string') {
+      return Response.json(
+        { ok: false, error: 'Missing or invalid "question" field' },
+        { status: 400 },
+      );
+    }
+
+    try {
+      const results = await querySecretaryVectorStore(question, topK ?? 5);
+      return Response.json({ ok: true, data: results });
+    } catch (err) {
+      console.error('[secretary/search] Error:', err);
+      return Response.json({ ok: false, error: String(err) }, { status: 500 });
+    }
+  }
 
   if (type === 'report') {
     // Generate weekly crew report using Claude (Secretary's LLM use case from spec §3.3)
