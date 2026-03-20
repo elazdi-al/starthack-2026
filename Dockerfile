@@ -8,6 +8,7 @@ RUN npm ci
 
 # Copy source and build Mastra
 COPY mastra ./mastra
+COPY src ./src
 COPY greenhouse ./greenhouse
 RUN npx mastra build
 

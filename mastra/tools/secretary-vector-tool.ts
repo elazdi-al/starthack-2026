@@ -38,10 +38,34 @@ export const secretaryVectorStore = new LibSQLVector({
 
 let indexReady = false;
 
+/** Drop and recreate the index with the correct dimensions. */
+async function recreateIndex(): Promise<void> {
+  try { await secretaryVectorStore.deleteIndex({ indexName: VECTOR_INDEX_NAME }); } catch { /* may not exist */ }
+  await secretaryVectorStore.createIndex({
+    indexName: VECTOR_INDEX_NAME,
+    dimension: EMBEDDING_DIMENSIONS,
+    metric: 'cosine',
+  });
+}
+
 async function ensureIndex(): Promise<void> {
   if (indexReady) return;
   const indexes = await secretaryVectorStore.listIndexes();
-  if (!indexes.includes(VECTOR_INDEX_NAME)) {
+  if (indexes.includes(VECTOR_INDEX_NAME)) {
+    // Verify dimensions match — recreate if a previous model left a stale index
+    try {
+      const info = await secretaryVectorStore.describeIndex({ indexName: VECTOR_INDEX_NAME });
+      if (info.dimension !== EMBEDDING_DIMENSIONS) {
+        console.warn(
+          `[secretary-vector] Index "${VECTOR_INDEX_NAME}" has ${info.dimension} dims, expected ${EMBEDDING_DIMENSIONS}. Recreating.`,
+        );
+        await recreateIndex();
+      }
+    } catch {
+      // describeIndex not supported — force-recreate to be safe
+      await recreateIndex();
+    }
+  } else {
     await secretaryVectorStore.createIndex({
       indexName: VECTOR_INDEX_NAME,
       dimension: EMBEDDING_DIMENSIONS,
@@ -105,15 +129,29 @@ export async function ingestSecretaryReports(sinceTimestamp?: number): Promise<n
       values: allChunks.map(c => c.text),
     });
 
-    // Upsert into vector store
-    await secretaryVectorStore.upsert({
+    // Upsert into vector store (auto-heal on dimension mismatch)
+    const upsertPayload = {
       indexName: VECTOR_INDEX_NAME,
       vectors: embeddings,
       metadata: allChunks.map(c => ({
         ...c.metadata,
         text: c.text,
       })),
-    });
+    };
+
+    try {
+      await secretaryVectorStore.upsert(upsertPayload);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('dimension')) {
+        console.warn('[secretary-vector] Dimension mismatch on upsert — recreating index and retrying.');
+        indexReady = false;
+        await recreateIndex();
+        indexReady = true;
+        await secretaryVectorStore.upsert(upsertPayload);
+      } else {
+        throw err;
+      }
+    }
 
     totalChunks += allChunks.length;
   }

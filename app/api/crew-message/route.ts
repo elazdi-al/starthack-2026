@@ -16,6 +16,13 @@
 import { mastra } from '@/mastra';
 import type { EnvironmentSnapshot } from '@/lib/greenhouse-store';
 
+/** Flush buffered trace spans to storage so Studio can display them. */
+async function flushTraces(): Promise<void> {
+  try {
+    await mastra.observability.getDefaultInstance()?.flush();
+  } catch { /* non-blocking */ }
+}
+
 export async function POST(req: Request) {
   try {
     const { message, snapshot, missionSol } = await req.json() as {
@@ -41,11 +48,14 @@ export async function POST(req: Request) {
     const output = dispatchStep?.status === 'success' ? dispatchStep.output : null;
 
     if (!output) {
+      await flushTraces();
       return Response.json(
         { ok: false, error: 'Dispatcher failed to produce output', crewResponse: 'System is processing your request. Please try again.' },
         { status: 500 },
       );
     }
+
+    await flushTraces();
 
     return Response.json({
       ok: true,

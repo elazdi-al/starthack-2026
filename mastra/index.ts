@@ -1,7 +1,7 @@
 import { Mastra } from '@mastra/core/mastra';
 import { LibSQLStore } from '@mastra/libsql';
 import { PinoLogger } from '@mastra/loggers';
-import { CloudExporter, DefaultExporter, Observability, SensitiveDataFilter } from '@mastra/observability';
+import { CloudExporter, DefaultExporter, Observability, SamplingStrategyType, SensitiveDataFilter } from '@mastra/observability';
 import { greenhouseAgent } from './agents/greenhouse-agent';
 import { survivalAgent } from './agents/survival-agent';
 import { wellbeingAgent } from './agents/wellbeing-agent';
@@ -27,6 +27,7 @@ export const mastra = new Mastra({
     configs: {
       default: {
         serviceName: 'mastra',
+        sampling: { type: SamplingStrategyType.ALWAYS },
         exporters: [
           new DefaultExporter(),
           new CloudExporter(),
@@ -34,6 +35,12 @@ export const mastra = new Mastra({
         spanOutputProcessors: [
           new SensitiveDataFilter(),
         ],
+        serializationOptions: {
+          maxStringLength: 4096,
+          maxDepth: 10,
+          maxArrayLength: 100,
+          maxObjectKeys: 75,
+        },
       },
     },
   }),

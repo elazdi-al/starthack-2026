@@ -1,6 +1,6 @@
 import { LibSQLVector } from '@mastra/libsql';
 import { createVectorQueryTool, MDocument } from '@mastra/rag';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { google } from '@ai-sdk/google';
 import { embedMany } from 'ai';
 
 class SecretaryStore {
@@ -280,6 +280,22 @@ ${biasLine}`;
   getMissionMemory() {
     return this.missionMemory;
   }
+  // ─── Reset ─────────────────────────────────────────────────────────────────
+  /** Wipe all in-memory state back to a fresh mission start. */
+  reset() {
+    this.decisionLog = [];
+    this.incidentLog = [];
+    this.crewPreferenceProfile = {
+      preferences: {},
+      aversions: [],
+      recentRequests: [],
+      overrideAttempts: [],
+      lastUpdatedSol: 0
+    };
+    this.weeklyReports = [];
+    this.missionMemory = null;
+    this.performanceDigests = null;
+  }
   // ─── Aggregated context for agents ────────────────────────────────────────
   getAgentContext(maxDecisions = 5) {
     const recentDecisions = this.decisionLog.slice(0, maxDecisions);
@@ -477,20 +493,40 @@ function getSecretaryDocumentsSince(sinceTimestamp) {
 }
 
 const VECTOR_INDEX_NAME = "secretary_reports";
-const EMBEDDING_DIMENSIONS = 1024;
-const bedrock = createAmazonBedrock({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1"
-});
-const secretaryEmbeddingModel = bedrock.embedding("amazon.nova-embed-text-v2:0");
+const EMBEDDING_DIMENSIONS = 3072;
+const secretaryEmbeddingModel = google.embedding("gemini-embedding-2-preview");
 const secretaryVectorStore = new LibSQLVector({
   id: "secretary-vector-store",
   url: "file:./secretary-vectors.db"
 });
 let indexReady = false;
+async function recreateIndex() {
+  try {
+    await secretaryVectorStore.deleteIndex({ indexName: VECTOR_INDEX_NAME });
+  } catch {
+  }
+  await secretaryVectorStore.createIndex({
+    indexName: VECTOR_INDEX_NAME,
+    dimension: EMBEDDING_DIMENSIONS,
+    metric: "cosine"
+  });
+}
 async function ensureIndex() {
   if (indexReady) return;
   const indexes = await secretaryVectorStore.listIndexes();
-  if (!indexes.includes(VECTOR_INDEX_NAME)) {
+  if (indexes.includes(VECTOR_INDEX_NAME)) {
+    try {
+      const info = await secretaryVectorStore.describeIndex({ indexName: VECTOR_INDEX_NAME });
+      if (info.dimension !== EMBEDDING_DIMENSIONS) {
+        console.warn(
+          `[secretary-vector] Index "${VECTOR_INDEX_NAME}" has ${info.dimension} dims, expected ${EMBEDDING_DIMENSIONS}. Recreating.`
+        );
+        await recreateIndex();
+      }
+    } catch {
+      await recreateIndex();
+    }
+  } else {
     await secretaryVectorStore.createIndex({
       indexName: VECTOR_INDEX_NAME,
       dimension: EMBEDDING_DIMENSIONS,
@@ -530,14 +566,27 @@ async function ingestSecretaryReports(sinceTimestamp) {
       model: secretaryEmbeddingModel,
       values: allChunks.map((c) => c.text)
     });
-    await secretaryVectorStore.upsert({
+    const upsertPayload = {
       indexName: VECTOR_INDEX_NAME,
       vectors: embeddings,
       metadata: allChunks.map((c) => ({
         ...c.metadata,
         text: c.text
       }))
-    });
+    };
+    try {
+      await secretaryVectorStore.upsert(upsertPayload);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("dimension")) {
+        console.warn("[secretary-vector] Dimension mismatch on upsert \u2014 recreating index and retrying.");
+        indexReady = false;
+        await recreateIndex();
+        indexReady = true;
+        await secretaryVectorStore.upsert(upsertPayload);
+      } else {
+        throw err;
+      }
+    }
     totalChunks += allChunks.length;
   }
   return totalChunks;

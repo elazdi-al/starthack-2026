@@ -15,6 +15,13 @@ import { mastra } from '@/mastra';
 import { secretaryStore } from '@/lib/secretary-store';
 import type { EnvironmentSnapshot } from '@/lib/greenhouse-store';
 
+/** Flush buffered trace spans to storage so Studio can display them. */
+async function flushTraces(): Promise<void> {
+  try {
+    await mastra.observability.getDefaultInstance()?.flush();
+  } catch { /* non-blocking */ }
+}
+
 // Refresh mission memory package every 3 sols
 const MEMORY_REFRESH_INTERVAL_SOLS = 3;
 let lastMemoryRefreshSol = -1;
@@ -102,6 +109,8 @@ export async function POST(req: Request) {
       const legacyReason = legacySteps['reason'] as { status: string; output: Record<string, unknown> } | undefined;
       const legacyOutput = legacyAct?.output ?? legacyReason?.output;
 
+      await flushTraces();
+
       return Response.json({
         ok: true,
         reasoning: (legacyOutput as { reasoning?: string })?.reasoning ?? 'Fallback tick',
@@ -130,6 +139,8 @@ export async function POST(req: Request) {
       lastDigestRefreshSol = sol;
       secretaryStore.generatePerformanceDigests(sol);
     }
+
+    await flushTraces();
 
     return Response.json({
       ok: true,
