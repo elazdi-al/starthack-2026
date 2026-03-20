@@ -6,13 +6,14 @@ import { greenhouseAgent } from './agents/greenhouse-agent';
 import { survivalAgent } from './agents/survival-agent';
 import { wellbeingAgent } from './agents/wellbeing-agent';
 import { arbiterAgent } from './agents/arbiter-agent';
+import { secretaryAgent } from './agents/secretary-agent';
 import { greenhouseControlWorkflow } from './workflows/greenhouse-control';
 import { dispatcherWorkflow } from './workflows/dispatcher';
 import { secretaryVectorStore } from './tools/secretary-vector-tool';
 
 export const mastra = new Mastra({
   workflows: { greenhouseControl: greenhouseControlWorkflow, dispatcher: dispatcherWorkflow },
-  agents: { greenhouseAgent, survivalAgent, wellbeingAgent, arbiterAgent },
+  agents: { greenhouseAgent, survivalAgent, wellbeingAgent, arbiterAgent, secretaryAgent },
   vectors: { secretaryVectorStore },
   storage: new LibSQLStore({
     id: 'mastra-storage',

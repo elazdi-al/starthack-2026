@@ -32,7 +32,7 @@ import {
   type WinningAgent,
 } from '../../lib/secretary-store';
 import { ingestSecretaryReports } from '../tools/secretary-vector-tool';
-import { crewProfilesForAgent } from '../../lib/crew-data';
+import { crewProfilesForAgent, INITIAL_CREW_PROFILES, type CrewmateProfile } from '../../lib/crew-data';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -401,7 +401,7 @@ const dispatchStep = createStep({
 
     const compactSnap = compactSnapshot(snapshot as Record<string, unknown>);
     const compactSnapJson = JSON.stringify(compactSnap, null, 2);
-    const crewStatusBlock = crewProfilesForAgent();
+    const crewStatusBlock = crewProfilesForAgent((Array.isArray(snapshot?.crew) ? snapshot.crew : INITIAL_CREW_PROFILES) as CrewmateProfile[]);
     const contextBlock = `
 ${crewStatusBlock}
 

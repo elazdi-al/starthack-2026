@@ -21,7 +21,8 @@ import type { RingData } from "@/components/charts/ring-context";
 
 /* ─────────────────────────── Types ─────────────────────────── */
 
-import { CREW_PROFILES, type CrewmateProfile, type HealthStatus, type NeedLevel } from "@/lib/crew-data";
+import { type CrewmateProfile, type HealthStatus, type NeedLevel } from "@/lib/crew-data";
+import { useGreenhouseStore } from "@/lib/greenhouse-store";
 
 interface Crewmate extends CrewmateProfile {
   initials: string;
@@ -37,10 +38,12 @@ const CREW_UI_EXTRAS: Record<string, { initials: string; color: string }> = {
   kenji: { initials: "K", color: "#ff9f0a" },
 };
 
-const CREW: Crewmate[] = CREW_PROFILES.map((p) => ({
-  ...p,
-  ...CREW_UI_EXTRAS[p.id],
-}));
+function profilesToCrewmates(profiles: CrewmateProfile[]): Crewmate[] {
+  return profiles.map((p) => ({
+    ...p,
+    ...CREW_UI_EXTRAS[p.id],
+  }));
+}
 
 /* ────────────────────── Apple-like ring colors ─────────────── */
 
@@ -296,21 +299,21 @@ function QuickStat({
 
 /* ──────── Crew Overview: wellness summary (Bklit RingChart) ── */
 
-function CrewOverviewChart() {
+function CrewOverviewChart({ crew }: { crew: Crewmate[] }) {
   const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
 
   const ringData: RingData[] = React.useMemo(
     () =>
-      CREW.map((c) => ({
+      crew.map((c) => ({
         label: c.name,
         value: c.morale,
         maxValue: 100,
         color: c.color,
       })),
-    []
+    [crew]
   );
 
-  const hoveredCrew = hoveredIndex !== null ? CREW[hoveredIndex] : null;
+  const hoveredCrew = hoveredIndex !== null ? crew[hoveredIndex] : null;
 
   return (
     <motion.div
@@ -328,7 +331,7 @@ function CrewOverviewChart() {
           Crew Wellness
         </span>
         <div className="flex items-center gap-3">
-          {CREW.map((c) => (
+          {crew.map((c) => (
             <div key={c.id} className="flex items-center gap-1">
               <span className="inline-block size-[5px] rounded-full" style={{ background: c.color }} />
               <span className="type-caption text-[var(--dial-text-tertiary)]" style={{ fontSize: 10 }}>{c.name}</span>
@@ -585,6 +588,8 @@ function Row({
 /* ─────────────────── Section Wrapper ───────────────────────── */
 
 function CrewmatesSection() {
+  const crewProfiles = useGreenhouseStore((s) => s.crew);
+  const crew = React.useMemo(() => profilesToCrewmates(crewProfiles), [crewProfiles]);
   const [selected, setSelected] = React.useState<Crewmate | null>(null);
   const handleClose = React.useCallback(() => setSelected(null), []);
 
@@ -597,7 +602,7 @@ function CrewmatesSection() {
 
         {/* Crew cards: vertical stack for left panel */}
         <div className="flex flex-col gap-2">
-          {CREW.map((c, i) => (
+          {crew.map((c, i) => (
             <CrewCard
               key={c.id}
               member={c}
@@ -608,7 +613,7 @@ function CrewmatesSection() {
         </div>
 
         {/* Overview chart */}
-        <CrewOverviewChart />
+        <CrewOverviewChart crew={crew} />
       </section>
 
       <AnimatePresence>

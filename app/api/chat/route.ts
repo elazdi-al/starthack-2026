@@ -14,7 +14,7 @@
 
 import { mastra } from '@/mastra';
 import { secretaryStore } from '@/lib/secretary-store';
-import { crewProfilesForAgent } from '@/lib/crew-data';
+import { crewProfilesForAgent, INITIAL_CREW_PROFILES, type CrewmateProfile } from '@/lib/crew-data';
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -32,8 +32,9 @@ export async function POST(req: Request) {
   const secretaryContext = secretaryStore.getAgentContext(3);
   const crewProfile = secretaryStore.getCrewPreferenceProfile();
 
+  const crew = (Array.isArray(greenhouseState?.crew) ? greenhouseState.crew : INITIAL_CREW_PROFILES) as CrewmateProfile[];
   const systemContext = [
-    crewProfilesForAgent(),
+    crewProfilesForAgent(crew),
     greenhouseState
       ? `Current greenhouse sensor readings (live):\n${JSON.stringify(greenhouseState, null, 2)}`
       : null,

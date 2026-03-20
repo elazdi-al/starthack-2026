@@ -119,7 +119,7 @@ const LiveParamCard = memo(function LiveParamCard({
 
 /* ── Crew data ─────────────────────────────────────────────────── */
 
-import { CREW_PROFILES, type HealthStatus, type NeedLevel } from "@/lib/crew-data";
+import { type HealthStatus, type NeedLevel, type CrewmateProfile } from "@/lib/crew-data";
 
 interface CrewMember {
   name: string;
@@ -139,18 +139,20 @@ const COLOR_MAP: Record<string, string> = {
   wei: "#30D158", amara: "#0A84FF", lena: "#BF5AF2", kenji: "#FF9F0A",
 };
 
-const CREW: CrewMember[] = CREW_PROFILES.map((p) => ({
-  name: p.name,
-  role: p.role,
-  color: COLOR_MAP[p.id] ?? "#888",
-  health: p.health,
-  morale: p.morale,
-  hydration: p.hydration,
-  nutrition: p.nutrition,
-  sleep: p.sleep,
-  o2Sat: p.o2Sat,
-  stress: STRESS_MAP[p.stress],
-}));
+function profilesToCrewMembers(profiles: CrewmateProfile[]): CrewMember[] {
+  return profiles.map((p) => ({
+    name: p.name,
+    role: p.role,
+    color: COLOR_MAP[p.id] ?? "#888",
+    health: p.health,
+    morale: p.morale,
+    hydration: p.hydration,
+    nutrition: p.nutrition,
+    sleep: p.sleep,
+    o2Sat: p.o2Sat,
+    stress: STRESS_MAP[p.stress],
+  }));
+}
 
 const HEALTH_METRICS: RadarMetric[] = [
   { key: "morale",    label: "Morale" },
@@ -509,6 +511,9 @@ export const DashboardView = memo(function DashboardView({ active = true }: { ac
   const externalTemp = env.externalTemp;
   const solarRadiation = env.solarRadiation;
 
+  const crewProfiles = useGreenhouseStore((s) => s.crew);
+  const crewMembers = useMemo(() => profilesToCrewMembers(crewProfiles), [crewProfiles]);
+
   const cropEntries = useMemo(() => {
     return (Object.entries(env.crops) as [string, { plantGrowth: number; healthScore: number; stage: string; estimatedYieldKg: number; biomassKg: number }][])
       .map(([key, crop]) => ({
@@ -581,7 +586,7 @@ export const DashboardView = memo(function DashboardView({ active = true }: { ac
 
         {/* Row 3: Crew radars — 4 across */}
         <div className="grid grid-cols-4 gap-3 flex-[3] min-h-0">
-          {CREW.map((m) => (
+          {crewMembers.map((m) => (
             <CrewRadarCard key={m.name} member={m} />
           ))}
         </div> 

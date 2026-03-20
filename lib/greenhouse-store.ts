@@ -2,6 +2,12 @@ import { create } from "zustand";
 import { saveJSON, loadJSON, STORAGE_KEYS } from "@/lib/persistence";
 import { useSettingsStore } from "@/lib/settings-store";
 import {
+  createInitialCrew,
+  updateCrew,
+  type CrewmateProfile,
+  type CrewEnvInputs,
+} from "@/lib/crew-data";
+import {
   createInitialEnvironment,
   createInitialGreenhouseState,
   createSimulation,
@@ -340,6 +346,8 @@ export interface EnvironmentSnapshot {
   tileCrops: Record<string, TileCropSnapshot>;
   /** Summary: count of tiles per crop type (helps agents decide planting allocation). */
   tileCounts: Partial<Record<CropType, { total: number; planted: number; harvested: number }>>;
+  /** Live crew status — updated each tick based on environmental conditions. */
+  crew: CrewmateProfile[];
 }
 
 // ─── Store Interface ────────────────────────────────────────────────────────────
@@ -372,6 +380,9 @@ export interface GreenhouseState {
   tickInFlight: boolean;
   autonomousEnabled: boolean;
   agentDecisions: AgentDecision[];
+
+  // Dynamic crew state
+  crew: CrewmateProfile[];
 
   setSpeed: (speed: SpeedKey) => void;
   setFocusedCrop: (crop: CropType | null) => void;
@@ -436,6 +447,7 @@ function buildSnapshot(
   env: ConcreteEnvironment,
   gh: ConcreteGreenhouseState,
   totalHarvestKg: number,
+  crew: CrewmateProfile[],
 ): EnvironmentSnapshot {
   const crops: EnvironmentSnapshot["crops"] = {};
   for (const [key, ce] of Object.entries(env.crops) as [CropType, CropEnvironment][]) {
@@ -500,6 +512,7 @@ function buildSnapshot(
     crops,
     tileCrops: buildTileCropSnapshots(env),
     tileCounts: buildTileCounts(env),
+    crew,
   };
 }
 
@@ -625,6 +638,7 @@ function buildInitialState(): {
   focusedCrop: CropType | null;
   agentDecisions: AgentDecision[];
   autonomousEnabled: boolean;
+  crew: CrewmateProfile[];
 } {
   const { simulation, greenhouse } = buildInitialSimulation();
   const initialEnvironment = simulation.getEnvironment(0);
@@ -639,6 +653,7 @@ function buildInitialState(): {
     focusedCrop: null,
     agentDecisions: [],
     autonomousEnabled: true,
+    crew: createInitialCrew(),
   };
 }
 
@@ -671,6 +686,7 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   tickInFlight: false,
   autonomousEnabled: init.autonomousEnabled,
   agentDecisions: init.agentDecisions,
+  crew: init.crew,
 
   setSpeed: (speed) => set({ speed }),
   setFocusedCrop: (crop) => set({ focusedCrop: crop }),
@@ -782,6 +798,22 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     if (nowDust !== wasDust) update.dustStormActive = nowDust;
     if (newEvents !== events) update.events = newEvents;
 
+    // ── Update crew state based on current environment ──
+    const dtHours = (nextMinutes - elapsedMinutes) / 60;
+    const crewEnv: CrewEnvInputs = {
+      nutritionalCoverage: env.nutritionalCoverage,
+      foodReservesSols: env.foodReservesSols,
+      dustStormActive: nowDust,
+      dustStormFactor: env.dustStormFactor,
+      energyDeficit: env.energyDeficit,
+      co2SafetyAlert: env.co2SafetyAlert,
+      waterRecyclingEfficiency: env.waterRecyclingEfficiency,
+      o2Level: env.o2Level,
+      missionSol: env.missionSol,
+    };
+    const nextCrew = updateCrew(state.crew, crewEnv, dtHours);
+    if (nextCrew !== state.crew) update.crew = nextCrew;
+
     set(update as Partial<GreenhouseState>);
 
     // Fire autonomous agent tick at the configured interval (default 120 sim-minutes)
@@ -795,8 +827,8 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
   setGrid: (grid) => set({ grid }),
 
   getEnvironmentSnapshot: () => {
-    const { environment, simState, totalHarvestKg } = get();
-    return buildSnapshot(environment, simState.greenhouse, totalHarvestKg);
+    const { environment, simState, totalHarvestKg, crew } = get();
+    return buildSnapshot(environment, simState.greenhouse, totalHarvestKg, crew);
   },
 
   applyParameterChanges: (changes) => {
@@ -1059,11 +1091,11 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
     if (_autonomousTickLock) return;
     _autonomousTickLock = true;
 
-    const { elapsedMinutes, environment, simState, totalHarvestKg } = get();
+    const { elapsedMinutes, environment, simState, totalHarvestKg, crew } = get();
     set({ tickInFlight: true, lastTickSimMinutes: elapsedMinutes });
 
     try {
-      const snapshot = buildSnapshot(environment, simState.greenhouse, totalHarvestKg);
+      const snapshot = buildSnapshot(environment, simState.greenhouse, totalHarvestKg, crew);
 
       // Guard: ensure snapshot serialises correctly before sending
       let body: string;

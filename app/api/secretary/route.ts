@@ -88,7 +88,7 @@ Write a clear, warm, informative report for the crew covering:
 Keep it under 300 words. Use plain language — no technical jargon. The crew needs to understand and trust these decisions.`;
 
     try {
-      const agent = mastra.getAgent('wellbeingAgent'); // Secretary uses Wellbeing agent voice for crew reports
+      const agent = mastra.getAgent('secretaryAgent');
       const result = await agent.generate(
         [{ role: 'user', content: summaryPrompt }],
         { maxSteps: 1 },
