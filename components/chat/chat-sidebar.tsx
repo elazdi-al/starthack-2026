@@ -60,8 +60,8 @@ export function ChatSidebar({ open }: ChatSidebarProps) {
         open ? "translate-x-0" : "translate-x-full",
       )}
     >
-      {/* Header — Call button */}
-      <div className="shrink-0 px-5 pt-5 flex items-center">
+      {/* Header — Call button (pt-7 aligns vertical center with sidebar toggle at top-6) */}
+      <div className="shrink-0 px-5 pt-7 pb-4 flex items-center">
         <button
           type="button"
           onClick={handleCallToggle}

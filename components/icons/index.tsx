@@ -214,6 +214,7 @@ export const SettingsGearIcon = createIcon(GearSixIcon, {
 export const SidebarPanelIcon = createIcon(SidebarSimpleIcon, {
   size: 22,
   weight: "fill",
+  mirrored: true,
 });
 
 export const ControlPanelIcon = createIcon(FadersIcon, {
