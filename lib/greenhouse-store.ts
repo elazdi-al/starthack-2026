@@ -80,7 +80,7 @@ export interface AgentDecision {
 
 export type TileKind = "crop" | "path";
 export type Status = "ok" | "warn" | null;
-export type SpeedKey = "x1" | "x2" | "x5" | "x10" | "x20" | "x50" | "x100" | "x1000" | "x5000" | "x10000";
+export type SpeedKey = "x1" | "x10" | "x100" | "x1000" | "x100000";
 export const TICK_INTERVAL_MS = 200; // ~5fps — simulation compensates via larger time steps
 export const TOTAL_MISSION_SOLS = 450;
 
@@ -257,7 +257,7 @@ const INITIAL_GRID: TileData[][] = [
 ];
 
 const SPEED_MULTIPLIER: Record<SpeedKey, number> = {
-  x1: 1, x2: 2, x5: 5, x10: 10, x20: 20, x50: 50, x100: 100, x1000: 1000, x5000: 5000, x10000: 10000,
+  x1: 1, x10: 10, x100: 100, x1000: 1000, x100000: 100000,
 };
 
 // ─── Snapshot Types ─────────────────────────────────────────────────────────────

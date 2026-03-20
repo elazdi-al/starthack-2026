@@ -71,15 +71,10 @@ export function ElevenLabsCallProvider({ children }: { children: React.ReactNode
           .setSpeed(
             params.speed as
               | "x1"
-              | "x2"
-              | "x5"
               | "x10"
-              | "x20"
-              | "x50"
               | "x100"
               | "x1000"
-              | "x5000"
-              | "x10000",
+              | "x100000",
           );
         return `Simulation speed set to ${params.speed}`;
       },
