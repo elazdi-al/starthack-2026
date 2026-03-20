@@ -196,7 +196,6 @@ const CrewPortrait = memo(function CrewPortrait({ color }: { color: string }) {
   const shellGlow = withAlpha(color, "28");
   const helmetTint = `linear-gradient(180deg, ${withAlpha(color, "DC")} 0%, ${withAlpha(color, "8C")} 100%)`;
   const highlightTint = `radial-gradient(circle at 50% 18%, ${withAlpha(color, "80")} 0%, transparent 62%)`;
-  const helmetClip = "inset(0 0 28% 0 round 1.35rem)";
 
   return (
     <div
@@ -220,7 +219,6 @@ const CrewPortrait = memo(function CrewPortrait({ color }: { color: string }) {
           background: helmetTint,
           mixBlendMode: "multiply",
           opacity: 0.92,
-          clipPath: helmetClip,
           WebkitMaskImage: `url(${CREW_AVATAR_MASK_SRC})`,
           maskImage: `url(${CREW_AVATAR_MASK_SRC})`,
           WebkitMaskPosition: "center",
@@ -237,7 +235,6 @@ const CrewPortrait = memo(function CrewPortrait({ color }: { color: string }) {
           background: highlightTint,
           mixBlendMode: "screen",
           opacity: 0.44,
-          clipPath: helmetClip,
           WebkitMaskImage: `url(${CREW_AVATAR_MASK_SRC})`,
           maskImage: `url(${CREW_AVATAR_MASK_SRC})`,
           WebkitMaskPosition: "center",
