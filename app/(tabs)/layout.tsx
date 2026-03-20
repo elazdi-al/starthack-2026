@@ -340,7 +340,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                     animate={UI_ANIMATE_Y}
                     exit={shouldReduceMotion ? undefined : UI_EXIT_BOTTOM}
                     transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_C}
-                    className="absolute top-20 left-6"
+                    className="absolute top-20 left-6 z-20 pointer-events-none"
                   >
                     <AgentDecisionPanel onClose={handleAgentClose} />
                   </motion.div>

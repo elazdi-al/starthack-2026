@@ -80,7 +80,7 @@ export function AgentDecisionPanel({ onClose }: Props) {
   };
 
   return (
-    <div ref={wrapperRef}>
+    <div ref={wrapperRef} className="pointer-events-auto">
     <div
       ref={panelRef}
       className="w-80 rounded-[14px] overflow-hidden flex flex-col max-h-[85vh]"
