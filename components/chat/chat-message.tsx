@@ -149,7 +149,10 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallData }) {
 export function ChatMessage({ message, isGrouped, isStreaming }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isEmpty = !message.content;
-  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+  const greenhouseToolCalls = message.toolCalls?.filter(
+    (tc) => tc.toolName === "greenhouseParameterTool",
+  );
+  const hasToolCalls = greenhouseToolCalls && greenhouseToolCalls.length > 0;
   const hasContent = !isEmpty || hasToolCalls;
 
   return (
@@ -190,7 +193,7 @@ export function ChatMessage({ message, isGrouped, isStreaming }: ChatMessageProp
       {/* Tool call cards */}
       {hasToolCalls && (
         <div className="w-full max-w-[82%]">
-          {message.toolCalls?.map((tc) => (
+          {greenhouseToolCalls?.map((tc) => (
             <ToolCallCard key={tc.toolCallId} toolCall={tc} />
           ))}
         </div>
