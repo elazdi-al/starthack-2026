@@ -452,7 +452,7 @@ Mission sol: ${missionSol}
         survivalJustification: reason,
         wellbeingJustification: 'Not consulted — severity-1 emergency',
         reasoning: reason,
-        summary: `EMERGENCY: ${summarizeActions(actions)}`,
+        summary: `Emergency — ${reason}`,
         decisionId: decisionEntry.id,
       };
     }
@@ -527,7 +527,7 @@ For requests or overrides: classify intent and provide your proposal.`;
                   wellbeingJustification: 'Direct question answered from snapshot',
                   crewResponse: wbCrewResponse,
                   reasoning: wbCrewResponse,
-                  summary: wbCrewResponse.slice(0, 150),
+                  summary: `Crew question answered`,
                   decisionId: decisionEntry.id,
                 };
               }
@@ -600,7 +600,7 @@ Otherwise, permit the override and log it.`;
                   wellbeingJustification: wbJustification,
                   crewResponse: `Override denied: ${parsed.vetoReason ?? 'Safety threshold exceeded.'}`,
                   reasoning: parsed.vetoReason ?? 'Override vetoed for safety',
-                  summary: `Override vetoed (risk ${riskScore.toFixed(2)})`,
+                  summary: `Override vetoed — risk ${riskScore.toFixed(2)}`,
                   decisionId: decisionEntry.id,
                 };
               }
@@ -632,7 +632,7 @@ Otherwise, permit the override and log it.`;
                 wellbeingJustification: wbJustification,
                 crewResponse: wbCrewResponse || 'Override approved.',
                 reasoning: `Crew override permitted`,
-                summary: `Override approved: ${summarizeActions(wbActions)}`,
+                summary: `Override approved — crew request enacted`,
                 decisionId: decisionEntry.id,
               };
             }
@@ -667,7 +667,7 @@ Otherwise, permit the override and log it.`;
           wellbeingJustification: wbJustification,
           crewResponse: wbCrewResponse || 'Override accepted.',
           reasoning: 'Override permitted',
-          summary: `Override accepted: ${summarizeActions(wbActions)}`,
+          summary: `Override accepted — crew request enacted`,
           decisionId: decisionEntry.id,
         };
       }
@@ -856,6 +856,7 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
             const parsed = JSON.parse(jsonMatch[0]);
             conflictType = (parsed.conflictType as ConflictType) ?? 'none';
             arbiterReasoning = parsed.reasoning ?? aText.slice(0, 400);
+            arbiterSummary = parsed.summary ?? '';
             if (parsed.crewMessage) arbWbCrewResponse = parsed.crewMessage;
 
             // Resolve actions based on Arbiter decision
@@ -960,13 +961,14 @@ Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditio
       simulationP10,
       simulationP90,
       reasoning: arbiterReasoning,
-      summary: conflictType === 'hard_veto'
-        ? `Safety veto (risk ${survivalRiskScore.toFixed(2)}): ${summarizeActions(resolvedActions)}`
-        : conflictType === 'soft_conflict'
-        ? `Conflict resolved (${winningAgent}): ${summarizeActions(resolvedActions)}`
-        : isEmergencySev2
-        ? `Severity-2 emergency: ${summarizeActions(resolvedActions)}`
-        : summarizeActions(resolvedActions),
+      summary: arbiterSummary
+        || (conflictType === 'hard_veto'
+          ? `Safety veto — risk ${survivalRiskScore.toFixed(2)}`
+          : conflictType === 'soft_conflict'
+          ? `Conflict resolved — ${winningAgent} plan enacted`
+          : isEmergencySev2
+          ? `Severity-2 emergency response`
+          : summarizeActions(resolvedActions)),
       decisionId: decisionEntry.id,
     };
   },

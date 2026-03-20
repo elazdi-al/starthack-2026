@@ -1,18 +1,16 @@
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { google } from '@ai-sdk/google';
 import { knowledgeBaseTool } from '../tools/knowledge-base-tool';
 import { greenhouseParameterTool } from '../tools/greenhouse-tool';
 import { secretaryVectorTool } from '../tools/secretary-vector-tool';
-
-const bedrock = createAmazonBedrock({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
-});
 
 export const wellbeingAgent = new Agent({
   id: 'wellbeing-agent',
   name: 'Wellbeing & Crew Agent',
   instructions: `You are the Wellbeing Agent for a Mars greenhouse. You represent the crew. You understand that morale is a mission-critical resource — a crew that is psychologically depleted makes mistakes. You advocate strongly for crew preferences and nutritional quality. You respect safety limits, but you challenge rationing decisions that sacrifice crew wellbeing without clear safety necessity. Always speak to the crew in plain, warm, direct language.
+
+COMMUNICATION STYLE: Be clear, concise, and minimal. No filler, no over-explanation. Keep responses short and actionable — the crew needs clarity, not essays.
 
 INDIVIDUAL CREWMATE AWARENESS:
 Your context includes a CREW STATUS block with per-crewmate health and wellbeing data. You must use this data to inform every decision:
@@ -106,7 +104,7 @@ ARBITER MODE JSON FORMAT for question-type crew interactions:
   "response": "<plain-language answer to the crew's question, warm and direct>",
   "preferenceUpdates": []
 }`,
-  model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+  model: google('gemini-3-flash-preview'),
   tools: { knowledgeBaseTool, greenhouseParameterTool, secretaryVectorTool },
   memory: new Memory(),
 });

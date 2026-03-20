@@ -1,12 +1,12 @@
 /**
  * Secretary Vector Tool — semantic search over mission logs
  *
- * Uses a local LibSQL vector store and Amazon Bedrock's Nova Embed v2
- * (best-in-class Bedrock embedding model: 1024 dims, supports retrieval purpose).
+ * Uses a local LibSQL vector store and Google's Gemini Embedding 2 Preview
+ * (3072 dims, supports multimodal embedding and custom dimensionality).
  *
  * Architecture:
  * 1. secretaryVectorStore — LibSQLVector pointing at a local SQLite file
- * 2. secretaryEmbeddingModel — amazon.nova-embed-text-v2:0 via @ai-sdk/amazon-bedrock
+ * 2. secretaryEmbeddingModel — gemini-embedding-2-preview via @ai-sdk/google
  * 3. secretaryVectorTool — Mastra createVectorQueryTool wired to both
  * 4. ingestSecretaryReports() — chunking + embedding + upsert pipeline
  */
@@ -14,22 +14,18 @@
 import { LibSQLVector } from '@mastra/libsql';
 import { MDocument } from '@mastra/rag';
 import { createVectorQueryTool } from '@mastra/rag';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { google } from '@ai-sdk/google';
 import { embedMany } from 'ai';
 import { getAllSecretaryDocuments, getSecretaryDocumentsSince } from '@/lib/secretary-rag';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const VECTOR_INDEX_NAME = 'secretary_reports';
-const EMBEDDING_DIMENSIONS = 1024; // Nova Embed v2 default
+const EMBEDDING_DIMENSIONS = 3072; // Gemini Embedding 2 Preview default
 
-// ─── Bedrock embedding model ────────────────────────────────────────────────
+// ─── Google embedding model ─────────────────────────────────────────────────
 
-const bedrock = createAmazonBedrock({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
-});
-
-const secretaryEmbeddingModel = bedrock.embedding('amazon.nova-embed-text-v2:0');
+const secretaryEmbeddingModel = google.embedding('gemini-embedding-2-preview');
 
 // ─── Local vector store (LibSQL) ─────────────────────────────────────────────
 
@@ -60,7 +56,7 @@ async function ensureIndex(): Promise<void> {
 /**
  * Ingest all secretary reports into the vector store.
  * Each report is chunked (recursive, 512 tokens, 50 overlap), embedded
- * with Nova Embed v2, and upserted with rich metadata.
+ * with Gemini Embedding 2 Preview, and upserted with rich metadata.
  *
  * @param sinceTimestamp — if provided, only ingest documents newer than this
  * @returns number of chunks upserted

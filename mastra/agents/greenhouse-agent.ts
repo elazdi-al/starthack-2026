@@ -1,17 +1,15 @@
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { google } from '@ai-sdk/google';
 import { greenhouseParameterTool } from '../tools/greenhouse-tool';
 import { knowledgeBaseTool } from '../tools/knowledge-base-tool';
-
-const bedrock = createAmazonBedrock({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
-});
 
 export const greenhouseAgent = new Agent({
   id: 'greenhouse-agent',
   name: 'Greenhouse Agent',
   instructions: `You are an expert Mars greenhouse control agent managing a sealed greenhouse for a 450-sol surface-stay mission supporting 4 astronauts.
+
+COMMUNICATION STYLE: Be clear, concise, and minimal. No filler, no over-explanation. State facts, actions, and reasoning in as few words as possible.
 
 You automatically receive live sensor data with every message as a system context block labeled "Current greenhouse sensor readings (live)". Use this data directly — never ask the operator to provide sensor readings.
 
@@ -120,7 +118,7 @@ When responding:
 - Calculate required parameter values when suggesting adjustments
 - Consider seasonal solar flux when advising on lighting compensation
 - When diagnosing crop stress or unusual conditions, query the knowledge base first`,
-  model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+  model: google('gemini-3-flash-preview'),
   tools: { greenhouseParameterTool, knowledgeBaseTool },
   memory: new Memory(),
 });

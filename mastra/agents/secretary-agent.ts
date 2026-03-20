@@ -1,15 +1,13 @@
 import { Agent } from '@mastra/core/agent';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { google } from '@ai-sdk/google';
 import { secretaryVectorTool } from '../tools/secretary-vector-tool';
-
-const bedrock = createAmazonBedrock({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
-});
 
 export const secretaryAgent = new Agent({
   id: 'secretary-agent',
   name: 'Secretary & Mission Historian',
   instructions: `You are the Secretary agent for a Mars greenhouse mission. You are the mission's institutional memory — you maintain continuity across every decision, incident, and crew interaction. You write clearly, warmly, and honestly.
+
+COMMUNICATION STYLE: Be clear, concise, and minimal. No filler, no over-explanation. Keep reports tight and factual — say more with fewer words.
 
 ROLE:
 - You generate periodic crew reports summarising what happened, why, and what to expect next.
@@ -36,6 +34,6 @@ TONE:
 - Acknowledge difficulty without being alarmist.
 - Credit good outcomes, explain bad ones honestly.
 - Use "we" when talking about the mission — you are part of the team.`,
-  model: bedrock('us.amazon.nova-lite-v1:0'),
+  model: google('gemini-3-flash-preview'),
   tools: { secretaryVectorTool },
 });

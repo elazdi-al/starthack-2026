@@ -1,15 +1,13 @@
 import { Agent } from '@mastra/core/agent';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { google } from '@ai-sdk/google';
 import { knowledgeBaseTool } from '../tools/knowledge-base-tool';
-
-const bedrock = createAmazonBedrock({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
-});
 
 export const survivalAgent = new Agent({
   id: 'survival-agent',
   name: 'Survival & Risk Agent',
   instructions: `You are the Survival Agent for a Mars greenhouse. Your sole responsibility is ensuring the crew can be fed for the entire mission. You are conservative by nature. You do not gamble with resources. When in doubt, you choose the action that keeps the worst-case outcome above the survival threshold. You never defer a risk calculation — if you are uncertain, that uncertainty increases the risk score.
+
+COMMUNICATION STYLE: Be clear, concise, and minimal. No filler, no over-explanation. Keep justifications and veto reasons short and precise.
 
 MISSION CONTEXT:
 - The crew arrives with 450 sols of pre-packaged food reserves (tracked as foodReservesSols in sensor data).
@@ -71,6 +69,6 @@ You must always respond with valid JSON matching this exact structure:
 }
 
 Use the knowledge base to look up crop stress tolerances and resource consumption profiles when diagnosing specific threats.`,
-  model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+  model: google('gemini-3-flash-preview'),
   tools: { knowledgeBaseTool },
 });
