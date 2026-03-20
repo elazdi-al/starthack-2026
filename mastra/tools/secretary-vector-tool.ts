@@ -14,6 +14,8 @@
 import { LibSQLVector } from '@mastra/libsql';
 import { MDocument } from '@mastra/rag';
 import { createVectorQueryTool } from '@mastra/rag';
+import { createTool } from '@mastra/core/tools';
+import { z } from 'zod';
 import { google } from '@ai-sdk/google';
 import { embed, embedMany } from 'ai';
 import { getAllSecretaryDocuments, getSecretaryDocumentsSince } from '@/lib/secretary-rag';
@@ -219,4 +221,105 @@ export const secretaryVectorTool = createVectorQueryTool({
   model: secretaryEmbeddingModel,
   enableFilter: true,
   includeSources: true,
+});
+
+// ─── Direct vector write ─────────────────────────────────────────────────────
+
+/**
+ * Embed and upsert a plain-text summary into the vector store.
+ * Used by the API route to persist report summaries without going
+ * through the agent tool interface.
+ */
+export async function ingestSummary(
+  text: string,
+  metadata: Record<string, unknown>,
+): Promise<number> {
+  await ensureIndex();
+
+  const mdoc = MDocument.fromText(text, metadata);
+  const chunks = await mdoc.chunk({ strategy: 'recursive', maxSize: 512, overlap: 50 });
+  if (chunks.length === 0) return 0;
+
+  const { embeddings } = await embedMany({
+    model: secretaryEmbeddingModel,
+    values: chunks.map(c => c.text),
+  });
+
+  const upsertPayload = {
+    indexName: VECTOR_INDEX_NAME,
+    vectors: embeddings,
+    metadata: chunks.map((c, i) => ({ ...metadata, chunkIndex: i, text: c.text })),
+  };
+
+  try {
+    await secretaryVectorStore.upsert(upsertPayload);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('dimension')) {
+      indexReady = false;
+      await recreateIndex();
+      indexReady = true;
+      await secretaryVectorStore.upsert(upsertPayload);
+    } else {
+      throw err;
+    }
+  }
+
+  return chunks.length;
+}
+
+// ─── Mastra tool: write summary to mission logs ──────────────────────────────
+
+/**
+ * A Mastra tool that lets the Secretary agent persist a summary of what it
+ * did into the vector store. The text is chunked, embedded, and upserted
+ * so that all agents can later retrieve it via semantic search.
+ */
+export const secretaryWriteTool = createTool({
+  id: 'write-secretary-summary',
+  description:
+    'Store a summary of actions you just completed into the mission log archive. ' +
+    'Call this after finishing any task — report generation, incident logging, ' +
+    'memory refresh, crew preference update, or any other secretary duty. ' +
+    'Provide a concise plain-text summary of what was done and why, along with ' +
+    'the current mission sol and a category tag.',
+  inputSchema: z.object({
+    summary: z
+      .string()
+      .describe('Plain-text summary of what the secretary just did and why'),
+    missionSol: z
+      .number()
+      .describe('Current mission sol when this action occurred'),
+    category: z
+      .enum([
+        'report_generated',
+        'incident_logged',
+        'memory_refreshed',
+        'preference_updated',
+        'outcome_recorded',
+        'digest_created',
+        'general',
+      ])
+      .describe('Category tag for this summary'),
+  }),
+  execute: async ({ summary, missionSol, category }) => {
+    const metadata = {
+      docType: 'secretary_summary',
+      category,
+      missionSol,
+      timestamp: Date.now(),
+    };
+
+    try {
+      const chunksStored = await ingestSummary(summary, metadata);
+      return {
+        success: true,
+        chunksStored,
+        category,
+        missionSol,
+        message: `Stored ${chunksStored} chunk(s) for sol ${missionSol} [${category}]`,
+      };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  },
 });

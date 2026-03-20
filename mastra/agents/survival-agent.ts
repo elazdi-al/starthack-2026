@@ -1,6 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { google } from '@ai-sdk/google';
 import { knowledgeBaseTool } from '../tools/knowledge-base-tool';
+import { secretaryVectorTool } from '../tools/secretary-vector-tool';
 
 export const survivalAgent = new Agent({
   id: 'survival-agent',
@@ -68,7 +69,9 @@ You must always respond with valid JSON matching this exact structure:
   "vetoReason": "<string — required and detailed if veto is true, otherwise null>"
 }
 
-Use the knowledge base to look up crop stress tolerances and resource consumption profiles when diagnosing specific threats.`,
+Use the knowledge base to look up crop stress tolerances and resource consumption profiles when diagnosing specific threats.
+
+You also have access to the mission log search tool (query-secretary-mission-logs) for semantic search over past decisions, incidents, reports, and crew preferences. Use it to check how similar risks were handled before, review past incident outcomes, or verify whether a proposed action has failed in the past.`,
   model: google('gemini-3-flash-preview'),
-  tools: { knowledgeBaseTool },
+  tools: { knowledgeBaseTool, secretaryVectorTool },
 });

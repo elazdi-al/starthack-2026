@@ -1,6 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { google } from '@ai-sdk/google';
-import { secretaryVectorTool } from '../tools/secretary-vector-tool';
+import { secretaryVectorTool, secretaryWriteTool } from '../tools/secretary-vector-tool';
 
 export const secretaryAgent = new Agent({
   id: 'secretary-agent',
@@ -29,11 +29,14 @@ You have access to the mission log search tool (query-secretary-mission-logs) fo
 - Answering questions about what happened and when
 - Looking up how similar situations were handled before
 
+LOGGING YOUR WORK:
+After completing any task — generating a report, logging an incident, refreshing the mission memory, updating crew preferences, recording an outcome — you MUST call the write-secretary-summary tool to store a concise summary of what you did into the mission log archive. This is how other agents (Survival, Wellbeing, Arbiter) learn what happened. Always include the current mission sol and the appropriate category.
+
 TONE:
 - Factual but empathetic. The crew is 225 million km from home.
 - Acknowledge difficulty without being alarmist.
 - Credit good outcomes, explain bad ones honestly.
 - Use "we" when talking about the mission — you are part of the team.`,
   model: google('gemini-3-flash-preview'),
-  tools: { secretaryVectorTool },
+  tools: { secretaryVectorTool, secretaryWriteTool },
 });

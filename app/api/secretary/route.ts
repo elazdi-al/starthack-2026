@@ -12,7 +12,7 @@
 
 import { mastra } from '@/mastra';
 import { secretaryStore } from '@/lib/secretary-store';
-import { querySecretaryVectorStore } from '@/mastra/tools/secretary-vector-tool';
+import { querySecretaryVectorStore, ingestSummary } from '@/mastra/tools/secretary-vector-tool';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -124,6 +124,15 @@ Keep it under 300 words. Use plain language — no technical jargon. The crew ne
         missionSolEnd,
         report: result.text ?? 'Report generation failed.',
       });
+
+      // Persist a summary into the vector DB so other agents can find it
+      ingestSummary(report.report, {
+        docType: 'weekly_report_summary',
+        weekNumber,
+        missionSolStart,
+        missionSolEnd,
+        timestamp: Date.now(),
+      }).catch(err => console.error('[secretary/report] Vector ingest failed:', err));
 
       return Response.json({ ok: true, data: report });
     } catch (err) {
