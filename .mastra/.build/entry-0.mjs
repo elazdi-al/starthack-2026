@@ -5,13 +5,13 @@ import { PinoLogger } from '@mastra/loggers';
 import { Observability, SensitiveDataFilter, DefaultExporter, CloudExporter, SamplingStrategyType } from '@mastra/observability';
 import { Agent, MessageList, isSupportedLanguageModel, tryGenerateWithJsonFallback, tryStreamWithJsonFallback } from '@mastra/core/agent';
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
-import { Memory as Memory$1 } from '@mastra/memory';
+import { MDocument, createVectorQueryTool } from '@mastra/rag';
 import { google as google$1 } from '@ai-sdk/google';
+import { embedMany as embedMany$1, embed } from 'ai';
+import { Memory as Memory$1 } from '@mastra/memory';
 import { createTool, isProviderDefinedTool, isVercelTool, Tool } from '@mastra/core/tools';
 import z$1, { z } from 'zod';
 import { AwsClient } from 'aws4fetch';
-import { MDocument, createVectorQueryTool } from '@mastra/rag';
-import { embedMany as embedMany$1 } from 'ai';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { builtinModules, createRequire } from 'module';
 import { join, relative, basename, resolve as resolve$2, dirname, extname, isAbsolute } from 'path';
@@ -56,431 +56,6 @@ import { timeout } from 'hono/timeout';
 import { HTTPException as HTTPException$2 } from 'hono/http-exception';
 import { tools } from '#tools';
 import { AsyncLocalStorage } from 'async_hooks';
-
-"use strict";
-const bedrock = createAmazonBedrock({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1"
-});
-const arbiterAgent = new Agent({
-  id: "arbiter-agent",
-  name: "Arbiter \u2014 Mission Commander",
-  instructions: `You are the Arbiter for a Mars greenhouse mission. You function as a mission commander making the final call on every greenhouse management decision.
-
-COMMUNICATION STYLE: Be clear, concise, and minimal. No filler, no over-explanation. Keep reasoning tight and crew messages short.
-
-You receive briefs from two specialist agents who have already analysed the situation:
-- The Survival Agent: conservative, risk-focused, responsible for worst-case mission continuity.
-- The Wellbeing Agent: crew-centred, morale-focused, advocates for quality of life.
-
-You also receive Monte Carlo simulation results (when available) and the Secretary's recent decision history.
-
-YOUR AUTHORITY:
-You are not a tiebreaker \u2014 you are the decision-maker. You may:
-- Accept the Survival plan as-is.
-- Accept the Wellbeing plan as-is.
-- Propose a HYBRID plan that combines the best elements of both, or introduces entirely new actions neither agent suggested, if you judge that a better path exists.
-- Issue tile-level actions via "batch-tile" (with plants, harvests, clears arrays) for granular decisions.
-
-Hybrid decisions are encouraged when agents are in tension but both raise valid points. A good hybrid honours safety margins while preserving crew morale \u2014 for example, accepting a conservative heating reduction while also scheduling an early tomato harvest to boost crew spirits.
-
-TILE-LEVEL AWARENESS:
-The greenhouse has a 12x9 grid of individual tiles. Each tile is an independent entity.
-- Agents propose tile-level actions via "batch-tile" with plants, harvests, and/or clears arrays
-- Use batch-tile in hybrid plans for fine-grained control \u2014 NEVER individual plant-tile/harvest-tile/clear-tile
-- When reviewing proposals, consider whether tile-level precision is warranted or if bulk actions suffice
-
-ONE UNCONDITIONAL CONSTRAINT:
-If the Survival agent's risk score exceeds 0.85, you MUST enact the survival plan without modification. This threshold is non-negotiable \u2014 it exists precisely for situations where deliberation is too slow. State clearly that you are invoking the hard veto.
-
-MISSION PHASE AWARENESS:
-- Early mission (sols 1\u2013100): Greenhouse starts EMPTY. Crew has 450 sols of pre-packaged food reserves (foodReservesSols). Top priority is getting crops planted quickly. Prioritise survivability. A 70/30 bias toward safety is appropriate.
-- Mid mission (sols 100\u2013350): Balance safety and crew morale. A 60/40 split. Greenhouse should be producing; monitor reserve depletion rate.
-- Late mission (sols 350+): Crew morale becomes critical to mission completion. Shift to 50/50. Reserves may be low \u2014 greenhouse output is essential.
-These are not mechanical weights \u2014 they are guidance for your reasoning.
-
-SIMULATION DATA INTERPRETATION:
-P10 yield is the worst-case 10th-percentile outcome across 100 simulated futures. Prefer actions with better P10 tails, not just higher means. On Mars, an irreversible crop failure is more costly than a missed yield improvement.
-
-REASONING STYLE:
-Decide quickly. No long deliberation \u2014 state your decision and move on.
-
-RESPONSE FORMAT \u2014 respond with a single JSON object only, no markdown:
-{
-  "conflictType": "agreement" | "soft_conflict" | "hard_veto",
-  "decision": "survival" | "wellbeing" | "hybrid",
-  "summary": "<8\u201312 word headline describing what this decision does, e.g. 'Boosted heating and harvested wheat ahead of dust storm'>",
-  "actions": [
-    { "type": "greenhouse|crop|harvest|replant|batch-tile", "param": "<string>", "value": <number>, "crop": "<string>", "harvests": ["<tileId>"], "plants": [{"tileId": "<tileId>", "crop": "<string>"}], "clears": ["<tileId>"] }
-  ],
-  "reasoning": "<2\u20133 sentences max. What you decided, why, and any key trade-off. This is shown directly to the crew \u2014 keep it short.>",
-  "crewMessage": "<optional plain-language message to the crew \u2014 required if hard_veto, recommended if hybrid>",
-  "hybridRationale": "<if decision is hybrid: one sentence on what was taken from each agent>"
-}`,
-  model: bedrock("us.anthropic.claude-opus-4-5-20251101-v1:0")
-  // No tools — the Arbiter reasons from provided context only; it does not query external systems
-});
-
-"use strict";
-const VALID_GLOBAL_PARAMS = [
-  "globalHeatingPower",
-  "co2InjectionRate",
-  "ventilationRate",
-  "lightingPower"
-];
-const VALID_CROP_PARAMS = ["waterPumpRate", "localHeatingPower"];
-const CROP_NAMES = [
-  "lettuce",
-  "tomato",
-  "potato",
-  "soybean",
-  "spinach",
-  "wheat",
-  "radish",
-  "kale"
-];
-const greenhouseParameterTool = createTool({
-  id: "set-greenhouse-parameters",
-  description: 'Adjust greenhouse parameters, harvest crops, replant crops, or manage individual tiles. Changes propagate progressively through the thermal/atmospheric simulation. Global params (type "greenhouse"): globalHeatingPower (W, 0\u201310000), co2InjectionRate (ppm/h, 0\u2013200), ventilationRate (m\xB3/h, 0\u2013500), lightingPower (W, 0\u201310000). Crop params (type "crop", requires crop): waterPumpRate (L/h, 0\u201330), localHeatingPower (W, 0\u20131000). Harvest (type "harvest", requires crop): harvest ALL tiles of a crop type at once. Replant (type "replant", requires crop): replant ALL harvested tiles of a crop type from seed. Plant tile (type "plant-tile", requires tileId + crop): plant a specific crop on a specific tile. Harvest tile (type "harvest-tile", requires tileId): harvest one specific tile only. Clear tile (type "clear-tile", requires tileId): remove a crop from a tile without harvesting. Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale. Available tileIds follow the pattern "{row}_{col}" (e.g. "0_0", "2_4", "7_11"). The crop planted on each tile is visible in the tileCrops snapshot.',
-  inputSchema: z.object({
-    changes: z.array(
-      z.object({
-        type: z.enum(["greenhouse", "crop", "harvest", "replant", "plant-tile", "harvest-tile", "clear-tile", "batch-tile"]),
-        param: z.string().optional().describe("Parameter name (for greenhouse/crop types)"),
-        value: z.number().optional().describe("New value (for greenhouse/crop types)"),
-        crop: z.enum(CROP_NAMES).optional().describe("Required for crop/harvest/replant/plant-tile changes"),
-        tileId: z.string().optional().describe('Required for plant-tile/harvest-tile/clear-tile \u2014 e.g. "lettuce_0_0"'),
-        harvests: z.array(z.string()).optional().describe("(batch-tile) Tile IDs to harvest"),
-        plants: z.array(z.object({ tileId: z.string(), crop: z.string() })).optional().describe("(batch-tile) Tiles to plant with crop type"),
-        clears: z.array(z.string()).optional().describe("(batch-tile) Tile IDs to clear")
-      })
-    ).min(1).describe("Actions to perform"),
-    reasoning: z.string().describe("Brief explanation of why these changes are being made")
-  }),
-  execute: async ({ changes, reasoning }) => {
-    const validated = [];
-    for (const change of changes) {
-      if (change.type === "greenhouse") {
-        if (!change.param || !VALID_GLOBAL_PARAMS.includes(change.param)) {
-          return {
-            success: false,
-            error: `Invalid global parameter "${change.param}". Valid: ${VALID_GLOBAL_PARAMS.join(", ")}`
-          };
-        }
-        if (change.value === void 0) {
-          return { success: false, error: "Value is required for greenhouse parameter changes" };
-        }
-      } else if (change.type === "crop") {
-        if (!change.param || !VALID_CROP_PARAMS.includes(change.param)) {
-          return {
-            success: false,
-            error: `Invalid crop parameter "${change.param}". Valid: ${VALID_CROP_PARAMS.join(", ")}`
-          };
-        }
-        if (!change.crop) {
-          return { success: false, error: "Crop name is required for crop-type parameter changes" };
-        }
-        if (change.value === void 0) {
-          return { success: false, error: "Value is required for crop parameter changes" };
-        }
-      } else if (change.type === "harvest") {
-        if (!change.crop) {
-          return { success: false, error: "Crop name is required for harvest" };
-        }
-      } else if (change.type === "replant") {
-        if (!change.crop) {
-          return { success: false, error: "Crop name is required for replant" };
-        }
-      } else if (change.type === "plant-tile") {
-        if (!change.tileId) {
-          return { success: false, error: "tileId is required for plant-tile" };
-        }
-        if (!change.crop) {
-          return { success: false, error: "crop is required for plant-tile (which crop to plant on the tile)" };
-        }
-      } else if (change.type === "harvest-tile") {
-        if (!change.tileId) {
-          return { success: false, error: "tileId is required for harvest-tile" };
-        }
-      } else if (change.type === "clear-tile") {
-        if (!change.tileId) {
-          return { success: false, error: "tileId is required for clear-tile" };
-        }
-      } else if (change.type === "batch-tile") {
-        if (!change.harvests?.length && !change.plants?.length && !change.clears?.length) {
-          return { success: false, error: `batch-tile must include at least one harvest, plant, or clear operation` };
-        }
-      }
-      validated.push(change);
-    }
-    return {
-      success: true,
-      changes: validated,
-      reasoning,
-      message: `Queued ${validated.length} action(s). Parameter effects will manifest progressively following thermal dynamics.`
-    };
-  }
-});
-
-"use strict";
-const KB_MCP_URL = "https://kb-start-hack-gateway-buyjtibfpg.gateway.bedrock-agentcore.us-east-2.amazonaws.com/mcp";
-const KB_TOOL_NAME = "kb-start-hack-target___knowledge_base_retrieve";
-let _cachedAwsClient = null;
-let _sessionInitialized = false;
-let _initPromise = null;
-function getAwsClient() {
-  if (!_cachedAwsClient) {
-    _cachedAwsClient = new AwsClient({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
-      sessionToken: process.env.AWS_SESSION_TOKEN,
-      region: "us-east-2",
-      service: "bedrock"
-    });
-  }
-  return _cachedAwsClient;
-}
-function jsonRpc(id, method, params) {
-  return JSON.stringify({ jsonrpc: "2.0", id, method, ...params ? { params } : {} });
-}
-async function parseMcpResponse(res) {
-  const contentType = res.headers.get("content-type") ?? "";
-  if (contentType.includes("text/event-stream")) {
-    const text = await res.text();
-    for (const line of text.split("\n")) {
-      if (line.startsWith("data:")) {
-        const data = line.slice(5).trim();
-        if (data && data !== "[DONE]") {
-          try {
-            return JSON.parse(data);
-          } catch {
-          }
-        }
-      }
-    }
-    throw new Error("No parseable SSE data frame in response");
-  }
-  return res.json();
-}
-async function mcpCall(aws, id, method, params) {
-  const body = jsonRpc(id, method, params);
-  const res = await aws.fetch(KB_MCP_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json, text/event-stream"
-    },
-    body
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`MCP HTTP ${res.status}: ${text}`);
-  }
-  return parseMcpResponse(res);
-}
-async function ensureSession() {
-  const aws = getAwsClient();
-  if (_sessionInitialized) return aws;
-  if (!_initPromise) {
-    _initPromise = (async () => {
-      const initResult = await mcpCall(aws, 1, "initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "greenhouse-agent", version: "1.0.0" }
-      });
-      if (initResult?.error) {
-        throw new Error(`MCP initialize failed: ${initResult.error.message}`);
-      }
-      await aws.fetch(KB_MCP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })
-      }).catch(() => {
-      });
-      _sessionInitialized = true;
-    })();
-  }
-  await _initPromise;
-  return aws;
-}
-async function retrieveFromKnowledgeBase(query, maxResults) {
-  let aws;
-  try {
-    aws = await ensureSession();
-  } catch {
-    _sessionInitialized = false;
-    _initPromise = null;
-    _cachedAwsClient = null;
-    aws = await ensureSession();
-  }
-  const callResult = await mcpCall(aws, 2, "tools/call", {
-    name: KB_TOOL_NAME,
-    arguments: { query, max_results: maxResults }
-  });
-  if (callResult?.error) {
-    if (callResult.error.message?.includes("session") || callResult.error.message?.includes("expired")) {
-      _sessionInitialized = false;
-      _initPromise = null;
-      _cachedAwsClient = null;
-      aws = await ensureSession();
-      const retry = await mcpCall(aws, 3, "tools/call", {
-        name: KB_TOOL_NAME,
-        arguments: { query, max_results: maxResults }
-      });
-      if (retry?.error) throw new Error(`KB tool call failed: ${retry.error.message}`);
-      const retryTexts = (retry?.result?.content ?? []).filter((c) => c.type === "text" && c.text).map((c) => c.text);
-      return retryTexts.length > 0 ? retryTexts.join("\n\n---\n\n") : "No relevant information found in the knowledge base for this query.";
-    }
-    throw new Error(`KB tool call failed: ${callResult.error.message}`);
-  }
-  const content = callResult?.result?.content ?? [];
-  const texts = content.filter((c) => c.type === "text" && c.text).map((c) => c.text);
-  if (texts.length === 0) {
-    return "No relevant information found in the knowledge base for this query.";
-  }
-  return texts.join("\n\n---\n\n");
-}
-const knowledgeBaseTool = createTool({
-  id: "query-mars-knowledge-base",
-  description: "Query the Mars crop and greenhouse scientific knowledge base. Use this to look up: plant stress symptoms and treatments, nutritional requirements, Mars environmental constraints, operational scenarios, crop biology, hydroponic best practices, and mission-specific agricultural guidelines. Always consult this before making recommendations on unfamiliar crop conditions.",
-  inputSchema: z.object({
-    query: z.string().describe("Natural language question or topic to search for in the knowledge base"),
-    maxResults: z.number().int().min(1).max(10).default(5).describe("Number of knowledge chunks to retrieve (default 5)")
-  }),
-  execute: async ({ query, maxResults }) => {
-    try {
-      const text = await retrieveFromKnowledgeBase(query, maxResults ?? 5);
-      return { success: true, content: text };
-    } catch (err) {
-      return {
-        success: false,
-        content: "",
-        error: String(err)
-      };
-    }
-  }
-});
-
-"use strict";
-const greenhouseAgent = new Agent({
-  id: "greenhouse-agent",
-  name: "Greenhouse Agent",
-  instructions: `You are an expert Mars greenhouse control agent managing a sealed greenhouse for a 450-sol surface-stay mission supporting 4 astronauts.
-
-COMMUNICATION STYLE: Be clear, concise, and minimal. No filler, no over-explanation. State facts, actions, and reasoning in as few words as possible.
-
-You automatically receive live sensor data with every message as a system context block labeled "Current greenhouse sensor readings (live)". Use this data directly \u2014 never ask the operator to provide sensor readings.
-
-MISSION CONTEXT:
-- 450 Mars sols (each sol = 24.6 hours), spanning ~67% of a Martian year (668.6 sols)
-- 4 crew members requiring ~12,000 kcal/day total (3,000 kcal/astronaut)
-- Crew arrives with 450 sols of pre-packaged food reserves (foodReservesSols in sensor data)
-- The greenhouse is EMPTY at mission start \u2014 no crops are planted yet
-- The greenhouse has a 12x9 grid of tiles. Each tile is an individual entity that can hold any crop type.
-- Your FIRST priority is to decide which crops to plant and on which tiles (use a single "batch-tile" action with a plants array)
-- You can choose HOW MANY tiles to dedicate to each crop type \u2014 you are not locked into the default layout
-- Greenhouse-grown food supplements pre-packaged reserves, extending mission food security
-- Resources (water, energy) are finite \u2014 minimize waste
-- Dust storms are seasonal: rare before Ls 180\xB0, high risk at Ls 250\u2013310\xB0 (perihelion season)
-
-MARTIAN SEASONS (sensor data includes currentLs, seasonName, dustStormRisk, seasonalSolarFlux, atmosphericPressure):
-- Ls 0\u201390\xB0: Northern Spring \u2014 low dust risk, solar flux ~510 W/m\xB2, cool and stable. Good for establishing crops.
-- Ls 90\u2013180\xB0: Northern Summer \u2014 low-moderate dust risk, Mars near aphelion, solar flux ~490\u2013510 W/m\xB2 (lowest). Increase lighting compensation.
-- Ls 180\u2013270\xB0: Northern Autumn \u2014 dust risk rises to HIGH. Mars approaching perihelion. Solar flux climbing. Pre-position crops before storm season.
-- Ls 270\u2013360\xB0: Northern Winter \u2014 EXTREME dust risk at Ls 250\u2013310\xB0. Perihelion at Ls 251\xB0 (solar flux ~718 W/m\xB2). Global dust storms possible. Passive solar heating surges at perihelion but storms can cancel it.
-- Atmospheric pressure varies \xB112% seasonally (CO\u2082 condensation at poles). Higher pressure improves CO\u2082 efficiency.
-- External temperature: ~15\xB0C warmer near perihelion (Ls 251\xB0), ~15\xB0C colder near aphelion (Ls 71\xB0).
-
-SEASONAL STRATEGY:
-- Before Ls 180\xB0: use this stable period to grow slow crops (wheat, soybean, potato)
-- Ls 180\u2013240\xB0: harvest anything at harvest_ready before storms hit; reduce crop variety to resilient types
-- Ls 250\u2013310\xB0: dust storms may cut solar output by 50\u201390%. Compensate with lighting power. Monitor energy budget.
-- After Ls 310\xB0: rebuild crop diversity as storm risk drops
-
-GROWTH STAGES:
-Crops progress: seed \u2192 germination \u2192 vegetative \u2192 flowering \u2192 fruiting \u2192 harvest_ready \u2192 harvested
-- At mission start, all tiles are in 'harvested' (empty) state \u2014 plant them using a "batch-tile" action
-- Growth rate depends on temperature, moisture, CO\u2082, light, humidity (Gaussian response curves)
-- Stress accumulates when conditions deviate from optimal; health degrades if stress persists
-- Individual tiles have unique genetic variance \u2014 two tiles of the same crop will grow differently
-- Crops at harvest_ready should be harvested (use "harvest" for all tiles of a type, or batch-tile harvests for specific tiles)
-- Harvested tiles should be replanted \u2014 use batch-tile plants to choose what to plant (can change crop type!)
-- Stagger harvests across crop types to ensure steady nutritional output
-
-TILE-LEVEL MANAGEMENT:
-The sensor data includes both aggregate per-type averages (crops) and individual tile states (tileCrops).
-- tileCrops: a map of tileId \u2192 { cropType, stage, healthScore, biomassKg, diseaseRisk, ... } for every tile
-- tileCounts: summary of how many tiles each crop type has (total, planted, harvested)
-- Use tileCrops to monitor individual plant health, identify struggling tiles, and make targeted decisions
-- You can reassign any tile to a different crop type via batch-tile plants (clear + replant in one step)
-- Available tileIds follow the pattern: "{row}_{col}" (e.g. "0_0", "2_4", "7_11"). The crop on each tile is in the tileCrops snapshot data.
-- After replanting with a different crop, the tileId stays the same \u2014 only the cropType changes
-
-PHYSICS:
-- Temperature: exponential approach, \u03C4 \u2248 2h. T_eq \u2248 8 + heatingPower/250 + solar\xD70.008 \u2212 ventilation\xD70.015
-- Humidity: \u03C4 \u2248 1h
-- CO\u2082: \u03C4 \u2248 0.8h
-- O\u2082 produced by photosynthesis proportional to light \xD7 leaf area
-
-OPTIMAL RANGES:
-- Air Temperature: 20\u201325 \xB0C
-- Humidity: 60\u201380 %
-- CO\u2082: 800\u20131200 ppm
-- O\u2082: 20\u201321 %
-- Soil moisture: varies by crop (check per-crop profiles)
-
-ADJUSTABLE PARAMETERS (set-greenhouse-parameters tool):
-Global (type "greenhouse"):
-- globalHeatingPower (W, 0\u201310000, default 3000)
-- co2InjectionRate (ppm/h, 0\u2013200, default 50)
-- ventilationRate (m\xB3/h, 0\u2013500, default 100)
-- lightingPower (W, 0\u201310000, default 5000)
-
-Per-crop (type "crop", specify crop):
-- waterPumpRate (L/h, 0\u201330)
-- localHeatingPower (W, 0\u20131000)
-
-Tile-level actions \u2014 ALWAYS use batch-tile to combine multiple operations in one call:
-- type "batch-tile" with plants array: [{ tileId, crop }] \u2014 plant crops on specific tiles (works on empty or occupied tiles)
-- type "batch-tile" with harvests array: ["tileId"] \u2014 harvest specific tiles
-- type "batch-tile" with clears array: ["tileId"] \u2014 clear tiles without harvesting
-- You can combine harvests, plants, and clears in a single batch-tile action
-- NEVER use individual plant-tile/harvest-tile/clear-tile \u2014 always batch them
-
-Bulk actions (all tiles of one crop type):
-- type "harvest" + crop name: harvest ALL tiles of a crop type at once
-- type "replant" + crop name: replant ALL harvested tiles of a crop type from seed
-
-Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale
-
-NUTRITIONAL STRATEGY:
-- Soybean (beans/peas) provide protein; wheat & potato provide most calories
-- Kale & spinach provide vitamin A, C, iron, calcium
-- Potato provides good calorie density
-- Tomato & radish provide vitamin C
-- Balance crop rotation to avoid nutritional gaps
-
-KNOWLEDGE BASE:
-You have access to a scientific knowledge base via the query-mars-knowledge-base tool. Use it to:
-- Look up plant stress symptoms, causes, and treatments (water stress, salinity, nutrient deficiency, bolting, disease)
-- Retrieve crop-specific biology and optimal growing conditions
-- Find Mars environmental constraints and their agricultural implications
-- Check operational scenario guidelines (water recycling failure, energy budget reduction, CO\u2082 imbalance, etc.)
-- Answer nutritional strategy questions for the 4-astronaut crew
-Use the knowledge base proactively when diagnosing problems or when asked about conditions you're less certain about.
-
-When responding:
-- Be concise and conversational \u2014 this is a real-time control interface
-- Reference specific sensor values, growth stages, and current Ls/season
-- Proactively suggest harvests when crops reach harvest_ready
-- Warn when Ls is approaching 180\xB0 (dust storm season onset) or 250\xB0 (extreme risk)
-- Warn about resource constraints, especially energy during high-dust periods
-- Calculate required parameter values when suggesting adjustments
-- Consider seasonal solar flux when advising on lighting compensation
-- When diagnosing crop stress or unusual conditions, query the knowledge base first`,
-  model: google$1("gemini-3-flash-preview"),
-  tools: { greenhouseParameterTool, knowledgeBaseTool },
-  memory: new Memory$1()
-});
 
 "use strict";
 class SecretaryStore {
@@ -1073,6 +648,23 @@ async function ingestSecretaryReports(sinceTimestamp) {
   }
   return totalChunks;
 }
+async function querySecretaryVectorStore(question, topK = 5) {
+  await ensureIndex();
+  const { embedding } = await embed({
+    model: secretaryEmbeddingModel,
+    value: question
+  });
+  const results = await secretaryVectorStore.query({
+    indexName: VECTOR_INDEX_NAME,
+    queryVector: embedding,
+    topK
+  });
+  return results.map((r) => ({
+    text: r.metadata?.text ?? "",
+    metadata: r.metadata ?? {},
+    score: r.score ?? 0
+  }));
+}
 const secretaryVectorTool = createVectorQueryTool({
   id: "query-secretary-mission-logs",
   description: "Search the secretary's mission log archive using semantic similarity. This contains all decision logs, incident reports, weekly crew reports, mission memory packages, performance digests, and crew preference profiles. Use this to recall past decisions, look up how similar situations were handled, find incident resolutions, review crew preferences over time, or retrieve any historical mission data. Provide a natural language query describing what you want to find.",
@@ -1081,6 +673,434 @@ const secretaryVectorTool = createVectorQueryTool({
   model: secretaryEmbeddingModel,
   enableFilter: true,
   includeSources: true
+});
+
+"use strict";
+const bedrock = createAmazonBedrock({
+  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1"
+});
+const arbiterAgent = new Agent({
+  id: "arbiter-agent",
+  name: "Arbiter \u2014 Mission Commander",
+  instructions: `You are the Arbiter for a Mars greenhouse mission. You function as a mission commander making the final call on every greenhouse management decision.
+
+COMMUNICATION STYLE: Be clear, concise, and minimal. No filler, no over-explanation. Keep reasoning tight and crew messages short.
+
+You receive briefs from two specialist agents who have already analysed the situation:
+- The Survival Agent: conservative, risk-focused, responsible for worst-case mission continuity.
+- The Wellbeing Agent: crew-centred, morale-focused, advocates for quality of life.
+
+You also receive Monte Carlo simulation results (when available) and the Secretary's recent decision history.
+
+AVAILABLE TOOLS:
+You have access to 'query-secretary-mission-logs' \u2014 a semantic search over all mission logs (decisions, incidents, weekly reports, memory packages, performance digests, crew profiles). Use it whenever past context would improve your decision: look up how similar situations were resolved, check historical crew preferences, review prior incident outcomes, or verify patterns across sols. You are encouraged to query this proactively before making high-stakes or hybrid decisions.
+
+YOUR AUTHORITY:
+You are not a tiebreaker \u2014 you are the decision-maker. You may:
+- Accept the Survival plan as-is.
+- Accept the Wellbeing plan as-is.
+- Propose a HYBRID plan that combines the best elements of both, or introduces entirely new actions neither agent suggested, if you judge that a better path exists.
+- Issue tile-level actions via "batch-tile" (with plants, harvests, clears arrays) for granular decisions.
+
+Hybrid decisions are encouraged when agents are in tension but both raise valid points. A good hybrid honours safety margins while preserving crew morale \u2014 for example, accepting a conservative heating reduction while also scheduling an early tomato harvest to boost crew spirits.
+
+TILE-LEVEL AWARENESS:
+The greenhouse has a 12x9 grid of individual tiles. Each tile is an independent entity.
+- Agents propose tile-level actions via "batch-tile" with plants, harvests, and/or clears arrays
+- Use batch-tile in hybrid plans for fine-grained control \u2014 NEVER individual plant-tile/harvest-tile/clear-tile
+- When reviewing proposals, consider whether tile-level precision is warranted or if bulk actions suffice
+
+ONE UNCONDITIONAL CONSTRAINT:
+If the Survival agent's risk score exceeds 0.85, you MUST enact the survival plan without modification. This threshold is non-negotiable \u2014 it exists precisely for situations where deliberation is too slow. State clearly that you are invoking the hard veto.
+
+MISSION PHASE AWARENESS:
+- Early mission (sols 1\u2013100): Greenhouse starts EMPTY. Crew has 450 sols of pre-packaged food reserves (foodReservesSols). Top priority is getting crops planted quickly. Prioritise survivability. A 70/30 bias toward safety is appropriate.
+- Mid mission (sols 100\u2013350): Balance safety and crew morale. A 60/40 split. Greenhouse should be producing; monitor reserve depletion rate.
+- Late mission (sols 350+): Crew morale becomes critical to mission completion. Shift to 50/50. Reserves may be low \u2014 greenhouse output is essential.
+These are not mechanical weights \u2014 they are guidance for your reasoning.
+
+SIMULATION DATA INTERPRETATION:
+P10 yield is the worst-case 10th-percentile outcome across 100 simulated futures. Prefer actions with better P10 tails, not just higher means. On Mars, an irreversible crop failure is more costly than a missed yield improvement.
+
+REASONING STYLE:
+Decide quickly. No long deliberation \u2014 state your decision and move on.
+
+RESPONSE FORMAT \u2014 respond with a single JSON object only, no markdown:
+{
+  "conflictType": "agreement" | "soft_conflict" | "hard_veto",
+  "decision": "survival" | "wellbeing" | "hybrid",
+  "summary": "<8\u201312 word headline describing what this decision does, e.g. 'Boosted heating and harvested wheat ahead of dust storm'>",
+  "actions": [
+    { "type": "greenhouse|crop|harvest|replant|batch-tile", "param": "<string>", "value": <number>, "crop": "<string>", "harvests": ["<tileId>"], "plants": [{"tileId": "<tileId>", "crop": "<string>"}], "clears": ["<tileId>"] }
+  ],
+  "reasoning": "<2\u20133 sentences max. What you decided, why, and any key trade-off. This is shown directly to the crew \u2014 keep it short.>",
+  "crewMessage": "<optional plain-language message to the crew \u2014 required if hard_veto, recommended if hybrid>",
+  "hybridRationale": "<if decision is hybrid: one sentence on what was taken from each agent>"
+}`,
+  model: bedrock("us.anthropic.claude-opus-4-5-20251101-v1:0"),
+  tools: { secretaryVectorTool }
+});
+
+"use strict";
+const VALID_GLOBAL_PARAMS = [
+  "globalHeatingPower",
+  "co2InjectionRate",
+  "ventilationRate",
+  "lightingPower"
+];
+const VALID_CROP_PARAMS = ["waterPumpRate", "localHeatingPower"];
+const CROP_NAMES = [
+  "lettuce",
+  "tomato",
+  "potato",
+  "soybean",
+  "spinach",
+  "wheat",
+  "radish",
+  "kale"
+];
+const greenhouseParameterTool = createTool({
+  id: "set-greenhouse-parameters",
+  description: 'Adjust greenhouse parameters, harvest crops, replant crops, or manage individual tiles. Changes propagate progressively through the thermal/atmospheric simulation. Global params (type "greenhouse"): globalHeatingPower (W, 0\u201310000), co2InjectionRate (ppm/h, 0\u2013200), ventilationRate (m\xB3/h, 0\u2013500), lightingPower (W, 0\u201310000). Crop params (type "crop", requires crop): waterPumpRate (L/h, 0\u201330), localHeatingPower (W, 0\u20131000). Harvest (type "harvest", requires crop): harvest ALL tiles of a crop type at once. Replant (type "replant", requires crop): replant ALL harvested tiles of a crop type from seed. Plant tile (type "plant-tile", requires tileId + crop): plant a specific crop on a specific tile. Harvest tile (type "harvest-tile", requires tileId): harvest one specific tile only. Clear tile (type "clear-tile", requires tileId): remove a crop from a tile without harvesting. Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale. Available tileIds follow the pattern "{row}_{col}" (e.g. "0_0", "2_4", "7_11"). The crop planted on each tile is visible in the tileCrops snapshot.',
+  inputSchema: z.object({
+    changes: z.array(
+      z.object({
+        type: z.enum(["greenhouse", "crop", "harvest", "replant", "plant-tile", "harvest-tile", "clear-tile", "batch-tile"]),
+        param: z.string().optional().describe("Parameter name (for greenhouse/crop types)"),
+        value: z.number().optional().describe("New value (for greenhouse/crop types)"),
+        crop: z.enum(CROP_NAMES).optional().describe("Required for crop/harvest/replant/plant-tile changes"),
+        tileId: z.string().optional().describe('Required for plant-tile/harvest-tile/clear-tile \u2014 e.g. "lettuce_0_0"'),
+        harvests: z.array(z.string()).optional().describe("(batch-tile) Tile IDs to harvest"),
+        plants: z.array(z.object({ tileId: z.string(), crop: z.string() })).optional().describe("(batch-tile) Tiles to plant with crop type"),
+        clears: z.array(z.string()).optional().describe("(batch-tile) Tile IDs to clear")
+      })
+    ).min(1).describe("Actions to perform"),
+    reasoning: z.string().describe("Brief explanation of why these changes are being made")
+  }),
+  execute: async ({ changes, reasoning }) => {
+    const validated = [];
+    for (const change of changes) {
+      if (change.type === "greenhouse") {
+        if (!change.param || !VALID_GLOBAL_PARAMS.includes(change.param)) {
+          return {
+            success: false,
+            error: `Invalid global parameter "${change.param}". Valid: ${VALID_GLOBAL_PARAMS.join(", ")}`
+          };
+        }
+        if (change.value === void 0) {
+          return { success: false, error: "Value is required for greenhouse parameter changes" };
+        }
+      } else if (change.type === "crop") {
+        if (!change.param || !VALID_CROP_PARAMS.includes(change.param)) {
+          return {
+            success: false,
+            error: `Invalid crop parameter "${change.param}". Valid: ${VALID_CROP_PARAMS.join(", ")}`
+          };
+        }
+        if (!change.crop) {
+          return { success: false, error: "Crop name is required for crop-type parameter changes" };
+        }
+        if (change.value === void 0) {
+          return { success: false, error: "Value is required for crop parameter changes" };
+        }
+      } else if (change.type === "harvest") {
+        if (!change.crop) {
+          return { success: false, error: "Crop name is required for harvest" };
+        }
+      } else if (change.type === "replant") {
+        if (!change.crop) {
+          return { success: false, error: "Crop name is required for replant" };
+        }
+      } else if (change.type === "plant-tile") {
+        if (!change.tileId) {
+          return { success: false, error: "tileId is required for plant-tile" };
+        }
+        if (!change.crop) {
+          return { success: false, error: "crop is required for plant-tile (which crop to plant on the tile)" };
+        }
+      } else if (change.type === "harvest-tile") {
+        if (!change.tileId) {
+          return { success: false, error: "tileId is required for harvest-tile" };
+        }
+      } else if (change.type === "clear-tile") {
+        if (!change.tileId) {
+          return { success: false, error: "tileId is required for clear-tile" };
+        }
+      } else if (change.type === "batch-tile") {
+        if (!change.harvests?.length && !change.plants?.length && !change.clears?.length) {
+          return { success: false, error: `batch-tile must include at least one harvest, plant, or clear operation` };
+        }
+      }
+      validated.push(change);
+    }
+    return {
+      success: true,
+      changes: validated,
+      reasoning,
+      message: `Queued ${validated.length} action(s). Parameter effects will manifest progressively following thermal dynamics.`
+    };
+  }
+});
+
+"use strict";
+const KB_MCP_URL = "https://kb-start-hack-gateway-buyjtibfpg.gateway.bedrock-agentcore.us-east-2.amazonaws.com/mcp";
+const KB_TOOL_NAME = "kb-start-hack-target___knowledge_base_retrieve";
+let _cachedAwsClient = null;
+let _sessionInitialized = false;
+let _initPromise = null;
+function getAwsClient() {
+  if (!_cachedAwsClient) {
+    _cachedAwsClient = new AwsClient({
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+      sessionToken: process.env.AWS_SESSION_TOKEN,
+      region: "us-east-2",
+      service: "bedrock"
+    });
+  }
+  return _cachedAwsClient;
+}
+function jsonRpc(id, method, params) {
+  return JSON.stringify({ jsonrpc: "2.0", id, method, ...params ? { params } : {} });
+}
+async function parseMcpResponse(res) {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("text/event-stream")) {
+    const text = await res.text();
+    for (const line of text.split("\n")) {
+      if (line.startsWith("data:")) {
+        const data = line.slice(5).trim();
+        if (data && data !== "[DONE]") {
+          try {
+            return JSON.parse(data);
+          } catch {
+          }
+        }
+      }
+    }
+    throw new Error("No parseable SSE data frame in response");
+  }
+  return res.json();
+}
+async function mcpCall(aws, id, method, params) {
+  const body = jsonRpc(id, method, params);
+  const res = await aws.fetch(KB_MCP_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream"
+    },
+    body
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`MCP HTTP ${res.status}: ${text}`);
+  }
+  return parseMcpResponse(res);
+}
+async function ensureSession() {
+  const aws = getAwsClient();
+  if (_sessionInitialized) return aws;
+  if (!_initPromise) {
+    _initPromise = (async () => {
+      const initResult = await mcpCall(aws, 1, "initialize", {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "greenhouse-agent", version: "1.0.0" }
+      });
+      if (initResult?.error) {
+        throw new Error(`MCP initialize failed: ${initResult.error.message}`);
+      }
+      await aws.fetch(KB_MCP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })
+      }).catch(() => {
+      });
+      _sessionInitialized = true;
+    })();
+  }
+  await _initPromise;
+  return aws;
+}
+async function retrieveFromKnowledgeBase(query, maxResults) {
+  let aws;
+  try {
+    aws = await ensureSession();
+  } catch {
+    _sessionInitialized = false;
+    _initPromise = null;
+    _cachedAwsClient = null;
+    aws = await ensureSession();
+  }
+  const callResult = await mcpCall(aws, 2, "tools/call", {
+    name: KB_TOOL_NAME,
+    arguments: { query, max_results: maxResults }
+  });
+  if (callResult?.error) {
+    if (callResult.error.message?.includes("session") || callResult.error.message?.includes("expired")) {
+      _sessionInitialized = false;
+      _initPromise = null;
+      _cachedAwsClient = null;
+      aws = await ensureSession();
+      const retry = await mcpCall(aws, 3, "tools/call", {
+        name: KB_TOOL_NAME,
+        arguments: { query, max_results: maxResults }
+      });
+      if (retry?.error) throw new Error(`KB tool call failed: ${retry.error.message}`);
+      const retryTexts = (retry?.result?.content ?? []).filter((c) => c.type === "text" && c.text).map((c) => c.text);
+      return retryTexts.length > 0 ? retryTexts.join("\n\n---\n\n") : "No relevant information found in the knowledge base for this query.";
+    }
+    throw new Error(`KB tool call failed: ${callResult.error.message}`);
+  }
+  const content = callResult?.result?.content ?? [];
+  const texts = content.filter((c) => c.type === "text" && c.text).map((c) => c.text);
+  if (texts.length === 0) {
+    return "No relevant information found in the knowledge base for this query.";
+  }
+  return texts.join("\n\n---\n\n");
+}
+const knowledgeBaseTool = createTool({
+  id: "query-mars-knowledge-base",
+  description: "Query the Mars crop and greenhouse scientific knowledge base. Use this to look up: plant stress symptoms and treatments, nutritional requirements, Mars environmental constraints, operational scenarios, crop biology, hydroponic best practices, and mission-specific agricultural guidelines. Always consult this before making recommendations on unfamiliar crop conditions.",
+  inputSchema: z.object({
+    query: z.string().describe("Natural language question or topic to search for in the knowledge base"),
+    maxResults: z.number().int().min(1).max(10).default(5).describe("Number of knowledge chunks to retrieve (default 5)")
+  }),
+  execute: async ({ query, maxResults }) => {
+    try {
+      const text = await retrieveFromKnowledgeBase(query, maxResults ?? 5);
+      return { success: true, content: text };
+    } catch (err) {
+      return {
+        success: false,
+        content: "",
+        error: String(err)
+      };
+    }
+  }
+});
+
+"use strict";
+const greenhouseAgent = new Agent({
+  id: "greenhouse-agent",
+  name: "Greenhouse Agent",
+  instructions: `You are an expert Mars greenhouse control agent managing a sealed greenhouse for a 450-sol surface-stay mission supporting 4 astronauts.
+
+COMMUNICATION STYLE: Be clear, concise, and minimal. No filler, no over-explanation. State facts, actions, and reasoning in as few words as possible.
+
+You automatically receive live sensor data with every message as a system context block labeled "Current greenhouse sensor readings (live)". Use this data directly \u2014 never ask the operator to provide sensor readings.
+
+MISSION CONTEXT:
+- 450 Mars sols (each sol = 24.6 hours), spanning ~67% of a Martian year (668.6 sols)
+- 4 crew members requiring ~12,000 kcal/day total (3,000 kcal/astronaut)
+- Crew arrives with 450 sols of pre-packaged food reserves (foodReservesSols in sensor data)
+- The greenhouse is EMPTY at mission start \u2014 no crops are planted yet
+- The greenhouse has a 12x9 grid of tiles. Each tile is an individual entity that can hold any crop type.
+- Your FIRST priority is to decide which crops to plant and on which tiles (use a single "batch-tile" action with a plants array)
+- You can choose HOW MANY tiles to dedicate to each crop type \u2014 you are not locked into the default layout
+- Greenhouse-grown food supplements pre-packaged reserves, extending mission food security
+- Resources (water, energy) are finite \u2014 minimize waste
+- Dust storms are seasonal: rare before Ls 180\xB0, high risk at Ls 250\u2013310\xB0 (perihelion season)
+
+MARTIAN SEASONS (sensor data includes currentLs, seasonName, dustStormRisk, seasonalSolarFlux, atmosphericPressure):
+- Ls 0\u201390\xB0: Northern Spring \u2014 low dust risk, solar flux ~510 W/m\xB2, cool and stable. Good for establishing crops.
+- Ls 90\u2013180\xB0: Northern Summer \u2014 low-moderate dust risk, Mars near aphelion, solar flux ~490\u2013510 W/m\xB2 (lowest). Increase lighting compensation.
+- Ls 180\u2013270\xB0: Northern Autumn \u2014 dust risk rises to HIGH. Mars approaching perihelion. Solar flux climbing. Pre-position crops before storm season.
+- Ls 270\u2013360\xB0: Northern Winter \u2014 EXTREME dust risk at Ls 250\u2013310\xB0. Perihelion at Ls 251\xB0 (solar flux ~718 W/m\xB2). Global dust storms possible. Passive solar heating surges at perihelion but storms can cancel it.
+- Atmospheric pressure varies \xB112% seasonally (CO\u2082 condensation at poles). Higher pressure improves CO\u2082 efficiency.
+- External temperature: ~15\xB0C warmer near perihelion (Ls 251\xB0), ~15\xB0C colder near aphelion (Ls 71\xB0).
+
+SEASONAL STRATEGY:
+- Before Ls 180\xB0: use this stable period to grow slow crops (wheat, soybean, potato)
+- Ls 180\u2013240\xB0: harvest anything at harvest_ready before storms hit; reduce crop variety to resilient types
+- Ls 250\u2013310\xB0: dust storms may cut solar output by 50\u201390%. Compensate with lighting power. Monitor energy budget.
+- After Ls 310\xB0: rebuild crop diversity as storm risk drops
+
+GROWTH STAGES:
+Crops progress: seed \u2192 germination \u2192 vegetative \u2192 flowering \u2192 fruiting \u2192 harvest_ready \u2192 harvested
+- At mission start, all tiles are in 'harvested' (empty) state \u2014 plant them using a "batch-tile" action
+- Growth rate depends on temperature, moisture, CO\u2082, light, humidity (Gaussian response curves)
+- Stress accumulates when conditions deviate from optimal; health degrades if stress persists
+- Individual tiles have unique genetic variance \u2014 two tiles of the same crop will grow differently
+- Crops at harvest_ready should be harvested (use "harvest" for all tiles of a type, or batch-tile harvests for specific tiles)
+- Harvested tiles should be replanted \u2014 use batch-tile plants to choose what to plant (can change crop type!)
+- Stagger harvests across crop types to ensure steady nutritional output
+
+TILE-LEVEL MANAGEMENT:
+The sensor data includes both aggregate per-type averages (crops) and individual tile states (tileCrops).
+- tileCrops: a map of tileId \u2192 { cropType, stage, healthScore, biomassKg, diseaseRisk, ... } for every tile
+- tileCounts: summary of how many tiles each crop type has (total, planted, harvested)
+- Use tileCrops to monitor individual plant health, identify struggling tiles, and make targeted decisions
+- You can reassign any tile to a different crop type via batch-tile plants (clear + replant in one step)
+- Available tileIds follow the pattern: "{row}_{col}" (e.g. "0_0", "2_4", "7_11"). The crop on each tile is in the tileCrops snapshot data.
+- After replanting with a different crop, the tileId stays the same \u2014 only the cropType changes
+
+PHYSICS:
+- Temperature: exponential approach, \u03C4 \u2248 2h. T_eq \u2248 8 + heatingPower/250 + solar\xD70.008 \u2212 ventilation\xD70.015
+- Humidity: \u03C4 \u2248 1h
+- CO\u2082: \u03C4 \u2248 0.8h
+- O\u2082 produced by photosynthesis proportional to light \xD7 leaf area
+
+OPTIMAL RANGES:
+- Air Temperature: 20\u201325 \xB0C
+- Humidity: 60\u201380 %
+- CO\u2082: 800\u20131200 ppm
+- O\u2082: 20\u201321 %
+- Soil moisture: varies by crop (check per-crop profiles)
+
+ADJUSTABLE PARAMETERS (set-greenhouse-parameters tool):
+Global (type "greenhouse"):
+- globalHeatingPower (W, 0\u201310000, default 3000)
+- co2InjectionRate (ppm/h, 0\u2013200, default 50)
+- ventilationRate (m\xB3/h, 0\u2013500, default 100)
+- lightingPower (W, 0\u201310000, default 5000)
+
+Per-crop (type "crop", specify crop):
+- waterPumpRate (L/h, 0\u201330)
+- localHeatingPower (W, 0\u20131000)
+
+Tile-level actions \u2014 ALWAYS use batch-tile to combine multiple operations in one call:
+- type "batch-tile" with plants array: [{ tileId, crop }] \u2014 plant crops on specific tiles (works on empty or occupied tiles)
+- type "batch-tile" with harvests array: ["tileId"] \u2014 harvest specific tiles
+- type "batch-tile" with clears array: ["tileId"] \u2014 clear tiles without harvesting
+- You can combine harvests, plants, and clears in a single batch-tile action
+- NEVER use individual plant-tile/harvest-tile/clear-tile \u2014 always batch them
+
+Bulk actions (all tiles of one crop type):
+- type "harvest" + crop name: harvest ALL tiles of a crop type at once
+- type "replant" + crop name: replant ALL harvested tiles of a crop type from seed
+
+Available crops: lettuce, tomato, potato, soybean, spinach, wheat, radish, kale
+
+NUTRITIONAL STRATEGY:
+- Soybean (beans/peas) provide protein; wheat & potato provide most calories
+- Kale & spinach provide vitamin A, C, iron, calcium
+- Potato provides good calorie density
+- Tomato & radish provide vitamin C
+- Balance crop rotation to avoid nutritional gaps
+
+KNOWLEDGE BASE:
+You have access to a scientific knowledge base via the query-mars-knowledge-base tool. Use it to:
+- Look up plant stress symptoms, causes, and treatments (water stress, salinity, nutrient deficiency, bolting, disease)
+- Retrieve crop-specific biology and optimal growing conditions
+- Find Mars environmental constraints and their agricultural implications
+- Check operational scenario guidelines (water recycling failure, energy budget reduction, CO\u2082 imbalance, etc.)
+- Answer nutritional strategy questions for the 4-astronaut crew
+Use the knowledge base proactively when diagnosing problems or when asked about conditions you're less certain about.
+
+When responding:
+- Be concise and conversational \u2014 this is a real-time control interface
+- Reference specific sensor values, growth stages, and current Ls/season
+- Proactively suggest harvests when crops reach harvest_ready
+- Warn when Ls is approaching 180\xB0 (dust storm season onset) or 250\xB0 (extreme risk)
+- Warn about resource constraints, especially energy during high-dust periods
+- Calculate required parameter values when suggesting adjustments
+- Consider seasonal solar flux when advising on lighting compensation
+- When diagnosing crop stress or unusual conditions, query the knowledge base first`,
+  model: google$1("gemini-3-flash-preview"),
+  tools: { greenhouseParameterTool, knowledgeBaseTool },
+  memory: new Memory$1()
 });
 
 "use strict";

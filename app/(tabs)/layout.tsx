@@ -63,27 +63,7 @@ const GREENHOUSE_PANEL_TRANSITION = {
   ease: [0.32, 0.72, 0, 1] as const,
 };
 
-const GREENHOUSE_PANEL_VARIANTS = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? "-60%" : "-100%",
-  }),
-  center: { x: 0 },
-  exit: (direction: number) => ({
-    x: direction > 0 ? "-100%" : "-60%",
-  }),
-};
-
-const DASHBOARD_PANEL_VARIANTS = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? "100%" : "-100%",
-  }),
-  center: { x: 0 },
-  exit: (direction: number) => ({
-    x: direction > 0 ? "-100%" : "100%",
-  }),
-};
-
-const REPORTS_PANEL_VARIANTS = {
+const PANEL_VARIANTS = {
   enter: (direction: number) => ({
     x: direction > 0 ? "100%" : "-100%",
   }),
@@ -133,16 +113,14 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
   /* ── Track navigation direction for slide animations ──────────────────── */
   const prevViewRef = React.useRef<MainView>(activeView);
-  const [viewDirection, setViewDirection] = React.useState(1);
+  const directionRef = React.useRef(1);
 
-  React.useEffect(() => {
-    if (prevViewRef.current !== activeView) {
-      setViewDirection(
-        VIEW_ORDER[activeView] > VIEW_ORDER[prevViewRef.current] ? 1 : -1,
-      );
-      prevViewRef.current = activeView;
-    }
-  }, [activeView]);
+  if (prevViewRef.current !== activeView) {
+    directionRef.current =
+      VIEW_ORDER[activeView] > VIEW_ORDER[prevViewRef.current] ? 1 : -1;
+    prevViewRef.current = activeView;
+  }
+  const viewDirection = directionRef.current;
 
   /* ── Optimistic tab state for instant highlight animation ─────────────── */
   const [activeTab, setActiveTab] = React.useState(activeView);
@@ -274,7 +252,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 initial={shouldReduceMotion ? false : "enter"}
                 animate="center"
                 exit={shouldReduceMotion ? BACKDROP_OFF : "exit"}
-                variants={GREENHOUSE_PANEL_VARIANTS}
+                variants={PANEL_VARIANTS}
                 transition={shouldReduceMotion ? ZERO_TRANSITION : GREENHOUSE_PANEL_TRANSITION}
                 className="absolute inset-0 z-10 will-change-transform"
               >
@@ -293,7 +271,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 initial={shouldReduceMotion ? false : "enter"}
                 animate="center"
                 exit={shouldReduceMotion ? BACKDROP_OFF : "exit"}
-                variants={DASHBOARD_PANEL_VARIANTS}
+                variants={PANEL_VARIANTS}
                 transition={shouldReduceMotion ? ZERO_TRANSITION : GREENHOUSE_PANEL_TRANSITION}
                 className="absolute inset-0 z-10 will-change-transform"
                 style={CONTAINED}
@@ -309,7 +287,7 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                 initial={shouldReduceMotion ? false : "enter"}
                 animate="center"
                 exit={shouldReduceMotion ? { opacity: 0 } : "exit"}
-                variants={REPORTS_PANEL_VARIANTS}
+                variants={PANEL_VARIANTS}
                 transition={shouldReduceMotion ? { duration: 0 } : GREENHOUSE_PANEL_TRANSITION}
                 className="absolute inset-0 z-10 will-change-transform"
               >

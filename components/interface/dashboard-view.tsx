@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, memo, useCallback, useRef } from "react";
+import Image from "next/image";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
 import { useLiveParam } from "@/lib/use-live-param";
 import { useIsVisible } from "@/lib/use-is-visible";
@@ -188,41 +189,66 @@ function withAlpha(color: string, alpha: string) {
   return color.startsWith("#") && color.length === 7 ? `${color}${alpha}` : color;
 }
 
+const CREW_AVATAR_SRC = "/images/crew/noto-astronaut.svg";
+const CREW_AVATAR_MASK_SRC = "/images/crew/noto-astronaut-mask.svg";
+
 const CrewPortrait = memo(function CrewPortrait({ color }: { color: string }) {
-  const shellGlow = withAlpha(color, "44");
-  const shellSoft = withAlpha(color, "1F");
-  const hardwareColor = withAlpha(color, "CC");
+  const shellGlow = withAlpha(color, "28");
+  const helmetTint = `linear-gradient(180deg, ${withAlpha(color, "DC")} 0%, ${withAlpha(color, "8C")} 100%)`;
+  const highlightTint = `radial-gradient(circle at 50% 18%, ${withAlpha(color, "80")} 0%, transparent 62%)`;
+  const helmetClip = "inset(0 0 28% 0 round 1.35rem)";
 
   return (
     <div
       aria-hidden="true"
       className="relative size-16 shrink-0 overflow-hidden rounded-[1.35rem] border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_10px_24px_rgba(0,0,0,0.18)]"
       style={{
-        background: `radial-gradient(circle at 30% 20%, ${shellGlow} 0%, ${shellSoft} 28%, rgba(10,14,24,0.98) 72%)`,
-        color,
+        background: `radial-gradient(circle at 30% 18%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 24%, rgba(10,14,24,0.98) 74%), radial-gradient(circle at 50% 34%, ${shellGlow} 0%, transparent 54%)`,
       }}
     >
-      <div className="absolute inset-x-0 top-0 h-7 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),transparent)]" />
-      <svg viewBox="0 0 88 88" className="relative h-full w-full">
-        <path d="M20 74c4-9 12-15 24-15s20 6 24 15" fill="#DCE7F5" opacity="0.9" />
-        <path d="M26 74c3-8 10-13 18-13s15 5 18 13" fill="#9CA8B8" opacity="0.55" />
-        <circle cx="44" cy="37" r="25" fill="rgba(190,230,255,0.08)" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
-        <path d="M24 33c1-11 9-21 20-24 12-3 24 2 31 13 3 5 5 11 5 17" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
-        <path d="M21 46c0 18 10 30 23 30s23-12 23-30v-4c0-18-10-29-23-29S21 24 21 42z" fill="#E8BE97" />
-        <path d="M30 33c4-5 10-8 14-8 6 0 11 3 16 8-3-10-9-17-16-17-8 0-14 7-16 17Z" fill="#3B312D" opacity="0.82" />
-        <ellipse cx="36" cy="46" rx="2.2" ry="2.6" fill="#2A2320" />
-        <ellipse cx="52" cy="46" rx="2.2" ry="2.6" fill="#2A2320" />
-        <path d="M38 57c3.5 2.8 8.5 2.8 12 0" fill="none" stroke="#9A5F51" strokeWidth="2.3" strokeLinecap="round" />
-        <path d="M44 47v5" fill="none" stroke="#C88473" strokeWidth="1.8" strokeLinecap="round" />
-        <path d="M33 60c3 3 7 4.5 11 4.5S52 63 55 60" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
-        <path d="M15 72c2-7 8-12 15-12h28c7 0 13 5 15 12" fill="currentColor" opacity="0.26" />
-        <path d="M17 70c3-4 8-7 14-7" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" opacity="0.7" />
-        <path d="M57 63c6 0 11 3 14 7" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" opacity="0.7" />
-        <circle cx="23" cy="37" r="5" fill={hardwareColor} />
-        <circle cx="65" cy="37" r="5" fill={hardwareColor} />
-        <circle cx="23" cy="37" r="2.2" fill="#DDE7F0" />
-        <circle cx="65" cy="37" r="2.2" fill="#DDE7F0" />
-      </svg>
+      <Image
+        src={CREW_AVATAR_SRC}
+        alt=""
+        fill
+        sizes="64px"
+        draggable={false}
+        className="relative z-10 select-none object-contain p-[2px]"
+      />
+      <div
+        className="pointer-events-none absolute inset-0 z-20"
+        style={{
+          background: helmetTint,
+          mixBlendMode: "multiply",
+          opacity: 0.92,
+          clipPath: helmetClip,
+          WebkitMaskImage: `url(${CREW_AVATAR_MASK_SRC})`,
+          maskImage: `url(${CREW_AVATAR_MASK_SRC})`,
+          WebkitMaskPosition: "center",
+          maskPosition: "center",
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 z-30"
+        style={{
+          background: highlightTint,
+          mixBlendMode: "screen",
+          opacity: 0.44,
+          clipPath: helmetClip,
+          WebkitMaskImage: `url(${CREW_AVATAR_MASK_SRC})`,
+          maskImage: `url(${CREW_AVATAR_MASK_SRC})`,
+          WebkitMaskPosition: "center",
+          maskPosition: "center",
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+          filter: `drop-shadow(0 0 12px ${shellGlow})`,
+        }}
+      />
     </div>
   );
 });
