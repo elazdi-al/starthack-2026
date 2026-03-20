@@ -788,21 +788,6 @@ Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew requ
         : `⚠️ Safety threshold exceeded — survival plan enacted.`;
       arbiterReasoning = `Hard veto invoked (risk ${survivalRiskScore.toFixed(2)} > 0.85). Survival plan enacted without deliberation. ${survivalVetoReason}`;
 
-    } else if (survivalRiskScore < 0.5 && !isEmergencySev2) {
-      // ── FAST PATH: Agents agree, low risk — skip Arbiter entirely ───────
-      // When risk is below 0.5 and it's not an emergency, there's no conflict
-      // to resolve. Merge both proposals and proceed without a Sonnet call.
-      const mergedMap = new Map<string, z.infer<typeof ActionSchema>>();
-      for (const a of survivalActions) mergedMap.set(`${a.type}:${a.param ?? a.crop ?? 'tile'}`, a);
-      for (const a of arbWbActions) {
-        const key = `${a.type}:${a.param ?? a.crop ?? 'tile'}`;
-        if (!mergedMap.has(key)) mergedMap.set(key, a);
-      }
-      resolvedActions = [...mergedMap.values()];
-      conflictType = 'none';
-      winningAgent = 'both';
-      arbiterReasoning = `Low risk (${survivalRiskScore.toFixed(2)}) — agents agreed, arbiter skipped.`;
-
     } else {
       // ── Run simulations before calling Arbiter so it has the data ────────
       let simSurvivalResult: { p10YieldKg: number; p90YieldKg: number } | undefined;

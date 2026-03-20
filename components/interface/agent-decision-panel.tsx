@@ -9,6 +9,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useGreenhouseStore } from "@/lib/greenhouse-store";
 import type { AgentDecision, AgentAction } from "@/lib/greenhouse-store";
+import { useSettingsStore } from "@/lib/settings-store";
 import { triggerHaptic } from "@/lib/haptics";
 
 interface Props {
@@ -22,9 +23,11 @@ export function AgentDecisionPanel({ onClose }: Props) {
   const setAutonomousEnabled = useGreenhouseStore((s) => s.setAutonomousEnabled);
   const lastTickSimMinutes = useGreenhouseStore((s) => s.lastTickSimMinutes);
   const elapsedMinutes = useGreenhouseStore((s) => s.elapsedMinutes);
+  const agentTickMinutes = useSettingsStore((s) => s.agentTickMinutes);
+  const setAgentTickMinutes = useSettingsStore((s) => s.setAgentTickMinutes);
 
   const minutesSinceTick = Math.floor(elapsedMinutes - lastTickSimMinutes);
-  const nextTickIn = Math.max(0, 120 - minutesSinceTick);
+  const nextTickIn = Math.max(0, agentTickMinutes - minutesSinceTick);
 
   return (
     <div
@@ -107,6 +110,33 @@ export function AgentDecisionPanel({ onClose }: Props) {
           <span className="type-caption text-blue-500">running...</span>
         )}
       </div>
+
+      {/* Agent tick interval slider */}
+      {autonomousEnabled && (
+        <div
+          className="px-4 py-2 flex items-center gap-3 shrink-0"
+          style={{ borderBottom: "1px solid var(--dial-border)" }}
+        >
+          <span className="type-caption text-[var(--dial-text-tertiary)] whitespace-nowrap">Period</span>
+          <input
+            type="range"
+            min={30}
+            max={480}
+            step={30}
+            value={agentTickMinutes}
+            onChange={(e) => {
+              setAgentTickMinutes(Number(e.target.value));
+              triggerHaptic("soft");
+            }}
+            className="flex-1 h-1 accent-blue-500 cursor-pointer"
+          />
+          <span className="type-caption text-[var(--dial-text-secondary)] tabular-nums whitespace-nowrap w-10 text-right">
+            {agentTickMinutes >= 60
+              ? `${(agentTickMinutes / 60).toFixed(agentTickMinutes % 60 === 0 ? 0 : 1)}h`
+              : `${agentTickMinutes}m`}
+          </span>
+        </div>
+      )}
 
       <div className="overflow-y-auto flex flex-col">
         {decisions.length === 0 ? (

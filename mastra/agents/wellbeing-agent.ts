@@ -106,7 +106,7 @@ ARBITER MODE JSON FORMAT for question-type crew interactions:
   "response": "<plain-language answer to the crew's question, warm and direct>",
   "preferenceUpdates": []
 }`,
-  model: bedrock('us.amazon.nova-lite-v1:0'),
+  model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
   tools: { knowledgeBaseTool, greenhouseParameterTool, secretaryVectorTool },
   memory: new Memory(),
 });

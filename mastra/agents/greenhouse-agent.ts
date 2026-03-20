@@ -120,7 +120,7 @@ When responding:
 - Calculate required parameter values when suggesting adjustments
 - Consider seasonal solar flux when advising on lighting compensation
 - When diagnosing crop stress or unusual conditions, query the knowledge base first`,
-  model: bedrock('us.amazon.nova-lite-v1:0'),
+  model: bedrock('us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
   tools: { greenhouseParameterTool, knowledgeBaseTool },
   memory: new Memory(),
 });

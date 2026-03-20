@@ -11,6 +11,7 @@ interface PersistedSettings {
   tempUnit: TempUnit
   timeFormat: TimeFormat
   reducedAnimations: boolean
+  agentTickMinutes: number
 }
 
 function loadPersistedSettings(): PersistedSettings {
@@ -19,6 +20,7 @@ function loadPersistedSettings(): PersistedSettings {
     tempUnit: saved?.tempUnit ?? "celsius",
     timeFormat: saved?.timeFormat ?? "24h",
     reducedAnimations: saved?.reducedAnimations ?? false,
+    agentTickMinutes: saved?.agentTickMinutes ?? 120,
   }
 }
 
@@ -31,21 +33,24 @@ export interface SettingsState {
   tempUnit: TempUnit
   timeFormat: TimeFormat
   reducedAnimations: boolean
+  agentTickMinutes: number
 
   setThemePreference: (preference: ThemePreference) => void
   setTempUnit: (unit: TempUnit) => void
   setTimeFormat: (format: TimeFormat) => void
   setReducedAnimations: (enabled: boolean) => void
+  setAgentTickMinutes: (minutes: number) => void
   hydrateFromStorage: () => void
 }
 
-const saved: PersistedSettings = { tempUnit: "celsius", timeFormat: "24h", reducedAnimations: false }
+const saved: PersistedSettings = { tempUnit: "celsius", timeFormat: "24h", reducedAnimations: false, agentTickMinutes: 120 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   themePreference: "system" as ThemePreference,
   tempUnit: saved.tempUnit,
   timeFormat: saved.timeFormat,
   reducedAnimations: saved.reducedAnimations,
+  agentTickMinutes: saved.agentTickMinutes,
 
   setThemePreference: (themePreference) => {
     setThemePreference(themePreference)
@@ -54,15 +59,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setTempUnit: (tempUnit) => {
     set({ tempUnit })
-    persistSettings({ tempUnit, timeFormat: get().timeFormat, reducedAnimations: get().reducedAnimations })
+    const s = get(); persistSettings({ tempUnit, timeFormat: s.timeFormat, reducedAnimations: s.reducedAnimations, agentTickMinutes: s.agentTickMinutes })
   },
   setTimeFormat: (timeFormat) => {
     set({ timeFormat })
-    persistSettings({ tempUnit: get().tempUnit, timeFormat, reducedAnimations: get().reducedAnimations })
+    const s = get(); persistSettings({ tempUnit: s.tempUnit, timeFormat, reducedAnimations: s.reducedAnimations, agentTickMinutes: s.agentTickMinutes })
   },
   setReducedAnimations: (reducedAnimations) => {
     set({ reducedAnimations })
-    persistSettings({ tempUnit: get().tempUnit, timeFormat: get().timeFormat, reducedAnimations })
+    const s = get(); persistSettings({ tempUnit: s.tempUnit, timeFormat: s.timeFormat, reducedAnimations, agentTickMinutes: s.agentTickMinutes })
+  },
+  setAgentTickMinutes: (agentTickMinutes) => {
+    set({ agentTickMinutes })
+    const s = get(); persistSettings({ tempUnit: s.tempUnit, timeFormat: s.timeFormat, reducedAnimations: s.reducedAnimations, agentTickMinutes })
   },
 
   hydrateFromStorage: () => {
@@ -72,6 +81,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       tempUnit: loaded.tempUnit,
       timeFormat: loaded.timeFormat,
       reducedAnimations: loaded.reducedAnimations,
+      agentTickMinutes: loaded.agentTickMinutes,
     })
   },
 }))

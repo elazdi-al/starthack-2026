@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { saveJSON, loadJSON, STORAGE_KEYS } from "@/lib/persistence";
+import { useSettingsStore } from "@/lib/settings-store";
 import {
   createInitialEnvironment,
   createInitialGreenhouseState,
@@ -783,9 +784,10 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
 
     set(update as Partial<GreenhouseState>);
 
-    // Fire autonomous agent tick every 2 simulation hours (120 minutes)
+    // Fire autonomous agent tick at the configured interval (default 120 sim-minutes)
     const { lastTickSimMinutes, tickInFlight, autonomousEnabled } = get();
-    if (autonomousEnabled && !tickInFlight && nextMinutes - lastTickSimMinutes >= 120) {
+    const tickInterval = useSettingsStore.getState().agentTickMinutes;
+    if (autonomousEnabled && !tickInFlight && nextMinutes - lastTickSimMinutes >= tickInterval) {
       get().autonomousTick();
     }
   },
