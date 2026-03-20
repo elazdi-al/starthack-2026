@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "studio": "mastra dev --dir mastra"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.77",
