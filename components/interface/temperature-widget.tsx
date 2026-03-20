@@ -12,9 +12,9 @@ export function TemperatureWidget() {
   const isHydrated = useHydrated();
 
   return (
-    <div className="rounded-lg flex justify-center items-center h-10 px-3 gap-1.5 bg-neutral-900 text-white dark:bg-white/8 dark:text-white/90">
-      <ThermometerSimple size={16} weight="fill" />
-      <p className="text-base whitespace-nowrap leading-5 font-mono tabular-nums">
+    <div className="rounded-lg flex justify-center items-center h-10 px-3 gap-1.5 bg-neutral-900 dark:bg-white/8">
+      <ThermometerSimple size={16} weight="fill" className="text-[var(--dial-text-primary)]" />
+      <p className="type-ui text-[var(--dial-text-primary)] font-medium whitespace-nowrap">
         {isHydrated ? (
           <AnimatedParameterValue value={formatTemperature(temperature, tempUnit)} debounceMs={72} />
         ) : "--"}

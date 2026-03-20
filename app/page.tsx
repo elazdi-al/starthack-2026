@@ -8,7 +8,7 @@ import { CentralControlExample } from "@/components/examples/central-control-exa
 import { SnapshotSync } from "@/components/interface/snapshot-sync";
 import { GreenhouseGrid, MarsBackdrop } from "@/components/interface/greenhouse-grid";
 import { CentralControlPanel } from "@/components/interface/central-control-panel";
-import { useGreenhouseStore, type CropType } from "@/lib/greenhouse-store";
+import { useGreenhouseStore, type CropType, type SeasonName } from "@/lib/greenhouse-store";
 import { useSettingsStore } from "@/lib/settings-store";
 import { useChatStore } from "@/lib/chat-store";
 import { DialStore } from "@/components/ui/central-control";
@@ -107,6 +107,13 @@ const UI_SPRING_D = { duration: 0.36, delay: 0.16, ease: [0.22, 1, 0.36, 1] };
 const UI_SPRING_E = { duration: 0.36, delay: 0.12, ease: [0.22, 1, 0.36, 1] };
 
 const ZERO_TRANSITION = { duration: 0 };
+
+const SEASON_LABEL: Record<SeasonName, string> = {
+  northern_spring: "Northern Spring",
+  northern_summer: "Northern Summer",
+  northern_autumn: "Northern Autumn",
+  northern_winter: "Northern Winter",
+};
 const BACKDROP_ON     = { opacity: 1 };
 const BACKDROP_OFF    = { opacity: 0 };
 
@@ -295,9 +302,9 @@ export default function Home() {
                 transition={shouldReduceMotion ? ZERO_TRANSITION : UI_SPRING_A}
                 className="absolute left-6 top-6 flex items-center gap-2"
               >
-                <div className="rounded-lg flex items-center h-10 px-3 bg-neutral-900 text-white dark:bg-white/8 dark:text-white/90">
-                  <span className="text-[11px] font-medium font-mono whitespace-nowrap">
-                    {seasonName}
+                <div className="rounded-lg flex items-center h-10 px-3 bg-neutral-900 dark:bg-white/8">
+                  <span className="type-ui text-[var(--dial-text-primary)] font-medium whitespace-nowrap">
+                    {SEASON_LABEL[seasonName]}
                   </span>
                 </div>
                 <ClockWidget />

@@ -85,10 +85,10 @@ function EnvShell({
   return (
     <div
       title={label}
-      className="h-10 rounded-lg flex items-center gap-1.5 px-3 bg-neutral-900 text-white dark:bg-white/8 dark:text-white/90 whitespace-nowrap"
+      className="h-10 rounded-lg flex items-center gap-1.5 px-3 bg-neutral-900 dark:bg-white/8 whitespace-nowrap"
     >
-      <span className="text-white/40 dark:text-white/80">{icon}</span>
-      <span className="text-base font-mono tabular-nums leading-5">{value}</span>
+      <span className="text-[var(--dial-text-primary)]">{icon}</span>
+      <span className="type-ui text-[var(--dial-text-primary)] font-medium">{value}</span>
     </div>
   );
 }
