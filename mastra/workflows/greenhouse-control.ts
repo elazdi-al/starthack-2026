@@ -1,12 +1,11 @@
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { greenhouseAgent } from '../agents/greenhouse-agent';
 
 // ─── Schemas ────────────────────────────────────────────────────────────────────
 
-const SnapshotSchema = z.record(z.string(), z.unknown());
+export const SnapshotSchema = z.record(z.string(), z.unknown());
 
-const SituationReportSchema = z.object({
+export const SituationReportSchema = z.object({
   snapshot: z.record(z.string(), z.unknown()),
   flags: z.object({
     energyDeficit: z.boolean(),
@@ -26,18 +25,21 @@ const SituationReportSchema = z.object({
   urgencyLevel: z.enum(['low', 'medium', 'high', 'critical']),
 });
 
-const ActionSchema = z.object({
-  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'harvest-tile', 'plant-tile', 'clear-tile']),
+export const GreenhouseActionSchema = z.object({
+  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'harvest-tile', 'plant-tile', 'clear-tile', 'batch-tile']),
   param: z.string().optional(),
   value: z.number().optional(),
   crop: z.string().optional(),
   tileId: z.string().optional(),
+  harvests: z.array(z.string()).optional(),
+  plants: z.array(z.object({ tileId: z.string(), crop: z.string() })).optional(),
+  clears: z.array(z.string()).optional(),
 });
 
-const ReasonOutputSchema = z.object({
+export const ReasonOutputSchema = z.object({
   reasoning: z.string().describe('Concise explanation of the situation and why these actions were chosen'),
   summary: z.string().describe('One-sentence status summary for the operator chat feed'),
-  actions: z.array(ActionSchema).describe('List of parameter changes, harvests, and replants to apply'),
+  actions: z.array(GreenhouseActionSchema).describe('List of validated greenhouse, crop, harvest, replant, or batch-tile actions to apply'),
 });
 
 // ─── Steps ──────────────────────────────────────────────────────────────────────
@@ -192,7 +194,7 @@ Tile-level alerts:
 Full sensor snapshot (includes tileCrops for individual tile states and tileCounts for allocation summary):
 ${JSON.stringify(snapshot, null, 2)}
 
-Decide what actions to take this tick. You can use tile-level actions (plant-tile, harvest-tile, clear-tile) for granular control, or bulk actions (harvest, replant) for entire crop types. Return your reasoning, a one-sentence summary for the operator, and the list of actions to apply. Only include actions that are genuinely warranted by the current state. If nothing needs changing, return an empty actions array.`;
+Decide what actions to take this tick. For tile-level control, prefer a single or small number of batch-tile actions using harvests, plants, and clears arrays. Use bulk harvest/replant actions only when acting on all tiles of a crop type. Return your reasoning, a one-sentence summary for the operator, and the list of actions to apply. Only include actions that are genuinely warranted by the current state. If nothing needs changing, return an empty actions array.`;
 
     const result = await agent.generate([{ role: 'user', content: prompt }], {
       structuredOutput: { schema: ReasonOutputSchema },
@@ -230,6 +232,7 @@ const actStep = createStep({
       if (a.type === 'harvest-tile') return !!a.tileId;
       if (a.type === 'plant-tile') return !!a.tileId && !!a.crop;
       if (a.type === 'clear-tile') return !!a.tileId;
+      if (a.type === 'batch-tile') return !!(a.harvests?.length || a.plants?.length || a.clears?.length);
       return false;
     });
 

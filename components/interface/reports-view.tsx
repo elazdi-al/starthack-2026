@@ -104,9 +104,11 @@ export function ReportsView() {
   const [search, setSearch] = React.useState("");
   const [activeFilter, setActiveFilter] = React.useState<ReportType | "all">("all");
 
-  // Fetch on mount
+  // Fetch on mount + poll every 15s so new reports appear after agent ticks
   React.useEffect(() => {
     fetchReports();
+    const id = setInterval(fetchReports, 15_000);
+    return () => clearInterval(id);
   }, [fetchReports]);
 
   // Filter + search
@@ -141,15 +143,6 @@ export function ReportsView() {
         <div className="shrink-0 px-6 pt-20 pb-4 flex flex-col gap-4">
           {/* Title row */}
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--highlight-tabs-active)]/10">
-              <FileText size={18} weight="fill" className="text-[var(--highlight-tabs-active)]" />
-            </div>
-            <div>
-              <h1 className="type-title text-foreground">Mission Reports</h1>
-              <p className="type-caption text-[var(--dial-text-tertiary)]">
-                {reports.length} report{reports.length !== 1 ? "s" : ""} logged
-              </p>
-            </div>
           </div>
 
           {/* Search + filters */}
@@ -208,11 +201,20 @@ export function ReportsView() {
               <CircleNotch size={24} className="animate-spin text-[var(--dial-text-tertiary)]" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-2">
-              <FileText size={32} className="text-[var(--dial-text-tertiary)] opacity-40" />
-              <p className="type-label text-[var(--dial-text-tertiary)]">
-                {search ? "No reports match your search" : "No reports yet"}
-              </p>
+            <div className="flex flex-col items-center justify-center h-full gap-3 -mt-12">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--dial-surface)] border border-[var(--dial-border)]">
+                <FileText size={28} weight="duotone" className="text-[var(--dial-text-tertiary)] opacity-60" />
+              </div>
+              <div className="flex flex-col items-center gap-1 max-w-[260px]">
+                <p className="text-[15px] font-medium text-[var(--dial-text-secondary)]">
+                  {search ? "No matching reports" : "No reports yet"}
+                </p>
+                <p className="text-[13px] text-[var(--dial-text-tertiary)] text-center leading-relaxed">
+                  {search
+                    ? "Try adjusting your search or filters"
+                    : "Your first agent decision run will generate reports here"}
+                </p>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-6">

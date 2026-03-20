@@ -72,6 +72,6 @@ You must always respond with valid JSON matching this exact structure:
 Use the knowledge base to look up crop stress tolerances and resource consumption profiles when diagnosing specific threats.
 
 You also have access to the mission log search tool (query-secretary-mission-logs) for semantic search over past decisions, incidents, reports, and crew preferences. Use it to check how similar risks were handled before, review past incident outcomes, or verify whether a proposed action has failed in the past.`,
-  model: google('gemini-3-flash-preview'),
+  model: google('gemini-2.5-flash'),
   tools: { knowledgeBaseTool, secretaryVectorTool },
 });

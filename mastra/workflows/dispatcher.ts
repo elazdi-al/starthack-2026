@@ -24,7 +24,6 @@
 
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { runSimulation, runBaseline } from '../tools/simulation-engine';
 import {
   secretaryStore,
   type TriggerType,
@@ -146,7 +145,9 @@ interface CompactSnapshot {
   greenhouseControls: Record<string, unknown>;
   crops: Record<string, unknown>;
   resources: Record<string, unknown>;
-  /** Only tiles with health < 0.7, bolting, disease > 0.3, or freshly harvested. */
+  /** Per-crop-type tile allocation counts (total, planted, harvested). */
+  tileCounts: Record<string, unknown>;
+  /** Only tiles with health < 0.7, bolting, disease > 0.3, or harvest_ready. */
   flaggedTiles: Record<string, unknown>;
   tileSummary: string;
 }
@@ -159,18 +160,28 @@ function compactSnapshot(snapshot: Record<string, unknown>): CompactSnapshot {
   const snap = snapshot as Record<string, unknown>;
   const tileCrops = (snap.tileCrops ?? {}) as Record<string, Record<string, unknown>>;
 
-  // Extract flagged tiles only (health < 0.7, bolting, disease > 0.3, or harvested with recent yield)
+  // Extract flagged tiles only (health < 0.7, bolting, disease > 0.3, or harvest_ready)
   const flaggedTiles: Record<string, unknown> = {};
   let totalTiles = 0;
   let flaggedCount = 0;
+  let harvestReadyCount = 0;
+  let emptyCount = 0;
   for (const [tileId, tile] of Object.entries(tileCrops)) {
     totalTiles++;
     const health = (tile.healthScore as number) ?? 1;
     const bolting = (tile.isBolting as boolean) ?? false;
     const disease = (tile.diseaseRisk as number) ?? 0;
-    if (health < 0.7 || bolting || disease > 0.3) {
+    const stage = (tile.stage as string) ?? '';
+    const isHarvestReady = stage === 'harvest_ready';
+    const isEmpty = stage === 'harvested' || !stage;
+
+    if (isEmpty) {
+      emptyCount++;
+      // Don't include every empty tile — tileCounts covers allocation
+    } else if (health < 0.7 || bolting || disease > 0.3 || isHarvestReady) {
       flaggedTiles[tileId] = tile;
       flaggedCount++;
+      if (isHarvestReady) harvestReadyCount++;
     }
   }
 
@@ -203,8 +214,9 @@ function compactSnapshot(snapshot: Record<string, unknown>): CompactSnapshot {
     greenhouseControls: (snap.greenhouseControls as Record<string, unknown>) ?? {},
     crops: (snap.crops as Record<string, unknown>) ?? {},
     resources: (snap.resources as Record<string, unknown>) ?? {},
+    tileCounts: (snap.tileCounts as Record<string, unknown>) ?? {},
     flaggedTiles,
-    tileSummary: `${totalTiles} tiles total, ${flaggedCount} flagged (health<0.7 / bolting / disease>0.3)`,
+    tileSummary: `${totalTiles} tiles total: ${emptyCount} empty awaiting planting, ${harvestReadyCount} harvest-ready, ${flaggedCount - harvestReadyCount} with issues (health<0.7 / bolting / disease>0.3)`,
   };
 }
 
@@ -218,12 +230,15 @@ function envSummaryForArbiter(snapshot: Record<string, unknown>): string {
   const controls = (s.greenhouseControls ?? {}) as Record<string, number>;
   const resources = (s.resources ?? {}) as Record<string, number>;
   const crops = (s.crops ?? {}) as Record<string, Record<string, unknown>>;
+  const tileCounts = (s.tileCounts ?? {}) as Record<string, Record<string, number>>;
 
-  // Build one-line per crop: name, stage, health, yield
+  // Build one-line per crop: name, stage, health, yield, tile allocation
   const cropLines = Object.entries(crops).map(([name, c]) => {
     const health = ((c.healthScore as number) ?? 1).toFixed(2);
     const yieldKg = ((c.estimatedYieldKg as number) ?? 0).toFixed(1);
-    return `  ${name}: stage=${c.stage}, health=${health}, yield=${yieldKg}kg, bolting=${c.isBolting ?? false}`;
+    const tc = tileCounts[name];
+    const tileInfo = tc ? ` tiles=${tc.planted ?? 0}/${tc.total ?? 0} (${tc.harvested ?? 0} harvested)` : '';
+    return `  ${name}: stage=${c.stage}, health=${health}, yield=${yieldKg}kg, bolting=${c.isBolting ?? false}${tileInfo}`;
   }).join('\n');
 
   return `KEY METRICS:
@@ -289,6 +304,27 @@ const DispatcherOutputSchema = z.object({
   decisionId: z.string(),
 });
 
+// ─── Timeout helper ───────────────────────────────────────────────────────────
+
+const AGENT_TIMEOUT_MS = 45_000;
+
+function withTimeout<T>(promise: Promise<T>, ms = AGENT_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Agent timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
+// ─── Structured output schema for greenhouse agent ────────────────────────────
+
+const RoutineOutputSchema = z.object({
+  reasoning: z.string().describe('Brief explanation of the situation and why these actions were chosen'),
+  summary: z.string().describe('One-sentence status summary for the operator'),
+  actions: z.array(ActionSchema).describe('Actions to apply this tick — empty array if no changes needed'),
+});
+
 // ─── Step 1: Classify ─────────────────────────────────────────────────────────
 // Pure function — no LLM. Deterministic severity classification (spec §6.1).
 
@@ -300,9 +336,10 @@ const classifyStep = createStep({
     const { triggerType, snapshot, crewMessage, missionSol } = inputData;
     const snap = snapshot as Record<string, unknown>;
 
-    if (triggerType !== 'emergency') {
+    // Crew triggers skip emergency classification — always route to crew pipeline
+    if (triggerType === 'crew') {
       return {
-        triggerType: triggerType as 'routine' | 'emergency' | 'crew',
+        triggerType: 'crew' as const,
         snapshot,
         crewMessage,
         missionSol,
@@ -311,6 +348,8 @@ const classifyStep = createStep({
 
     // ── Emergency severity classification (spec §6.1) ──────────────────────
     // Classification is deterministic — no LLM inference at this stage.
+    // Runs for BOTH 'routine' and 'emergency' triggers so that routine ticks
+    // with emergency-level readings are correctly upgraded (single source of truth).
 
     const dustOpacity = (() => {
       const rawOpacity = snap.dustOpacity as number | undefined;
@@ -400,8 +439,7 @@ const classifyStep = createStep({
       };
     }
 
-    // Emergency trigger fired but conditions don't meet severity-1 or severity-2
-    // thresholds — downgrade to routine so agents handle it normally.
+    // No emergency conditions detected — proceed as routine.
     return {
       triggerType: 'routine' as const,
       snapshot,
@@ -411,7 +449,11 @@ const classifyStep = createStep({
 });
 
 // ─── Step 2: Dispatch ─────────────────────────────────────────────────────────
-// Calls the appropriate agent(s), applies Arbiter, returns resolved decision.
+// Routes to the right agent based on trigger type. Simple, linear flow:
+//   sev-1 → hardcoded playbook (instant, no LLM)
+//   crew question → wellbeing agent (conversational answer)
+//   crew override → survival safety check, then greenhouse agent
+//   everything else → greenhouse agent with structured output
 
 const dispatchStep = createStep({
   id: 'dispatch',
@@ -420,32 +462,21 @@ const dispatchStep = createStep({
   execute: async ({ inputData, mastra }) => {
     const { triggerType, emergencySeverity, snapshot, crewMessage, missionSol, playbookActions, playbookReason } = inputData;
 
-    const survivalAgent = mastra?.getAgent('survivalAgent');
-    const wellbeingAgent = mastra?.getAgent('wellbeingAgent');
-
-    // Shared context: inject secretary's decision log for continuity (spec §3.1 inputs)
-    const secretaryContext = secretaryStore.getAgentContext(5);
-    const crewProfile = secretaryStore.getCrewPreferenceProfile();
-
     const compactSnap = compactSnapshot(snapshot as Record<string, unknown>);
     const compactSnapJson = JSON.stringify(compactSnap, null, 2);
-    const crewStatusBlock = crewProfilesForAgent((Array.isArray(snapshot?.crew) ? snapshot.crew : INITIAL_CREW_PROFILES) as CrewmateProfile[]);
-    const contextBlock = `
-${crewStatusBlock}
+    const crewStatusBlock = crewProfilesForAgent(
+      (Array.isArray((snapshot as Record<string, unknown>)?.crew)
+        ? (snapshot as Record<string, unknown>).crew
+        : INITIAL_CREW_PROFILES) as CrewmateProfile[],
+    );
+    const secretaryContext = secretaryStore.getAgentContext(5);
 
-Secretary context (recent decisions and crew state):
-${secretaryContext || 'No prior decisions logged.'}
+    // ── SEV-1 EMERGENCY: Hardcoded playbook, no LLM ──────────────────────
 
-Crew preference profile: ${JSON.stringify(crewProfile.preferences)}
-Mission sol: ${missionSol}
-`.trim();
-
-    // ── SEVERITY-1 EMERGENCY: Hardcoded playbook, no LLM ──────────────────
     if (triggerType === 'emergency' && emergencySeverity === 1) {
       const actions = playbookActions ?? [];
       const reason = playbookReason ?? 'Severity-1 emergency: hardcoded playbook executed.';
 
-      // Log incident
       secretaryStore.addIncident({
         missionSol,
         emergencyType: reason.split(':')[0],
@@ -456,7 +487,7 @@ Mission sol: ${missionSol}
         resolved: false,
       });
 
-      const decisionEntry = secretaryStore.addDecision({
+      const entry = secretaryStore.addDecision({
         missionSol,
         triggerType: 'emergency_sev1',
         riskScore: 1.0,
@@ -481,521 +512,224 @@ Mission sol: ${missionSol}
         wellbeingJustification: 'Not consulted — severity-1 emergency',
         reasoning: reason,
         summary: `Emergency — ${reason}`,
-        decisionId: decisionEntry.id,
+        decisionId: entry.id,
       };
     }
 
-    // ── CREW TRIGGER: Classify intent, then route ─────────────────────────
-    // Wellbeing state is hoisted so crew-request results can be carried
-    // forward into the Both + Arbiter pipeline without a redundant LLM call.
-    let crewIntent = 'question';
-    let wbScore = 0.7;
-    let wbActions: z.infer<typeof ActionSchema>[] = [];
-    let wbJustification = '';
-    let wbCrewResponse = '';
+    // ── CREW TRIGGER: Wellbeing classifies intent, then route ─────────────
+
+    let crewIntent: string | undefined;
+    let crewResponse: string | undefined;
 
     if (triggerType === 'crew' && crewMessage) {
-      // Classify intent using wellbeing agent
-      const intentClassificationPrompt = `[ARBITER_MODE]
-${contextBlock}
-
-Current greenhouse sensor readings:
-${compactSnapJson}
-
-Crew message: "${crewMessage}"
-
-Classify this message as "question", "request", or "override" and respond accordingly.
-For questions: answer directly from the sensor data.
-For requests or overrides: classify intent and provide your proposal.`;
-
-      if (wellbeingAgent) {
+      const wb = mastra?.getAgent('wellbeingAgent');
+      if (wb) {
         try {
-          const wResult = await wellbeingAgent.generate(
-            [{ role: 'user', content: intentClassificationPrompt }],
+          const wResult = await withTimeout(wb.generate(
+            [{ role: 'user', content: `[ARBITER_MODE]\nMission sol: ${missionSol}\n\nCurrent greenhouse sensor readings:\n${compactSnapJson}\n\nCrew message: "${crewMessage}"\n\nClassify this message as "question", "request", or "override" and respond accordingly.` }],
             { maxSteps: 1 },
-          );
+          ));
           const wText = wResult.text ?? '';
-
-          // Parse JSON response
           const jsonMatch = wText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
-            try {
-              const parsed = JSON.parse(jsonMatch[0]);
-              crewIntent = parsed.intent ?? 'question';
-              wbScore = parsed.wellbeingScore ?? 0.7;
+            const parsed = JSON.parse(jsonMatch[0]);
+            crewIntent = parsed.intent ?? 'question';
+            applyPreferenceUpdates(parsed.preferenceUpdates, missionSol);
+            secretaryStore.addCrewRequest(crewMessage, missionSol);
 
-              // Apply preference updates from any crew interaction
-              applyPreferenceUpdates(parsed.preferenceUpdates, missionSol);
-              secretaryStore.addCrewRequest(crewMessage, missionSol);
-
-              if (crewIntent === 'question') {
-                wbCrewResponse = parsed.response ?? wText;
-                const decisionEntry = secretaryStore.addDecision({
-                  missionSol,
-                  triggerType: 'crew_question',
-                  riskScore: 0,
-                  wellbeingScore: wbScore,
-                  conflictType: 'none',
-                  winningAgent: 'wellbeing',
-                  survivalProposalSummary: 'Not consulted (question)',
-                  wellbeingProposalSummary: wbCrewResponse.slice(0, 100),
-                  actionsEnacted: [],
-                  reasoning: wbCrewResponse,
-                });
-
-                return {
-                  triggerType: 'crew_question',
-                  crewIntent: 'question',
-                  resolvedActions: [],
-                  conflictType: 'none',
-                  winningAgent: 'wellbeing',
-                  riskScore: 0,
-                  wellbeingScore: wbScore,
-                  survivalJustification: '',
-                  wellbeingJustification: 'Direct question answered from snapshot',
-                  crewResponse: wbCrewResponse,
-                  reasoning: wbCrewResponse,
-                  summary: `Crew question answered`,
-                  decisionId: decisionEntry.id,
-                };
-              }
-
-              // For request or override
-              wbActions = parsed.proposal?.actions ?? [];
-              wbJustification = parsed.proposal?.justification ?? '';
-              wbCrewResponse = parsed.crewResponse ?? '';
-              // preferenceUpdates already applied above
-            } catch { /* continue with empty proposal */ }
-          }
-        } catch (err) {
-          console.error('[dispatcher] wellbeing agent error:', err);
-        }
-      }
-
-      // For crew overrides: Survival veto check only
-      if (crewIntent === 'override') {
-        secretaryStore.logOverrideAttempt(crewMessage, false, missionSol); // optimistic false, update below
-
-        if (survivalAgent) {
-          const vetoPrompt = `${digestPreamble('survival')}
-${contextBlock}
-
-Current greenhouse sensor readings:
-${compactSnapJson}
-
-The crew is attempting an OVERRIDE: "${crewMessage}"
-Proposed override actions: ${JSON.stringify(wbActions)}
-
-Evaluate this override. If risk score > 0.85, issue a hard veto with explanation.
-Otherwise, permit the override and log it.`;
-
-          try {
-            const sResult = await survivalAgent.generate(
-              [{ role: 'user', content: vetoPrompt }],
-              { maxSteps: 1 },
-            );
-            const sText = sResult.text ?? '';
-            const jsonMatch = sText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              const parsed = JSON.parse(jsonMatch[0]);
-              const riskScore = parsed.riskScore ?? 0.5;
-              const veto = parsed.veto ?? (riskScore > 0.85);
-
-              if (veto) {
-                secretaryStore.logOverrideAttempt(crewMessage, false, missionSol);
-                const decisionEntry = secretaryStore.addDecision({
-                  missionSol,
-                  triggerType: 'crew_override',
-                  riskScore,
-                  wellbeingScore: wbScore,
-                  conflictType: 'hard_veto',
-                  winningAgent: 'survival',
-                  survivalProposalSummary: parsed.vetoReason ?? 'Veto issued',
-                  wellbeingProposalSummary: wbJustification,
-                  actionsEnacted: [],
-                  reasoning: parsed.vetoReason ?? 'Override vetoed for safety',
-                });
-
-                return {
-                  triggerType: 'crew_override',
-                  crewIntent: 'override',
-                  resolvedActions: [],
-                  conflictType: 'hard_veto',
-                  winningAgent: 'survival',
-                  riskScore,
-                  wellbeingScore: wbScore,
-                  survivalJustification: parsed.vetoReason ?? 'Override vetoed',
-                  wellbeingJustification: wbJustification,
-                  crewResponse: `Override denied: ${parsed.vetoReason ?? 'Safety threshold exceeded.'}`,
-                  reasoning: parsed.vetoReason ?? 'Override vetoed for safety',
-                  summary: `Override vetoed — risk ${riskScore.toFixed(2)}`,
-                  decisionId: decisionEntry.id,
-                };
-              }
-
-              // Override permitted
-              secretaryStore.logOverrideAttempt(crewMessage, true, missionSol);
-              const decisionEntry = secretaryStore.addDecision({
+            // QUESTION → Return answer directly, no greenhouse agent needed
+            if (crewIntent === 'question') {
+              const answer = parsed.response ?? wText;
+              crewResponse = answer;
+              const entry = secretaryStore.addDecision({
                 missionSol,
-                triggerType: 'crew_override',
-                riskScore,
-                wellbeingScore: wbScore,
+                triggerType: 'crew_question',
+                riskScore: 0,
+                wellbeingScore: parsed.wellbeingScore ?? 0.7,
                 conflictType: 'none',
                 winningAgent: 'wellbeing',
-                survivalProposalSummary: `Risk score ${riskScore.toFixed(2)} — permitted`,
-                wellbeingProposalSummary: wbJustification,
-                actionsEnacted: wbActions,
-                reasoning: `Crew override permitted — risk score ${riskScore.toFixed(2)} < 0.85`,
+                survivalProposalSummary: 'Not consulted (question)',
+                wellbeingProposalSummary: answer.slice(0, 100),
+                actionsEnacted: [],
+                reasoning: answer,
               });
-
               return {
-                triggerType: 'crew_override',
-                crewIntent: 'override',
-                resolvedActions: wbActions,
+                triggerType: 'crew_question',
+                crewIntent: 'question',
+                resolvedActions: [],
                 conflictType: 'none',
                 winningAgent: 'wellbeing',
-                riskScore,
-                wellbeingScore: wbScore,
-                survivalJustification: `Permitted — risk ${riskScore.toFixed(2)}`,
-                wellbeingJustification: wbJustification,
-                crewResponse: wbCrewResponse || 'Override approved.',
-                reasoning: `Crew override permitted`,
-                summary: `Override approved — crew request enacted`,
-                decisionId: decisionEntry.id,
+                riskScore: 0,
+                wellbeingScore: parsed.wellbeingScore ?? 0.7,
+                survivalJustification: '',
+                wellbeingJustification: 'Direct question answered',
+                crewResponse: answer,
+                reasoning: answer,
+                summary: 'Crew question answered',
+                decisionId: entry.id,
               };
             }
-          } catch (err) {
-            console.error('[dispatcher] survival veto check error:', err);
-          }
-        }
 
-        // Fallback: permit without survival check
-        const decisionEntry = secretaryStore.addDecision({
-          missionSol,
-          triggerType: 'crew_override',
-          riskScore: 0.3,
-          wellbeingScore: wbScore,
-          conflictType: 'none',
-          winningAgent: 'wellbeing',
-          survivalProposalSummary: 'No survival check (agent unavailable)',
-          wellbeingProposalSummary: wbJustification,
-          actionsEnacted: wbActions,
-          reasoning: 'Override permitted — survival check unavailable',
-        });
-
-        return {
-          triggerType: 'crew_override',
-          crewIntent: 'override',
-          resolvedActions: wbActions,
-          conflictType: 'none',
-          winningAgent: 'wellbeing',
-          riskScore: 0.3,
-          wellbeingScore: wbScore,
-          survivalJustification: '',
-          wellbeingJustification: wbJustification,
-          crewResponse: wbCrewResponse || 'Override accepted.',
-          reasoning: 'Override permitted',
-          summary: `Override accepted — crew request enacted`,
-          decisionId: decisionEntry.id,
-        };
-      }
-
-      // Crew request → fall through to full Both + Arbiter pipeline below.
-      // Carry forward the wellbeing result from intent classification to avoid
-      // a redundant second wellbeing LLM call (saves 3-8s on the critical path).
-    }
-
-    // ── BOTH AGENTS + ARBITER (Routine, Crew Request, Severity-2 Emergency) ──
-
-    // Determine simulation parameters based on trigger type
-    const isEmergencySev2 = triggerType === 'emergency' && emergencySeverity === 2;
-    const isCrewRequest = triggerType === 'crew';
-    const horizonSols = isEmergencySev2 ? 3 : 7;
-    const scenarioCount = isEmergencySev2 ? 10 : 100;
-
-    const basePrompt = `
-${contextBlock}
-
-Current greenhouse sensor readings:
-${compactSnapJson}
-
-${crewMessage ? `Crew message (context for this decision): "${crewMessage}"` : ''}
-Mission sol: ${missionSol}
-Trigger: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew request' : 'routine'}`;
-
-    // Run both agents in parallel
-    let survivalRiskScore = 0.3;
-    let survivalActions: z.infer<typeof ActionSchema>[] = [];
-    let survivalJustification = 'No proposal';
-    let survivalVeto = false;
-    let survivalVetoReason = '';
-
-    // For crew requests, reuse the wellbeing result from intent classification above
-    // instead of calling the wellbeing agent a second time.
-    let arbWbScore = isCrewRequest ? wbScore : 0.7;
-    let arbWbActions: z.infer<typeof ActionSchema>[] = isCrewRequest ? wbActions : [];
-    let arbWbJustification = isCrewRequest ? wbJustification : 'No proposal';
-    let arbWbCrewResponse = isCrewRequest ? wbCrewResponse : '';
-
-    // For crew requests, only run survival (wellbeing already done).
-    // For routine/sev-2, run both in parallel.
-    // Use maxSteps: 1 — agents get full context in the prompt and don't need
-    // tool calls in dispatcher mode. This eliminates the KB round-trip (~2-4s).
-    const agentCalls: Promise<unknown>[] = [
-      survivalAgent?.generate(
-        [{ role: 'user', content: `${digestPreamble('survival')}${basePrompt}\n\nProvide your risk assessment and conservative action proposal.` }],
-        { maxSteps: 1 },
-      ) ?? Promise.resolve(null),
-    ];
-    if (!isCrewRequest) {
-      agentCalls.push(
-        wellbeingAgent?.generate(
-          [{ role: 'user', content: `[ARBITER_MODE]\n${digestPreamble('wellbeing')}${basePrompt}\n\nProvide your wellbeing assessment and crew-centred action proposal.` }],
-          { maxSteps: 1 },
-        ) ?? Promise.resolve(null),
-      );
-    }
-
-    const agentResults = await Promise.allSettled(agentCalls);
-    const survivalResult = agentResults[0];
-    const wellbeingResult = agentResults[1]; // undefined for crew requests
-
-    // Parse survival agent output
-    if (survivalResult.status === 'fulfilled' && survivalResult.value) {
-      const sText = (survivalResult.value as { text?: string }).text ?? '';
-      const jsonMatch = sText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          survivalRiskScore = parsed.riskScore ?? 0.3;
-          survivalActions = parsed.proposal?.actions ?? [];
-          survivalJustification = parsed.proposal?.justification ?? sText.slice(0, 200);
-          survivalVeto = parsed.veto ?? (survivalRiskScore > 0.85);
-          survivalVetoReason = parsed.vetoReason ?? '';
-        } catch { survivalJustification = sText.slice(0, 200); }
-      } else {
-        survivalJustification = (survivalResult.value as { text?: string }).text?.slice(0, 200) ?? 'No proposal';
-      }
-    }
-
-    // Parse wellbeing agent output (only for non-crew-request paths)
-    if (!isCrewRequest && wellbeingResult?.status === 'fulfilled' && wellbeingResult.value) {
-      const wText = (wellbeingResult.value as { text?: string }).text ?? '';
-      const jsonMatch = wText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          arbWbScore = parsed.wellbeingScore ?? 0.7;
-          arbWbActions = parsed.proposal?.actions ?? [];
-          arbWbJustification = parsed.proposal?.justification ?? wText.slice(0, 200);
-          arbWbCrewResponse = parsed.crewResponse ?? '';
-          applyPreferenceUpdates(parsed.preferenceUpdates, missionSol);
-        } catch { arbWbJustification = wText.slice(0, 200); }
-      } else {
-        arbWbJustification = wText.slice(0, 200);
-      }
-    }
-
-    // ── SAFETY NET: Hard veto bypasses Arbiter entirely ──────────────────
-    // Risk > 0.85 is unconditional — no deliberation, no hybrid possible.
-
-    let conflictType: ConflictType = 'none';
-    let winningAgent: WinningAgent = 'both';
-    let resolvedActions: z.infer<typeof ActionSchema>[] = [];
-    let simulationP10: number | undefined;
-    let simulationP90: number | undefined;
-    let arbiterReasoning = '';
-    let arbiterSummary = '';
-
-    if (survivalVeto || survivalRiskScore > 0.85) {
-      conflictType = 'hard_veto';
-      winningAgent = 'survival';
-      resolvedActions = survivalActions;
-      arbWbCrewResponse = survivalVetoReason
-        ? `⚠️ Mission commander veto: ${survivalVetoReason}`
-        : `⚠️ Safety threshold exceeded — survival plan enacted.`;
-      arbiterReasoning = `Hard veto invoked (risk ${survivalRiskScore.toFixed(2)} > 0.85). Survival plan enacted without deliberation. ${survivalVetoReason}`;
-
-    } else {
-      // ── Run simulations before calling Arbiter so it has the data ────────
-      let simSurvivalResult: { p10YieldKg: number; p90YieldKg: number } | undefined;
-      let simWellbeingResult: { p10YieldKg: number; p90YieldKg: number } | undefined;
-
-      // Always run sim for sev-2 emergency; run for both proposals when risk is elevated
-      const shouldSim = isEmergencySev2 || survivalRiskScore >= 0.5;
-      if (shouldSim) {
-        const [ss, sw] = await Promise.all([
-          Promise.resolve(runSimulation({ snapshot, proposedActions: survivalActions, horizonSols, scenarioCount })),
-          isEmergencySev2
-            ? Promise.resolve(null) // sev-2: only sim survival plan
-            : Promise.resolve(runSimulation({ snapshot, proposedActions: arbWbActions, horizonSols, scenarioCount })),
-        ]);
-        simSurvivalResult = ss;
-        simWellbeingResult = sw ?? undefined;
-        simulationP10 = ss.p10YieldKg;
-        simulationP90 = ss.p90YieldKg;
-      }
-
-      // ── Call Arbiter agent ─────────────────────────────────────────────
-      const arbiterAgent = mastra?.getAgent('arbiterAgent');
-      const missionPhase =
-        missionSol > 350 ? 'late (sols 350+) — crew morale weight increases to 50/50' :
-        missionSol > 100 ? `mid (sol ${missionSol}) — 60/40 survival/wellbeing balance` :
-        `early (sol ${missionSol}) — 70/30 bias toward survivability`;
-
-      const arbiterPrompt = `${digestPreamble('arbiter')}
-MISSION PHASE: ${missionPhase}
-TRIGGER: ${isEmergencySev2 ? 'EMERGENCY severity-2' : isCrewRequest ? 'crew request' : 'routine'}
-
-SECRETARY CONTEXT (recent mission history):
-${secretaryContext || 'No prior decisions.'}
-
-CURRENT GREENHOUSE STATE:
-${envSummaryForArbiter(snapshot as Record<string, unknown>)}
-${crewMessage ? `\nCREW MESSAGE: "${crewMessage}"` : ''}
-
-SURVIVAL AGENT BRIEF:
-Risk score: ${survivalRiskScore.toFixed(3)}
-Justification: ${survivalJustification}
-Proposed actions: ${JSON.stringify(survivalActions, null, 2)}
-
-WELLBEING AGENT BRIEF:
-Wellbeing score: ${arbWbScore.toFixed(3)}
-Justification: ${arbWbJustification}
-Proposed actions: ${JSON.stringify(arbWbActions, null, 2)}
-${arbWbCrewResponse ? `Crew-facing message from Wellbeing: "${arbWbCrewResponse}"` : ''}
-
-SIMULATION RESULTS (P10 = worst-case 10th percentile):
-${simSurvivalResult ? `Survival plan — P10: ${simSurvivalResult.p10YieldKg.toFixed(2)} kg, P90: ${simSurvivalResult.p90YieldKg.toFixed(2)} kg` : 'Survival plan: not simulated'}
-${simWellbeingResult ? `Wellbeing plan — P10: ${simWellbeingResult.p10YieldKg.toFixed(2)} kg, P90: ${simWellbeingResult.p90YieldKg.toFixed(2)} kg` : isEmergencySev2 ? 'Wellbeing plan: not consulted (emergency)' : 'Wellbeing plan: not simulated (low risk)'}
-
-Make your decision. You may propose a hybrid. Remember: risk > 0.85 = unconditional survival veto (already checked — not applicable here).`.trim();
-
-      if (arbiterAgent) {
-        try {
-          const arbiterResult = await arbiterAgent.generate(
-            [{ role: 'user', content: arbiterPrompt }],
-            { maxSteps: 1 },
-          );
-          const aText = arbiterResult.text ?? '';
-          const jsonMatch = aText.match(/\{[\s\S]*\}/);
-
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            conflictType = (parsed.conflictType as ConflictType) ?? 'none';
-            arbiterReasoning = parsed.reasoning ?? aText.slice(0, 400);
-            arbiterSummary = parsed.summary ?? '';
-            if (parsed.crewMessage) arbWbCrewResponse = parsed.crewMessage;
-
-            // Resolve actions based on Arbiter decision
-            const rawActions: z.infer<typeof ActionSchema>[] = parsed.actions ?? [];
-            winningAgent =
-              parsed.decision === 'hybrid' ? 'arbiter' :
-              parsed.decision === 'survival' ? 'survival' :
-              parsed.decision === 'wellbeing' ? 'wellbeing' : 'both';
-
-            // Use Arbiter's actions if provided and non-empty, else fall back to chosen agent
-            if (rawActions.length > 0) {
-              resolvedActions = rawActions;
-            } else if (winningAgent === 'survival') {
-              resolvedActions = survivalActions;
-            } else if (winningAgent === 'wellbeing') {
-              resolvedActions = arbWbActions;
-            } else {
-              // Fallback merge for agreement
-              const mergedMap = new Map<string, z.infer<typeof ActionSchema>>();
-              for (const a of survivalActions) mergedMap.set(`${a.type}:${a.param ?? a.crop}`, a);
-              for (const a of arbWbActions) {
-                const key = `${a.type}:${a.param ?? a.crop}`;
-                if (!mergedMap.has(key)) mergedMap.set(key, a);
+            // OVERRIDE → Quick survival safety check
+            if (crewIntent === 'override') {
+              const survival = mastra?.getAgent('survivalAgent');
+              if (survival) {
+                try {
+                  const sResult = await withTimeout(survival.generate(
+                    [{ role: 'user', content: `Mission sol: ${missionSol}\n\nGreenhouse:\n${compactSnapJson}\n\nCrew override: "${crewMessage}"\n\nOutput JSON: { "riskScore": number, "veto": boolean, "vetoReason": string }` }],
+                    { maxSteps: 1 },
+                  ), 30_000);
+                  const sText = sResult.text ?? '';
+                  const sJson = sText.match(/\{[\s\S]*\}/);
+                  if (sJson) {
+                    const sp = JSON.parse(sJson[0]);
+                    if (sp.veto || (sp.riskScore ?? 0) > 0.85) {
+                      secretaryStore.logOverrideAttempt(crewMessage, false, missionSol);
+                      const entry = secretaryStore.addDecision({
+                        missionSol, triggerType: 'crew_override', riskScore: sp.riskScore ?? 0.9,
+                        wellbeingScore: 0.5, conflictType: 'hard_veto', winningAgent: 'survival',
+                        survivalProposalSummary: sp.vetoReason ?? 'Veto issued',
+                        wellbeingProposalSummary: '', actionsEnacted: [],
+                        reasoning: sp.vetoReason ?? 'Override vetoed for safety',
+                      });
+                      return {
+                        triggerType: 'crew_override', crewIntent: 'override',
+                        resolvedActions: [], conflictType: 'hard_veto', winningAgent: 'survival',
+                        riskScore: sp.riskScore ?? 0.9, wellbeingScore: 0.5,
+                        survivalJustification: sp.vetoReason ?? 'Override vetoed',
+                        wellbeingJustification: '',
+                        crewResponse: `Override denied: ${sp.vetoReason ?? 'Safety concern'}`,
+                        reasoning: sp.vetoReason ?? 'Override vetoed',
+                        summary: 'Override vetoed', decisionId: entry.id,
+                      };
+                    }
+                    secretaryStore.logOverrideAttempt(crewMessage, true, missionSol);
+                  }
+                } catch {
+                  // Safety check failed/timed out → permit the override, let greenhouse agent handle it
+                  secretaryStore.logOverrideAttempt(crewMessage, true, missionSol);
+                }
               }
-              resolvedActions = [...mergedMap.values()];
             }
 
-            if (simSurvivalResult) simulationP10 = simSurvivalResult.p10YieldKg;
-            if (simSurvivalResult) simulationP90 = simSurvivalResult.p90YieldKg;
-          } else {
-            // Arbiter returned plain text — use it as reasoning, fall back to survival plan
-            arbiterReasoning = aText.slice(0, 400);
-            winningAgent = 'survival';
-            resolvedActions = survivalActions;
-            conflictType = 'none';
+            // REQUEST or permitted OVERRIDE → carry crew context to greenhouse agent below
+            crewResponse = parsed.crewResponse;
           }
         } catch (err) {
-          console.error('[dispatcher] arbiter agent error:', err);
-          // Fallback: survival plan on error
-          winningAgent = 'survival';
-          resolvedActions = survivalActions;
-          arbiterReasoning = `Arbiter error — defaulting to survival plan. ${err instanceof Error ? err.message : ''}`;
+          console.error('[dispatcher] crew intent classification failed:', err);
+          // Fall through to greenhouse agent — treat as routine with crew context
         }
-      } else {
-        // No arbiter available — deterministic fallback
-        winningAgent = survivalRiskScore >= 0.5 ? 'survival' : 'both';
-        resolvedActions = survivalRiskScore >= 0.5 ? survivalActions : [...survivalActions, ...arbWbActions];
-        arbiterReasoning = 'Arbiter unavailable — deterministic fallback applied.';
       }
     }
 
-    // Filter to valid actions only
-    resolvedActions = resolvedActions.filter(a => {
-      if (a.type === 'harvest' || a.type === 'replant') return !!a.crop;
-      if (a.type === 'greenhouse') return !!a.param && a.value !== undefined;
-      if (a.type === 'crop') return !!a.crop && !!a.param && a.value !== undefined;
-      if (a.type === 'batch-tile') return !!(a.harvests?.length || a.plants?.length || a.clears?.length);
-      return false;
-    });
+    // ── MAIN PATH: Greenhouse agent with structured output ────────────────
+    // Handles: routine ticks, sev-2 emergencies, crew requests, permitted overrides.
+    // One agent call, structured output, timeout. No regex JSON parsing.
 
-    // ── SECRETARY LOGGING ──────────────────────────────────────────────────
+    const agent = mastra?.getAgent('greenhouseAgent');
+    if (!agent) {
+      const entry = secretaryStore.addDecision({
+        missionSol, triggerType: 'routine', riskScore: 0, wellbeingScore: 0,
+        conflictType: 'none', winningAgent: 'none',
+        survivalProposalSummary: '', wellbeingProposalSummary: '',
+        actionsEnacted: [], reasoning: 'Greenhouse agent unavailable',
+      });
+      return {
+        triggerType: 'routine', resolvedActions: [], conflictType: 'none',
+        winningAgent: 'none', riskScore: 0, wellbeingScore: 0,
+        survivalJustification: '', wellbeingJustification: '',
+        reasoning: 'Greenhouse agent unavailable', summary: 'No agent available',
+        decisionId: entry.id,
+      };
+    }
 
-    const logTriggerType: TriggerType = isEmergencySev2 ? 'emergency_sev2'
-      : isCrewRequest ? 'crew_request'
-      : 'routine';
+    const isEmergency = triggerType === 'emergency' && emergencySeverity === 2;
+    const triggerLabel = isEmergency
+      ? 'EMERGENCY severity-2 — prioritise crew safety, act conservatively'
+      : crewMessage ? `Crew ${crewIntent ?? 'request'}: "${crewMessage}"` : 'routine';
 
-    const decisionEntry = secretaryStore.addDecision({
-      missionSol,
-      triggerType: logTriggerType,
-      riskScore: survivalRiskScore,
-      wellbeingScore: arbWbScore,
-      conflictType,
-      winningAgent,
-      survivalProposalSummary: survivalJustification.slice(0, 150),
-      wellbeingProposalSummary: arbWbJustification.slice(0, 150),
-      actionsEnacted: resolvedActions,
-      simulationP10,
-      simulationP90,
-      reasoning: arbiterReasoning,
-    });
+    const prompt = `AUTONOMOUS CONTROL TICK — Sol ${missionSol}
+Trigger: ${triggerLabel}
 
-    // Fire-and-forget: ingest latest decision into vector store for RAG
-    ingestSecretaryReports(Date.now() - 5000).catch(err =>
-      console.warn('[dispatcher] vector ingestion failed (non-blocking):', err),
-    );
+${crewStatusBlock}
 
-    return {
-      triggerType: logTriggerType,
-      emergencySeverity,
-      crewIntent: isCrewRequest ? 'request' : undefined,
-      resolvedActions,
-      conflictType,
-      winningAgent,
-      riskScore: survivalRiskScore,
-      wellbeingScore: arbWbScore,
-      survivalJustification,
-      wellbeingJustification: arbWbJustification,
-      crewResponse: arbWbCrewResponse || undefined,
-      simulationP10,
-      simulationP90,
-      reasoning: arbiterReasoning,
-      summary: arbiterSummary
-        || (conflictType === 'hard_veto'
-          ? `Safety veto — risk ${survivalRiskScore.toFixed(2)}`
-          : conflictType === 'soft_conflict'
-          ? `Conflict resolved — ${winningAgent} plan enacted`
-          : isEmergencySev2
-          ? `Severity-2 emergency response`
-          : summarizeActions(resolvedActions)),
-      decisionId: decisionEntry.id,
-    };
+Recent decisions: ${secretaryContext || 'None yet.'}
+
+Current greenhouse state:
+${compactSnapJson}
+
+Decide what actions to take this tick. Use batch-tile for tile operations. If nothing needs changing, return an empty actions array.`;
+
+    try {
+      const result = await withTimeout(agent.generate(
+        [{ role: 'user', content: prompt }],
+        { structuredOutput: { schema: RoutineOutputSchema }, maxSteps: 3 },
+      ));
+
+      const output = result.object;
+      let actions: z.infer<typeof ActionSchema>[] = [];
+      let reasoning = 'Autonomous tick completed';
+      let summary = 'Autonomous tick completed';
+
+      if (output && typeof output === 'object' && 'actions' in output) {
+        actions = (output.actions ?? []).filter(a => {
+          if (a.type === 'harvest' || a.type === 'replant') return !!a.crop;
+          if (a.type === 'greenhouse') return !!a.param && a.value !== undefined;
+          if (a.type === 'crop') return !!a.crop && !!a.param && a.value !== undefined;
+          if (a.type === 'batch-tile') return !!(a.harvests?.length || a.plants?.length || a.clears?.length);
+          return false;
+        });
+        reasoning = output.reasoning ?? reasoning;
+        summary = output.summary ?? summary;
+      }
+
+      const logType: TriggerType = isEmergency ? 'emergency_sev2'
+        : crewIntent ? 'crew_request' : 'routine';
+
+      const entry = secretaryStore.addDecision({
+        missionSol, triggerType: logType, riskScore: 0, wellbeingScore: 0,
+        conflictType: 'none', winningAgent: 'greenhouse',
+        survivalProposalSummary: isEmergency ? 'Handled by greenhouse agent' : '',
+        wellbeingProposalSummary: crewIntent ? 'Handled by greenhouse agent' : '',
+        actionsEnacted: actions, reasoning,
+      });
+
+      // Fire-and-forget: ingest decision into vector store for RAG
+      ingestSecretaryReports(Date.now() - 5000).catch(() => {});
+
+      return {
+        triggerType: logType,
+        emergencySeverity: isEmergency ? 2 : undefined,
+        crewIntent,
+        resolvedActions: actions,
+        conflictType: 'none',
+        winningAgent: 'greenhouse',
+        riskScore: 0,
+        wellbeingScore: 0,
+        survivalJustification: isEmergency ? 'Handled by greenhouse agent' : '',
+        wellbeingJustification: crewIntent ? 'Handled by greenhouse agent' : '',
+        crewResponse,
+        reasoning,
+        summary: summary || summarizeActions(actions),
+        decisionId: entry.id,
+      };
+    } catch (err) {
+      console.error('[dispatcher] greenhouse agent error:', err);
+      const entry = secretaryStore.addDecision({
+        missionSol, triggerType: 'routine', riskScore: 0, wellbeingScore: 0,
+        conflictType: 'none', winningAgent: 'none',
+        survivalProposalSummary: '', wellbeingProposalSummary: '',
+        actionsEnacted: [], reasoning: `Agent error: ${err instanceof Error ? err.message : 'unknown'}`,
+      });
+      return {
+        triggerType: 'routine', resolvedActions: [], conflictType: 'none',
+        winningAgent: 'none', riskScore: 0, wellbeingScore: 0,
+        survivalJustification: '', wellbeingJustification: '',
+        reasoning: `Agent error: ${err instanceof Error ? err.message : 'unknown'}`,
+        summary: 'Agent error — no actions taken',
+        decisionId: entry.id,
+      };
+    }
   },
 });
 

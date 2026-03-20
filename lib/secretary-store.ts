@@ -15,7 +15,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ConflictType = 'agreement' | 'soft_conflict' | 'hard_veto' | 'none';
-export type WinningAgent = 'survival' | 'wellbeing' | 'both' | 'hardcoded' | 'arbiter';
+export type WinningAgent = 'survival' | 'wellbeing' | 'both' | 'hardcoded' | 'arbiter' | 'greenhouse' | 'none';
 export type TriggerType = 'emergency_sev1' | 'emergency_sev2' | 'routine' | 'crew_question' | 'crew_request' | 'crew_override';
 
 export interface DecisionLogEntry {
@@ -192,15 +192,19 @@ class SecretaryStore {
     return { ...this.crewPreferenceProfile };
   }
 
-  // ─── Weekly Reports ────────────────────────────────────────────────────────
+  // ─── Reports ────────────────────────────────────────────────────────────────
 
   addWeeklyReport(report: Omit<WeeklyCrewReport, 'id' | 'generatedAt'>): WeeklyCrewReport {
     const full: WeeklyCrewReport = {
-      id: `report-week${report.weekNumber}`,
+      id: `report-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       generatedAt: Date.now(),
       ...report,
     };
     this.weeklyReports.unshift(full);
+    // Cap at 300 to prevent unbounded growth from per-tick reports
+    if (this.weeklyReports.length > 300) {
+      this.weeklyReports.length = 300;
+    }
     return full;
   }
 

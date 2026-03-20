@@ -123,6 +123,10 @@ ${i.resolution ? `## Resolution\n\n${i.resolution}` : ""}`;
 }
 
 function weeklyToMarkdown(r: any): string {
+  // Per-decision reports have missionSolStart === missionSolEnd
+  if (r.missionSolStart === r.missionSolEnd) {
+    return `# Decision Report — Sol ${r.missionSolStart}\n\n${r.report}`;
+  }
   return `# Weekly Report — Week ${r.weekNumber}
 
 > Sols ${r.missionSolStart}–${r.missionSolEnd}
@@ -268,15 +272,20 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         }
       }
 
-      // Weekly reports
+      // Reports (per-decision and weekly)
       const repData = await reportsRes.json();
       if (repData.ok && Array.isArray(repData.data)) {
         for (const r of repData.data) {
+          const isPerDecision = r.missionSolStart === r.missionSolEnd;
           items.push({
             id: r.id,
             type: "weekly_report",
-            title: `Week ${r.weekNumber} Report`,
-            subtitle: `Sols ${r.missionSolStart}–${r.missionSolEnd}`,
+            title: isPerDecision
+              ? `Decision Report — Sol ${r.missionSolStart}`
+              : `Week ${r.weekNumber} Report`,
+            subtitle: isPerDecision
+              ? `Autonomous tick`
+              : `Sols ${r.missionSolStart}–${r.missionSolEnd}`,
             date: new Date(r.generatedAt),
             missionSol: r.missionSolEnd,
             markdown: weeklyToMarkdown(r),

@@ -20,6 +20,22 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Greenhouse Workflow Evals
+
+Run the greenhouse-control evaluation harness with Mastra tracing and custom scorers:
+
+```bash
+bun run eval:greenhouse-control
+```
+
+For a smaller smoke run:
+
+```bash
+bun run eval:greenhouse-control:smoke
+```
+
+Reports are written to `artifacts/evals/greenhouse-control/latest.{json,md}` and each workflow run is tagged in Mastra observability with `greenhouse-control-eval`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

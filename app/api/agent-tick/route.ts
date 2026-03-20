@@ -22,6 +22,63 @@ async function flushTraces(): Promise<void> {
   } catch { /* non-blocking */ }
 }
 
+/** Build a clean markdown report from the dispatcher output for the reports tab. */
+function buildDecisionReport(output: Record<string, unknown>, sol: number): string {
+  const actions = (output.resolvedActions as Array<Record<string, unknown>> ?? [])
+    .map((a) => {
+      if (a.type === 'greenhouse') return `Set **${a.param}** to ${a.value}`;
+      if (a.type === 'crop') return `Set ${a.crop} **${a.param}** to ${a.value}`;
+      if (a.type === 'harvest') return `Harvest all **${a.crop}**`;
+      if (a.type === 'replant') return `Replant all **${a.crop}**`;
+      if (a.type === 'batch-tile') {
+        const parts: string[] = [];
+        if ((a.harvests as string[])?.length) parts.push(`harvest ${(a.harvests as string[]).length} tiles`);
+        if ((a.plants as unknown[])?.length) parts.push(`plant ${(a.plants as unknown[]).length} tiles`);
+        if ((a.clears as string[])?.length) parts.push(`clear ${(a.clears as string[]).length} tiles`);
+        return `Batch: ${parts.join(', ')}`;
+      }
+      return `${a.type}`;
+    })
+    .map(s => `- ${s}`)
+    .join('\n');
+
+  const riskScore = output.riskScore as number | undefined;
+  const wellbeingScore = output.wellbeingScore as number | undefined;
+  const simP10 = output.simulationP10 as number | undefined;
+  const simP90 = output.simulationP90 as number | undefined;
+
+  const simBlock = simP10 != null
+    ? `\n## Simulation\n\n| P10 yield | P90 yield |\n|---|---|\n| ${simP10.toFixed(1)} kg | ${simP90?.toFixed(1) ?? '—'} kg |`
+    : '';
+
+  return `**${output.summary || 'Autonomous tick completed'}**
+
+| | |
+|---|---|
+| Trigger | ${output.triggerType}${output.emergencySeverity ? ` (severity ${output.emergencySeverity})` : ''} |
+| Risk | ${riskScore?.toFixed(2) ?? '—'} |
+| Wellbeing | ${wellbeingScore?.toFixed(2) ?? '—'} |
+| Conflict | ${output.conflictType} |
+| Decision by | ${output.winningAgent} |
+
+## Survival Assessment
+
+${output.survivalJustification || '_Not consulted_'}
+
+## Wellbeing Assessment
+
+${output.wellbeingJustification || '_Not consulted_'}
+
+## Arbiter Reasoning
+
+${output.reasoning || '_No reasoning provided_'}
+
+## Actions Enacted
+
+${actions || '_No actions taken this tick_'}
+${simBlock}`;
+}
+
 // Refresh mission memory package every 3 sols
 const MEMORY_REFRESH_INTERVAL_SOLS = 3;
 let lastMemoryRefreshSol = -1;
@@ -56,35 +113,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // Classify emergency triggers deterministically before hitting LLMs
-    // Severity-1 conditions (spec §6.1)
-    const batteryPct = snapshot.batteryStorageKWh / Math.max(1, snapshot.batteryCapacityKWh);
-    // Solar sev-1 requires BOTH critically low generation AND battery nearly depleted —
-    // a transient dip (nighttime, mild dust) does not constitute an emergency on its own.
-    const solarCritical = snapshot.solarGenerationKW < snapshot.batteryCapacityKWh * 0.003 && batteryPct < 0.15;
-
-    const isSev1Emergency =
-      (snapshot.dustStormFactor < 0.1 && snapshot.dustStormActive) || // tau > 3
-      solarCritical ||
-      snapshot.co2Level > 5000 ||
-      batteryPct < 0.10;
-
-    const isSev2Emergency =
-      !isSev1Emergency && (
-        batteryPct < 0.20 ||
-        snapshot.waterRecyclingEfficiency < 0.25 ||
-        snapshot.nutritionalCoverage < 0.5 ||
-        (snapshot.dustStormActive && snapshot.dustStormFactor < 0.25)
-      );
-
-    const resolvedTriggerType = isSev1Emergency || isSev2Emergency ? 'emergency' : triggerType;
+    // Emergency classification is handled entirely by the dispatcher workflow's
+    // classifyStep — single source of truth, no duplicate thresholds here.
 
     const workflow = mastra.getWorkflow('dispatcher');
     const run = await workflow.createRun();
 
     const result = await run.start({
       inputData: {
-        triggerType: resolvedTriggerType,
+        triggerType,
         snapshot: snapshot as unknown as Record<string, unknown>,
         crewMessage,
         missionSol: snapshot.missionSol,
@@ -98,31 +135,21 @@ export async function POST(req: Request) {
     const output = dispatchOutput?.status === 'success' ? dispatchOutput.output : null;
 
     if (!output) {
-      // Fallback to legacy greenhouse control workflow if dispatcher fails
-      const legacyWorkflow = mastra.getWorkflow('greenhouseControl');
-      const legacyRun = await legacyWorkflow.createRun();
-      const legacyResult = await legacyRun.start({
-        inputData: snapshot as unknown as Record<string, unknown>,
-      });
-      const legacySteps = legacyResult.steps ?? {};
-      const legacyAct = legacySteps['act'] as { status: string; output: Record<string, unknown> } | undefined;
-      const legacyReason = legacySteps['reason'] as { status: string; output: Record<string, unknown> } | undefined;
-      const legacyOutput = legacyAct?.output ?? legacyReason?.output;
-
+      // Dispatcher failed — return immediately with empty actions.
+      // No legacy fallback (calling another LLM just adds more latency on failure).
       await flushTraces();
-
       return Response.json({
         ok: true,
-        reasoning: (legacyOutput as { reasoning?: string })?.reasoning ?? 'Fallback tick',
-        summary: (legacyOutput as { summary?: string })?.summary ?? 'Autonomous tick completed',
-        actions: (legacyOutput as { actions?: unknown[] })?.actions ?? [],
+        reasoning: 'Dispatcher returned no output',
+        summary: 'No actions — dispatcher error',
+        actions: [],
         triggerType: 'routine',
-        conflictType: 'agreement',
-        winningAgent: 'greenhouse',
-        riskScore: 0.3,
-        wellbeingScore: 0.7,
-        survivalJustification: 'Legacy single-agent tick — no multi-agent evaluation performed.',
-        wellbeingJustification: 'Legacy single-agent tick — no multi-agent evaluation performed.',
+        conflictType: 'none',
+        winningAgent: 'none',
+        riskScore: 0,
+        wellbeingScore: 0,
+        survivalJustification: '',
+        wellbeingJustification: '',
         decisionId: null,
       });
     }
@@ -139,6 +166,14 @@ export async function POST(req: Request) {
       lastDigestRefreshSol = sol;
       secretaryStore.generatePerformanceDigests(sol);
     }
+
+    // Generate a per-decision report for the reports tab
+    secretaryStore.addWeeklyReport({
+      weekNumber: sol,
+      missionSolStart: sol,
+      missionSolEnd: sol,
+      report: buildDecisionReport(output, sol),
+    });
 
     await flushTraces();
 

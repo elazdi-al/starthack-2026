@@ -16,10 +16,20 @@ import { wellbeingAgent } from '../../mastra/agents/wellbeing-agent';
 import { secretaryVectorStore } from '../../mastra/tools/secretary-vector-tool';
 import { dispatcherWorkflow } from '../../mastra/workflows/dispatcher';
 import { greenhouseControlWorkflow } from '../../mastra/workflows/greenhouse-control';
+import {
+  greenhouseControlActionSafetyScorer,
+  greenhouseControlAssessScorer,
+  greenhouseControlScenarioFitScorer,
+} from '../../mastra/evals/greenhouse-control-scorers';
 
 export const mastra = new Mastra({
   workflows: { greenhouseControl: greenhouseControlWorkflow, dispatcher: dispatcherWorkflow },
   agents: { greenhouseAgent, survivalAgent, wellbeingAgent, arbiterAgent, secretaryAgent },
+  scorers: {
+    greenhouseControlAssessScorer,
+    greenhouseControlActionSafetyScorer,
+    greenhouseControlScenarioFitScorer,
+  },
   vectors: { secretaryVectorStore },
   storage: new LibSQLStore({
     id: 'mastra-storage',

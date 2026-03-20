@@ -48,10 +48,11 @@ export type { CropType, GrowthStage, SeasonName, DustStormRisk, ManualOverrides 
 // ─── Agent Decision Log ──────────────────────────────────────────────────────────
 
 export interface AgentAction {
-  type: "greenhouse" | "crop" | "harvest" | "replant" | "batch-tile";
+  type: "greenhouse" | "crop" | "harvest" | "replant" | "harvest-tile" | "plant-tile" | "clear-tile" | "batch-tile";
   param?: string;
   value?: number;
   crop?: string;
+  tileId?: string;
   harvests?: string[];
   plants?: Array<{ tileId: string; crop: string }>;
   clears?: string[];

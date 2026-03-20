@@ -28,8 +28,9 @@ import { SimulationOverrides } from "@/components/interface/simulation-overrides
 import { EnvWidgetShells } from "@/components/interface/env-widget-shells";
 import { ReportsView } from "@/components/interface/reports-view";
 import { DashboardView } from "@/components/interface/dashboard-view";
-import { SquaresFour, Leaf, Robot, FileText } from "@phosphor-icons/react";
+import { SquaresFour, Leaf, Robot, FileText, Plant } from "@phosphor-icons/react";
 import { triggerHaptic } from "@/lib/haptics";
+import { playDecisionChime } from "@/lib/notification-sound";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
@@ -152,6 +153,16 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
     useChatStore.getState().hydrateFromStorage();
   }, []);
 
+  /* ── Play notification chime when a new agent decision arrives ─────────── */
+  React.useEffect(() => {
+    let prev = useGreenhouseStore.getState().agentDecisions.length;
+    return useGreenhouseStore.subscribe((state) => {
+      const next = state.agentDecisions.length;
+      if (next > prev) playDecisionChime();
+      prev = next;
+    });
+  }, []);
+
   /* ── Intro animation sequence ─────────────────────────────────────────── */
   React.useEffect(() => {
     if (shouldReduceMotion) {
@@ -199,6 +210,12 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
 
   const handleAgentClose = React.useCallback(() => {
     setAgentOpen(false);
+  }, []);
+
+  const handleSeedTerrain = React.useCallback(() => {
+    const store = useGreenhouseStore.getState();
+    if (!store.autonomousEnabled) store.setAutonomousEnabled(true);
+    store.autonomousTick();
   }, []);
 
   /** Navigate to the selected tab route. */
@@ -348,6 +365,21 @@ export default function TabsLayout({ children }: { children: React.ReactNode }) 
                     className="absolute top-20 left-6 z-20 pointer-events-none"
                   >
                     <AgentDecisionPanel onClose={handleAgentClose} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {activeView === "greenhouse" && decisionCount === 0 && (
+                  <motion.div
+                    key="seed-cta"
+                    initial={shouldReduceMotion ? false : { opacity: 0, y: 10, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                    transition={shouldReduceMotion ? ZERO_TRANSITION : { duration: 0.36, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                  >
+                    <SeedTerrainButton onClick={handleSeedTerrain} loading={tickInFlight} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -512,6 +544,34 @@ function AgentToggleButton({
       {running && (
         <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-[var(--highlight-tabs-bg)] animate-pulse" />
       )}
+    </button>
+  );
+}
+
+function SeedTerrainButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      aria-label={loading ? "Seeding greenhouse" : "Seed greenhouse with crops"}
+      className="pointer-events-auto inline-flex items-center gap-2.5 h-10 px-5 rounded-full type-ui select-none outline-none transition-all duration-200 ease-out hover:scale-[1.03] active:scale-[0.97] disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-ring/50 seed-terrain-btn"
+      style={{
+        background: "rgba(var(--mars-module-surface, 255 255 255) / 0.72)",
+        backdropFilter: "blur(16px) saturate(1.4)",
+        border: "1px solid rgba(var(--mars-module-border, 0 0 0) / 0.12)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08)",
+        color: "var(--foreground)",
+      }}
+    >
+      {loading ? (
+        <span className="seed-terrain-spinner" />
+      ) : (
+        <Plant size={15} weight="fill" className="opacity-70" />
+      )}
+      <span className={loading ? "opacity-50" : "opacity-80"}>
+        {loading ? "Seeding\u2026" : "Seed Greenhouse"}
+      </span>
     </button>
   );
 }
