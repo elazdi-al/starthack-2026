@@ -9,7 +9,21 @@
   },
   "author": "Mastra",
   "license": "ISC",
-  "dependencies": {},
+  "dependencies": {
+    "@mastra/core": "1.14.0",
+    "@mastra/libsql": "1.7.1",
+    "@mastra/loggers": "1.0.3",
+    "@mastra/observability": "1.5.0",
+    "@ai-sdk/amazon-bedrock": "4.0.77",
+    "@mastra/memory": "1.8.3",
+    "@ai-sdk/google": "3.0.43",
+    "zod": "4.3.6",
+    "aws4fetch": "1.0.20",
+    "@mastra/rag": "2.1.2",
+    "ai": "6.0.130",
+    "hono": "4.12.8",
+    "typescript": "5.9.3"
+  },
   "pnpm": {
     "neverBuiltDependencies": []
   }

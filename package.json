@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "studio": "mastra dev --dir mastra",
-    "preinstall": "rm -rf node_modules/@elevenlabs 2>/dev/null; true"
+    "studio": "mastra dev --dir src/mastra"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.77",

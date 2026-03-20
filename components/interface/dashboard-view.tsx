@@ -184,32 +184,72 @@ const STATUS_DOT: Record<HealthStatus, string> = {
   critical: "bg-red-500",
 };
 
+function withAlpha(color: string, alpha: string) {
+  return color.startsWith("#") && color.length === 7 ? `${color}${alpha}` : color;
+}
+
+const CrewPortrait = memo(function CrewPortrait({ color }: { color: string }) {
+  const shellGlow = withAlpha(color, "44");
+  const shellSoft = withAlpha(color, "1F");
+  const hardwareColor = withAlpha(color, "CC");
+
+  return (
+    <div
+      aria-hidden="true"
+      className="relative size-16 shrink-0 overflow-hidden rounded-[1.35rem] border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_10px_24px_rgba(0,0,0,0.18)]"
+      style={{
+        background: `radial-gradient(circle at 30% 20%, ${shellGlow} 0%, ${shellSoft} 28%, rgba(10,14,24,0.98) 72%)`,
+        color,
+      }}
+    >
+      <div className="absolute inset-x-0 top-0 h-7 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),transparent)]" />
+      <svg viewBox="0 0 88 88" className="relative h-full w-full">
+        <path d="M20 74c4-9 12-15 24-15s20 6 24 15" fill="#DCE7F5" opacity="0.9" />
+        <path d="M26 74c3-8 10-13 18-13s15 5 18 13" fill="#9CA8B8" opacity="0.55" />
+        <circle cx="44" cy="37" r="25" fill="rgba(190,230,255,0.08)" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
+        <path d="M24 33c1-11 9-21 20-24 12-3 24 2 31 13 3 5 5 11 5 17" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" />
+        <path d="M21 46c0 18 10 30 23 30s23-12 23-30v-4c0-18-10-29-23-29S21 24 21 42z" fill="#E8BE97" />
+        <path d="M30 33c4-5 10-8 14-8 6 0 11 3 16 8-3-10-9-17-16-17-8 0-14 7-16 17Z" fill="#3B312D" opacity="0.82" />
+        <ellipse cx="36" cy="46" rx="2.2" ry="2.6" fill="#2A2320" />
+        <ellipse cx="52" cy="46" rx="2.2" ry="2.6" fill="#2A2320" />
+        <path d="M38 57c3.5 2.8 8.5 2.8 12 0" fill="none" stroke="#9A5F51" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M44 47v5" fill="none" stroke="#C88473" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M33 60c3 3 7 4.5 11 4.5S52 63 55 60" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
+        <path d="M15 72c2-7 8-12 15-12h28c7 0 13 5 15 12" fill="currentColor" opacity="0.26" />
+        <path d="M17 70c3-4 8-7 14-7" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" opacity="0.7" />
+        <path d="M57 63c6 0 11 3 14 7" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" opacity="0.7" />
+        <circle cx="23" cy="37" r="5" fill={hardwareColor} />
+        <circle cx="65" cy="37" r="5" fill={hardwareColor} />
+        <circle cx="23" cy="37" r="2.2" fill="#DDE7F0" />
+        <circle cx="65" cy="37" r="2.2" fill="#DDE7F0" />
+      </svg>
+    </div>
+  );
+});
+
 const CrewRadarCard = memo(function CrewRadarCard({ member }: { member: CrewMember }) {
   const radarData = useMemo(() => [crewToRadar(member)], [member]);
   return (
-    <div className="flex flex-col rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm p-2 h-full min-h-0">
-      <div className="flex items-center gap-1.5 px-0.5 shrink-0">
-        <div
-          className="size-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
-          style={{ background: member.color }}
-        >
-          {member.name[0]}
+    <div className="flex h-full min-h-0 flex-col rounded-xl border border-border/60 bg-card/80 p-2.5 backdrop-blur-sm">
+      <div className="flex items-start justify-between gap-2 px-0.5 shrink-0">
+        <div className="min-w-0">
+          <CrewPortrait color={member.color} />
+          <div className="mt-2 min-w-0">
+            <span className="block truncate text-[10px] font-semibold leading-tight text-foreground">
+              {member.name}
+            </span>
+            <span className="block truncate text-[8px] uppercase tracking-[0.16em] text-muted-foreground/90">
+              {member.role}
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-[10px] font-semibold text-foreground leading-tight truncate">
-            {member.name}
-          </span>
-          <span className="text-[8px] text-muted-foreground leading-tight truncate">
-            {member.role}
-          </span>
-        </div>
-        <div className="ml-auto flex items-center gap-1 shrink-0">
+        <div className="mt-0.5 flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-background/40 px-1.5 py-1 shadow-sm">
           <span className={`size-1.5 rounded-full ${STATUS_DOT[member.health]}`} />
           <span className="text-[8px] text-muted-foreground capitalize">{member.health}</span>
         </div>
       </div>
-      <div className="flex-1 min-h-0 flex items-center justify-center">
-        <RadarChart data={radarData} metrics={HEALTH_METRICS} size={140} levels={3} margin={28}>
+      <div className="flex min-h-0 flex-1 items-center justify-center pb-1">
+        <RadarChart data={radarData} metrics={HEALTH_METRICS} size={132} levels={3} margin={25}>
           <RadarGrid showLabels={false} />
           <RadarAxis />
           <RadarLabels fontSize={7} offset={12} />
