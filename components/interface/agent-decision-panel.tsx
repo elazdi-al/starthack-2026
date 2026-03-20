@@ -29,8 +29,62 @@ export function AgentDecisionPanel({ onClose }: Props) {
   const minutesSinceTick = Math.floor(elapsedMinutes - lastTickSimMinutes);
   const nextTickIn = Math.max(0, agentTickMinutes - minutesSinceTick);
 
+  /* ── Drag via refs — no React state on mousemove ─────────────────────── */
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const dragOffsetRef = React.useRef({ x: 0, y: 0 });
+  const dragRef = React.useRef<{
+    startX: number; startY: number;
+    offsetX: number; offsetY: number;
+    baseLeft: number; baseTop: number;
+    baseWidth: number; baseHeight: number;
+  } | null>(null);
+
+  React.useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const { startX, startY, offsetX, offsetY, baseLeft, baseTop, baseWidth, baseHeight } = dragRef.current;
+      let newX = offsetX + (e.clientX - startX);
+      let newY = offsetY + (e.clientY - startY);
+
+      newX = Math.max(-baseLeft, Math.min(window.innerWidth - baseLeft - baseWidth, newX));
+      newY = Math.max(-baseTop, Math.min(window.innerHeight - baseTop - baseHeight, newY));
+
+      dragOffsetRef.current = { x: newX, y: newY };
+      if (wrapperRef.current) {
+        wrapperRef.current.style.transform = `translate(${newX}px, ${newY}px)`;
+      }
+    };
+    const onMouseUp = () => { dragRef.current = null; };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      offsetX: dragOffsetRef.current.x,
+      offsetY: dragOffsetRef.current.y,
+      baseLeft: rect.left - dragOffsetRef.current.x,
+      baseTop: rect.top - dragOffsetRef.current.y,
+      baseWidth: rect.width,
+      baseHeight: rect.height,
+    };
+    e.preventDefault();
+  };
+
   return (
+    <div ref={wrapperRef}>
     <div
+      ref={panelRef}
       className="w-80 rounded-[14px] overflow-hidden flex flex-col max-h-[85vh]"
       style={{
         background: "var(--dial-glass-bg)",
@@ -40,10 +94,11 @@ export function AgentDecisionPanel({ onClose }: Props) {
         boxShadow: "inset 0 1px 0 var(--glass-panel-highlight), var(--dial-shadow)",
       }}
     >
-      {/* Header */}
+      {/* Header — drag handle */}
       <div
         className="flex items-center justify-between px-4 pt-3.5 pb-2.5 shrink-0"
-        style={{ borderBottom: "1px solid var(--dial-border)" }}
+        style={{ borderBottom: "1px solid var(--dial-border)", cursor: "grab" }}
+        onMouseDown={handleDragStart}
       >
         <div className="flex items-center gap-2">
           <Robot
@@ -66,6 +121,7 @@ export function AgentDecisionPanel({ onClose }: Props) {
               triggerHaptic("soft");
               onClose();
             }}
+            onMouseDown={(e) => e.stopPropagation()}
             className="w-5 h-5 rounded-full flex items-center justify-center text-[var(--dial-text-tertiary)] hover:text-[var(--dial-text-primary)] hover:bg-black/6 dark:hover:bg-white/10 transition-colors"
           >
             <X size={11} weight="bold" />
@@ -77,6 +133,7 @@ export function AgentDecisionPanel({ onClose }: Props) {
       <div
         className="px-4 py-2.5 flex items-center justify-between shrink-0"
         style={{ borderBottom: "1px solid var(--dial-border)", background: "var(--dial-surface)" }}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
           <button
@@ -116,6 +173,7 @@ export function AgentDecisionPanel({ onClose }: Props) {
         <div
           className="px-4 py-2 flex items-center gap-3 shrink-0"
           style={{ borderBottom: "1px solid var(--dial-border)" }}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <span className="type-caption text-[var(--dial-text-tertiary)] whitespace-nowrap">Period</span>
           <input
@@ -149,6 +207,7 @@ export function AgentDecisionPanel({ onClose }: Props) {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

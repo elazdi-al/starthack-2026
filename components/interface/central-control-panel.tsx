@@ -151,19 +151,6 @@ export function CentralControlPanel({
   const showPanel = open && mounted && panels.length > 0;
   const anim = useAnimationConfig();
 
-  // Close on click outside
-  React.useEffect(() => {
-    if (!showPanel) return;
-    const handler = (e: MouseEvent) => {
-      const wrapper = wrapperRef.current;
-      if (wrapper && !wrapper.contains(e.target as Node)) {
-        onOpenChange(false);
-      }
-    };
-    window.addEventListener("pointerdown", handler);
-    return () => window.removeEventListener("pointerdown", handler);
-  }, [showPanel, onOpenChange]);
-
   /* ── Icon swap transition (CSS-only, no mount/unmount) ───────────────── */
   const iconTransition = anim.enabled
     ? "opacity 0.15s ease-out, transform 0.15s ease-out"
