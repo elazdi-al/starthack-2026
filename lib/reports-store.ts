@@ -1,6 +1,12 @@
 import { create } from "zustand";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import type {
+  CrewPreferenceProfile,
+  DecisionLogEntry,
+  IncidentLogEntry,
+  MissionMemoryPackage,
+  PerformanceDigests,
+  WeeklyCrewReport,
+} from "@/lib/secretary-store";
 
 export type ReportType =
   | "decision"
@@ -17,22 +23,17 @@ export interface ReportItem {
   subtitle: string;
   date: Date;
   missionSol: number;
-  /** Pre-rendered markdown string for the popup viewer */
   markdown: string;
 }
 
 export interface ReportsState {
   reports: ReportItem[];
   loading: boolean;
-  /** Currently-opened report id */
   openReportId: string | null;
-
   fetchReports: () => Promise<void>;
   openReport: (id: string) => void;
   closeReport: () => void;
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const TYPE_LABELS: Record<ReportType, string> = {
   decision: "Decision Log",
@@ -52,39 +53,38 @@ const TYPE_ICONS: Record<ReportType, string> = {
   mission_memory: "Brain",
 };
 
-export function getTypeLabel(t: ReportType) {
-  return TYPE_LABELS[t];
-}
-export function getTypeIcon(t: ReportType) {
-  return TYPE_ICONS[t];
+export function getTypeLabel(type: ReportType) {
+  return TYPE_LABELS[type];
 }
 
-// ─── Markdown serialisers ────────────────────────────────────────────────────
+export function getTypeIcon(type: ReportType) {
+  return TYPE_ICONS[type];
+}
 
-function decisionToMarkdown(d: any): string {
-  const actions = (d.actionsEnacted ?? [])
-    .map(
-      (a: any) =>
-        `- **${a.type}** ${a.param ?? ""}${a.crop ? ` on \`${a.crop}\`` : ""}${a.value !== undefined ? ` = ${a.value}` : ""}`
+function decisionToMarkdown(decision: DecisionLogEntry): string {
+  const actions = (decision.actionsEnacted ?? [])
+    .map((action) =>
+      `- **${action.type}** ${action.param ?? ""}${action.crop ? ` on \`${action.crop}\`` : ""}${action.value !== undefined ? ` = ${action.value}` : ""}`
     )
     .join("\n");
 
-  return `# Decision Log — Sol ${d.missionSol}
+  return `# Decision Log — Sol ${decision.missionSol}
 
 | Field | Value |
 |-------|-------|
-| **Trigger** | ${d.triggerType} |
-| **Risk Score** | ${d.riskScore?.toFixed(2)} |
-| **Wellbeing Score** | ${d.wellbeingScore?.toFixed(2)} |
-| **Conflict** | ${d.conflictType} |
-| **Winner** | ${d.winningAgent} |
-| **Sim P10 / P90** | ${d.simulationP10?.toFixed(1) ?? "—"} / ${d.simulationP90?.toFixed(1) ?? "—"} kg |
+| **Trigger** | ${decision.triggerType} |
+| **Risk Score** | ${decision.riskScore?.toFixed(2)} |
+| **Crew Impact Score** | ${decision.crewImpactScore?.toFixed(2)} |
+| **Decision Mode** | ${decision.decisionMode} |
+| **Handled By** | ${decision.handledBy} |
 
-## Proposals
+## Operational Summary
 
-**Survival:** ${d.survivalProposalSummary}
+${decision.operationsSummary || "_None_"}
 
-**Wellbeing:** ${d.wellbeingProposalSummary}
+## Crew Summary
+
+${decision.crewSummary || "_None_"}
 
 ## Actions Enacted
 
@@ -92,80 +92,77 @@ ${actions || "_None_"}
 
 ## Reasoning
 
-${d.reasoning}
+${decision.reasoning}
 
-${d.actualOutcome ? `## Actual Outcome\n\n${d.actualOutcome}` : ""}`;
+${decision.actualOutcome ? `## Actual Outcome\n\n${decision.actualOutcome}` : ""}`;
 }
 
-function incidentToMarkdown(i: any): string {
-  return `# Incident Report — Sol ${i.missionSol}
+function incidentToMarkdown(incident: IncidentLogEntry): string {
+  return `# Incident Report — Sol ${incident.missionSol}
 
 | Field | Value |
 |-------|-------|
-| **Type** | ${i.emergencyType} |
-| **Severity** | ${i.severity} |
-| **Resolved** | ${i.resolved ? "Yes" : "No"} |
-| **Resolution Time** | ${i.timeToResolutionSols ?? "—"} sols |
+| **Type** | ${incident.emergencyType} |
+| **Severity** | ${incident.severity} |
+| **Resolved** | ${incident.resolved ? "Yes" : "No"} |
+| **Resolution Time** | ${incident.timeToResolutionSols ?? "—"} sols |
 
 ## Trigger
 
-${i.trigger}
+${incident.trigger}
 
 ## Systems Affected
 
-${(i.systemsAffected ?? []).map((s: string) => `- ${s}`).join("\n") || "_None_"}
+${(incident.systemsAffected ?? []).map((item: string) => `- ${item}`).join("\n") || "_None_"}
 
 ## Actions Executed
 
-${(i.actionsExecuted ?? []).map((a: string) => `- ${a}`).join("\n") || "_None_"}
+${(incident.actionsExecuted ?? []).map((item: string) => `- ${item}`).join("\n") || "_None_"}
 
-${i.resolution ? `## Resolution\n\n${i.resolution}` : ""}`;
+${incident.resolution ? `## Resolution\n\n${incident.resolution}` : ""}`;
 }
 
-function weeklyToMarkdown(r: any): string {
-  // Per-decision reports have missionSolStart === missionSolEnd
-  if (r.missionSolStart === r.missionSolEnd) {
-    return `# Decision Report — Sol ${r.missionSolStart}\n\n${r.report}`;
+function weeklyToMarkdown(report: WeeklyCrewReport): string {
+  if (report.missionSolStart === report.missionSolEnd) {
+    return `# Decision Report — Sol ${report.missionSolStart}\n\n${report.report}`;
   }
-  return `# Weekly Report — Week ${r.weekNumber}
 
-> Sols ${r.missionSolStart}–${r.missionSolEnd}
+  return `# Weekly Report — Week ${report.weekNumber}
 
-${r.report}`;
+> Sols ${report.missionSolStart}–${report.missionSolEnd}
+
+${report.report}`;
 }
 
-function digestToMarkdown(d: any): string {
-  return `# Performance Digests — Sol ${d.generatedAtSol}
+function digestToMarkdown(digest: PerformanceDigests): string {
+  return `# Performance Digests — Sol ${digest.generatedAtSol}
 
-## Survival Agent
+## Decision System
 
-${d.survival}
+${digest.decision}
 
-## Wellbeing Agent
+## Crew Signal
 
-${d.wellbeing}
+${digest.crew}
 
-## Arbiter
+## History Signal
 
-${d.arbiter}`;
+${digest.history}`;
 }
 
-function profileToMarkdown(p: any): string {
-  const prefs = Object.entries(p.preferences ?? {})
-    .map(([crop, val]) => `| ${crop} | ${(val as number) > 0 ? "+" : ""}${(val as number).toFixed(2)} |`)
+function profileToMarkdown(profile: CrewPreferenceProfile): string {
+  const prefs = Object.entries(profile.preferences ?? {})
+    .map(([crop, value]) => `| ${crop} | ${(value as number) > 0 ? "+" : ""}${(value as number).toFixed(2)} |`)
     .join("\n");
 
-  const overrides = (p.overrideAttempts ?? [])
+  const overrides = (profile.overrideAttempts ?? [])
     .slice(0, 10)
-    .map(
-      (o: any) =>
-        `| Sol ${o.sol} | ${o.request} | ${o.granted ? "Granted" : "Denied"} |`
-    )
+    .map((attempt) => `| Sol ${attempt.sol} | ${attempt.request} | ${attempt.granted ? "Granted" : "Denied"} |`)
     .join("\n");
 
   return `# Crew Preference Profile
 
-*Last updated: Sol ${p.lastUpdatedSol}*
+*Last updated: Sol ${profile.lastUpdatedSol}*
 
 ## Food Preferences
 
@@ -175,11 +172,11 @@ ${prefs || "| _No data_ | — |"}
 
 ## Aversions
 
-${(p.aversions ?? []).length > 0 ? (p.aversions as string[]).map((a) => `- ${a}`).join("\n") : "_None recorded_"}
+${(profile.aversions ?? []).length > 0 ? (profile.aversions as string[]).map((item) => `- ${item}`).join("\n") : "_None recorded_"}
 
 ## Recent Requests
 
-${(p.recentRequests ?? []).slice(0, 10).map((r: string) => `- ${r}`).join("\n") || "_None_"}
+${(profile.recentRequests ?? []).slice(0, 10).map((request: string) => `- ${request}`).join("\n") || "_None_"}
 
 ## Override Attempts
 
@@ -188,37 +185,35 @@ ${(p.recentRequests ?? []).slice(0, 10).map((r: string) => `- ${r}`).join("\n") 
 ${overrides || "| _None_ | — | — |"}`;
 }
 
-function memoryToMarkdown(m: any): string {
-  return `# Mission Memory Package — Sol ${m.missionSol}
+function memoryToMarkdown(memory: MissionMemoryPackage): string {
+  return `# Mission Memory Package — Sol ${memory.missionSol}
 
-## Conflict Resolution History
+## Decision History
 
 | Metric | Value |
 |--------|-------|
-| Total vetoes | ${m.conflictResolutionHistory?.totalVetoes ?? 0} |
-| Vetoes correct | ${m.conflictResolutionHistory?.vetoesCorrectInHindsight ?? 0} |
-| Soft conflicts resolved | ${m.conflictResolutionHistory?.softConflictsResolved ?? 0} |
+| Safety blocks | ${memory.decisionHistory?.safetyBlocks ?? 0} |
+| Emergency playbooks | ${memory.decisionHistory?.emergencyPlaybooks ?? 0} |
+| Direct decisions | ${memory.decisionHistory?.directDecisions ?? 0} |
 
-## Storm Response Learnings
+## Emergency Learnings
 
-${(m.stormResponseLearnings ?? []).map((l: string) => `- ${l}`).join("\n") || "_None_"}
+${(memory.emergencyLearnings ?? []).map((item: string) => `- ${item}`).join("\n") || "_None_"}
 
 ## What Worked
 
-${(m.whatWorked ?? []).map((w: string) => `- ${w}`).join("\n") || "_None_"}
+${(memory.whatWorked ?? []).map((item: string) => `- ${item}`).join("\n") || "_None_"}
 
 ## What Failed
 
-${(m.whatFailed ?? []).map((f: string) => `- ${f}`).join("\n") || "_None recorded_"}
+${(memory.whatFailed ?? []).map((item: string) => `- ${item}`).join("\n") || "_None recorded_"}
 
 ## Calibrated Crop Parameters
 
 \`\`\`json
-${JSON.stringify(m.calibratedCropParams ?? {}, null, 2)}
+${JSON.stringify(memory.calibratedCropParams ?? {}, null, 2)}
 \`\`\``;
 }
-
-// ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useReportsStore = create<ReportsState>((set, get) => ({
   reports: [],
@@ -240,108 +235,97 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
 
       const items: ReportItem[] = [];
 
-      // Decisions
       const decData = await decisionsRes.json();
       if (decData.ok && Array.isArray(decData.data)) {
-        for (const d of decData.data) {
+        for (const decision of decData.data) {
           items.push({
-            id: d.id,
+            id: decision.id,
             type: "decision",
-            title: `Decision — Sol ${d.missionSol}`,
-            subtitle: `${d.triggerType} | ${d.winningAgent} | risk ${d.riskScore?.toFixed(2)}`,
-            date: new Date(d.timestamp),
-            missionSol: d.missionSol,
-            markdown: decisionToMarkdown(d),
+            title: `Decision — Sol ${decision.missionSol}`,
+            subtitle: `${decision.triggerType} | ${decision.handledBy} | risk ${decision.riskScore?.toFixed(2)}`,
+            date: new Date(decision.timestamp),
+            missionSol: decision.missionSol,
+            markdown: decisionToMarkdown(decision),
           });
         }
       }
 
-      // Incidents
       const incData = await incidentsRes.json();
       if (incData.ok && Array.isArray(incData.data)) {
-        for (const i of incData.data) {
+        for (const incident of incData.data) {
           items.push({
-            id: i.id,
+            id: incident.id,
             type: "incident",
-            title: `Incident — Sol ${i.missionSol}`,
-            subtitle: `${i.emergencyType} (sev ${i.severity}) — ${i.resolved ? "resolved" : "active"}`,
-            date: new Date(i.timestamp),
-            missionSol: i.missionSol,
-            markdown: incidentToMarkdown(i),
+            title: `Incident — Sol ${incident.missionSol}`,
+            subtitle: `${incident.emergencyType} (sev ${incident.severity}) — ${incident.resolved ? "resolved" : "active"}`,
+            date: new Date(incident.timestamp),
+            missionSol: incident.missionSol,
+            markdown: incidentToMarkdown(incident),
           });
         }
       }
 
-      // Reports (per-decision and weekly)
       const repData = await reportsRes.json();
       if (repData.ok && Array.isArray(repData.data)) {
-        for (const r of repData.data) {
-          const isPerDecision = r.missionSolStart === r.missionSolEnd;
+        for (const report of repData.data) {
+          const isPerDecision = report.missionSolStart === report.missionSolEnd;
           items.push({
-            id: r.id,
+            id: report.id,
             type: "weekly_report",
-            title: isPerDecision
-              ? `Decision Report — Sol ${r.missionSolStart}`
-              : `Week ${r.weekNumber} Report`,
-            subtitle: isPerDecision
-              ? `Autonomous tick`
-              : `Sols ${r.missionSolStart}–${r.missionSolEnd}`,
-            date: new Date(r.generatedAt),
-            missionSol: r.missionSolEnd,
-            markdown: weeklyToMarkdown(r),
+            title: isPerDecision ? `Decision Report — Sol ${report.missionSolStart}` : `Week ${report.weekNumber} Report`,
+            subtitle: isPerDecision ? "Autonomous tick" : `Sols ${report.missionSolStart}–${report.missionSolEnd}`,
+            date: new Date(report.generatedAt),
+            missionSol: report.missionSolEnd,
+            markdown: weeklyToMarkdown(report),
           });
         }
       }
 
-      // Performance digests
-      const digData = await digestsRes.json();
-      if (digData.ok && digData.data) {
-        const d = digData.data;
+      const digestData = await digestsRes.json();
+      if (digestData.ok && digestData.data) {
+        const digest = digestData.data;
         items.push({
-          id: `digest-sol${d.generatedAtSol}`,
+          id: `digest-sol${digest.generatedAtSol}`,
           type: "performance_digest",
-          title: `Performance Digest — Sol ${d.generatedAtSol}`,
-          subtitle: "Agent calibration signals",
+          title: `Performance Digest — Sol ${digest.generatedAtSol}`,
+          subtitle: "Decision-system calibration signals",
           date: new Date(),
-          missionSol: d.generatedAtSol,
-          markdown: digestToMarkdown(d),
+          missionSol: digest.generatedAtSol,
+          markdown: digestToMarkdown(digest),
         });
       }
 
-      // Crew profile
-      const profData = await profileRes.json();
-      if (profData.ok && profData.data) {
-        const p = profData.data;
-        if (p.lastUpdatedSol > 0 || Object.keys(p.preferences ?? {}).length > 0) {
+      const profileData = await profileRes.json();
+      if (profileData.ok && profileData.data) {
+        const profile = profileData.data;
+        if (profile.lastUpdatedSol > 0 || Object.keys(profile.preferences ?? {}).length > 0) {
           items.push({
-            id: `profile-sol${p.lastUpdatedSol}`,
+            id: `profile-sol${profile.lastUpdatedSol}`,
             type: "crew_profile",
             title: "Crew Preference Profile",
-            subtitle: `Last updated Sol ${p.lastUpdatedSol}`,
+            subtitle: `Last updated Sol ${profile.lastUpdatedSol}`,
             date: new Date(),
-            missionSol: p.lastUpdatedSol,
-            markdown: profileToMarkdown(p),
+            missionSol: profile.lastUpdatedSol,
+            markdown: profileToMarkdown(profile),
           });
         }
       }
 
-      // Mission memory
-      const memData = await memoryRes.json();
-      if (memData.ok && memData.data) {
-        const m = memData.data;
+      const memoryData = await memoryRes.json();
+      if (memoryData.ok && memoryData.data) {
+        const memory = memoryData.data;
         items.push({
-          id: `memory-sol${m.missionSol}`,
+          id: `memory-sol${memory.missionSol}`,
           type: "mission_memory",
-          title: `Mission Memory — Sol ${m.missionSol}`,
+          title: `Mission Memory — Sol ${memory.missionSol}`,
           subtitle: "Compressed mission policy package",
-          date: new Date(m.generatedAt),
-          missionSol: m.missionSol,
-          markdown: memoryToMarkdown(m),
+          date: new Date(memory.generatedAt),
+          missionSol: memory.missionSol,
+          markdown: memoryToMarkdown(memory),
         });
       }
 
-      // Sort newest first
-      items.sort((a, b) => b.date.getTime() - a.date.getTime());
+      items.sort((left, right) => right.date.getTime() - left.date.getTime());
       set({ reports: items, loading: false });
     } catch (err) {
       console.error("[reports-store] fetch error:", err);
@@ -350,7 +334,7 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
   },
 
   openReport: (id: string) => {
-    const report = get().reports.find((r) => r.id === id);
+    const report = get().reports.find((item) => item.id === id);
     if (!report) return;
     set({ openReportId: id });
   },

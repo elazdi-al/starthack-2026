@@ -26,11 +26,10 @@ export const SituationReportSchema = z.object({
 });
 
 export const GreenhouseActionSchema = z.object({
-  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'harvest-tile', 'plant-tile', 'clear-tile', 'batch-tile']),
+  type: z.enum(['greenhouse', 'crop', 'harvest', 'replant', 'batch-tile']),
   param: z.string().optional(),
   value: z.number().optional(),
   crop: z.string().optional(),
-  tileId: z.string().optional(),
   harvests: z.array(z.string()).optional(),
   plants: z.array(z.object({ tileId: z.string(), crop: z.string() })).optional(),
   clears: z.array(z.string()).optional(),
@@ -150,17 +149,14 @@ const assessStep = createStep({
 });
 
 /**
- * reasonStep: Calls the greenhouse agent with structured output.
- * This is the single-agent version — in future iterations this can be replaced with
- * parallel specialist agents (e.g., cropAgent, energyAgent, nutritionAgent) that each
- * return the same ActionSchema, with a merge step combining their outputs.
+ * reasonStep: Calls the decision agent with structured output.
  */
 const reasonStep = createStep({
   id: 'reason',
   inputSchema: SituationReportSchema,
   outputSchema: ReasonOutputSchema,
   execute: async ({ inputData, mastra }) => {
-    const agent = mastra?.getAgent('greenhouseAgent');
+    const agent = mastra?.getAgent('decisionAgent');
     if (!agent) {
       return {
         reasoning: 'Agent unavailable',
@@ -194,7 +190,7 @@ Tile-level alerts:
 Full sensor snapshot (includes tileCrops for individual tile states and tileCounts for allocation summary):
 ${JSON.stringify(snapshot, null, 2)}
 
-Decide what actions to take this tick. For tile-level control, prefer a single or small number of batch-tile actions using harvests, plants, and clears arrays. Use bulk harvest/replant actions only when acting on all tiles of a crop type. Return your reasoning, a one-sentence summary for the operator, and the list of actions to apply. Only include actions that are genuinely warranted by the current state. If nothing needs changing, return an empty actions array.`;
+Decide what actions to take this tick. For tile-level control, use batch-tile actions with harvests, plants, and clears arrays. Use bulk harvest/replant actions only when acting on all tiles of a crop type. Return your reasoning, a one-sentence summary for the operator, and the list of actions to apply. Only include actions that are genuinely warranted by the current state. If nothing needs changing, return an empty actions array.`;
 
     const result = await agent.generate([{ role: 'user', content: prompt }], {
       structuredOutput: { schema: ReasonOutputSchema },
@@ -217,8 +213,6 @@ Decide what actions to take this tick. For tile-level control, prefer a single o
 
 /**
  * actStep: Validates and passes through the actions.
- * In future multi-agent iterations, this step merges outputs from parallel specialist agents
- * and deduplicates/prioritizes conflicting recommendations before returning.
  */
 const actStep = createStep({
   id: 'act',
@@ -229,9 +223,6 @@ const actStep = createStep({
       if (a.type === 'harvest' || a.type === 'replant') return !!a.crop;
       if (a.type === 'greenhouse') return !!a.param && a.value !== undefined;
       if (a.type === 'crop') return !!a.crop && !!a.param && a.value !== undefined;
-      if (a.type === 'harvest-tile') return !!a.tileId;
-      if (a.type === 'plant-tile') return !!a.tileId && !!a.crop;
-      if (a.type === 'clear-tile') return !!a.tileId;
       if (a.type === 'batch-tile') return !!(a.harvests?.length || a.plants?.length || a.clears?.length);
       return false;
     });

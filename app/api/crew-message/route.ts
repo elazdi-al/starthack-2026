@@ -1,16 +1,10 @@
 /**
- * Crew interaction endpoint — handles crew messages as dispatcher triggers
+ * Crew interaction endpoint — handles crew messages through the simplified dispatcher
  *
- * Unlike /api/chat (streaming), this endpoint runs the full dispatcher pipeline
- * for crew requests and overrides, returning a structured decision.
+ * Unlike /api/chat (streaming), this endpoint returns a structured decision payload.
  *
  * POST /api/crew-message
  * Body: { message: string, snapshot: EnvironmentSnapshot, missionSol: number }
- *
- * Intent classification (spec §6.3):
- * - question  → Wellbeing answers directly from snapshot (< 3s)
- * - request   → Both agents + Arbiter (mini routine cycle)
- * - override  → Survival veto check
  */
 
 import { mastra } from '@/mastra';
@@ -62,10 +56,12 @@ export async function POST(req: Request) {
       crewIntent: output.crewIntent,
       crewResponse: output.crewResponse,
       resolvedActions: output.resolvedActions,
-      conflictType: output.conflictType,
-      winningAgent: output.winningAgent,
+      decisionMode: output.decisionMode,
+      handledBy: output.handledBy,
       riskScore: output.riskScore,
-      wellbeingScore: output.wellbeingScore,
+      crewImpactScore: output.crewImpactScore,
+      operationsSummary: output.operationsSummary,
+      crewSummary: output.crewSummary,
       decisionId: output.decisionId,
       summary: output.summary,
     });

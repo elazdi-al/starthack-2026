@@ -1,15 +1,9 @@
 /**
  * Chat endpoint — crew interaction handler
  *
- * All crew messages arrive here first. The Wellbeing agent classifies the intent
- * (question / request / override) before any further routing occurs (spec §6.3).
- *
- * - Questions: answered directly by Wellbeing agent with sensor snapshot context.
- * - Requests + overrides: dispatched through the full dispatcher pipeline.
- *
- * Streaming is used for all Wellbeing-agent responses so the crew sees fast feedback.
- * The dispatcher pipeline runs asynchronously for request/override types while the
- * Wellbeing agent streams an acknowledgement.
+ * All crew messages stream through the single decision agent.
+ * The agent can answer questions, reference mission history, and execute
+ * greenhouse actions directly through tools when needed.
  */
 
 import { mastra } from '@/mastra';
@@ -26,7 +20,7 @@ export async function POST(req: Request) {
     missionSol?: number;
   };
 
-  const wellbeingAgent = mastra.getAgent('wellbeingAgent');
+  const decisionAgent = mastra.getAgent('decisionAgent');
 
   // Inject live sensor snapshot + secretary context into the conversation
   const secretaryContext = secretaryStore.getAgentContext(3);
@@ -58,9 +52,9 @@ export async function POST(req: Request) {
     secretaryStore.addCrewRequest(lastUserMessage.content, missionSol);
   }
 
-  // Stream response from Wellbeing agent
+  // Stream response from the decision agent
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result = await wellbeingAgent.stream(augmentedMessages as any, {
+  const result = await decisionAgent.stream(augmentedMessages as any, {
     maxSteps: 10,
     memory: {
       thread: threadId ?? 'default-thread',

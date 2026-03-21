@@ -224,20 +224,6 @@ function collectActionStats(snapshot: WorkflowInput, actions: Action[]) {
       harvestedCrops.add(action.crop);
     }
 
-    if (action.type === 'harvest-tile' && action.tileId) {
-      harvestedTiles.add(action.tileId);
-    }
-
-    if (action.type === 'clear-tile' && action.tileId) {
-      clearedTiles.add(action.tileId);
-    }
-
-    if (action.type === 'plant-tile' && action.tileId && isCropName(action.crop)) {
-      if (plantedTiles.has(action.tileId)) duplicatePlantTargets.add(action.tileId);
-      plantedTiles.add(action.tileId);
-      plantedCrops.add(action.crop);
-    }
-
     if (action.type === 'batch-tile') {
       if (action.harvests?.length) {
         for (const tileId of action.harvests) harvestedTiles.add(tileId);
@@ -402,10 +388,6 @@ function analyzeActionSafety(input: WorkflowInput | undefined, output: WorkflowO
 
     if ((action.type === 'harvest' || action.type === 'replant') && !isCropName(action.crop)) {
       issues.push(`${action.type} action references invalid crop`);
-    }
-
-    if ((action.type === 'harvest-tile' || action.type === 'plant-tile' || action.type === 'clear-tile') && !action.tileId?.match(/^\d+_\d+$/)) {
-      issues.push(`${action.type} action uses invalid tile id`);
     }
 
     if (action.type === 'batch-tile') {

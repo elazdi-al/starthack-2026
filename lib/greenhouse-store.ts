@@ -67,13 +67,12 @@ export interface AgentDecision {
   reasoning: string;
   actions: AgentAction[];
   actionCount: number;
-  // Multi-agent reasoning data
-  conflictType?: string;
-  winningAgent?: string;
+  decisionMode?: string;
+  handledBy?: string;
   riskScore?: number;
-  wellbeingScore?: number;
-  survivalJustification?: string;
-  wellbeingJustification?: string;
+  crewImpactScore?: number;
+  operationsSummary?: string;
+  crewSummary?: string;
 }
 
 // ─── UI Types ───────────────────────────────────────────────────────────────────
@@ -1109,11 +1108,19 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
         return;
       }
 
+      // 60-second timeout prevents the fetch from hanging forever
+      // (e.g. if the LLM or MCP tool stalls), which would lock tickInFlight permanently.
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 60_000);
+
       const res = await fetch('/api/agent-tick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
+        signal: controller.signal,
       });
+
+      clearTimeout(fetchTimeout);
 
       if (!res.ok) {
         console.warn('[autonomousTick] server returned', res.status);
@@ -1134,12 +1141,12 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
           plants?: Array<{ tileId: string; crop: string }>;
           clears?: string[];
         }>;
-        conflictType?: string;
-        winningAgent?: string;
+        decisionMode?: string;
+        handledBy?: string;
         riskScore?: number;
-        wellbeingScore?: number;
-        survivalJustification?: string;
-        wellbeingJustification?: string;
+        crewImpactScore?: number;
+        operationsSummary?: string;
+        crewSummary?: string;
       };
 
       if (!data.ok || !data.actions) return;
@@ -1158,12 +1165,12 @@ export const useGreenhouseStore = create<GreenhouseState>((set, get) => ({
         reasoning: data.reasoning ?? '',
         actions: data.actions as AgentAction[],
         actionCount: data.actions.length,
-        conflictType: data.conflictType,
-        winningAgent: data.winningAgent,
+        decisionMode: data.decisionMode,
+        handledBy: data.handledBy,
         riskScore: data.riskScore,
-        wellbeingScore: data.wellbeingScore,
-        survivalJustification: data.survivalJustification,
-        wellbeingJustification: data.wellbeingJustification,
+        crewImpactScore: data.crewImpactScore,
+        operationsSummary: data.operationsSummary,
+        crewSummary: data.crewSummary,
       };
       const agentEvents: SimEvent[] = [...get().events, {
         sol: currentEnv.missionSol,

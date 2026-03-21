@@ -16,18 +16,14 @@ import { MDocument } from '@mastra/rag';
 import { createVectorQueryTool } from '@mastra/rag';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { google } from '@ai-sdk/google';
 import { embed, embedMany } from 'ai';
 import { getAllSecretaryDocuments, getSecretaryDocumentsSince } from '@/lib/secretary-rag';
+import { secretaryEmbeddingModel } from '../lib/google';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const VECTOR_INDEX_NAME = 'secretary_reports';
 const EMBEDDING_DIMENSIONS = 3072; // Gemini Embedding 2 Preview default
-
-// ─── Google embedding model ─────────────────────────────────────────────────
-
-const secretaryEmbeddingModel = google.embedding('gemini-embedding-2-preview');
 
 // ─── Local vector store (LibSQL) ─────────────────────────────────────────────
 

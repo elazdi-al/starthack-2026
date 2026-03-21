@@ -76,7 +76,6 @@ export async function POST(req: Request) {
   }
 
   if (type === 'report') {
-    // Generate weekly crew report using Claude (Secretary's LLM use case from spec §3.3)
     const { missionSolStart, missionSolEnd, weekNumber } = await req.json() as {
       missionSolStart: number;
       missionSolEnd: number;
@@ -91,7 +90,7 @@ export async function POST(req: Request) {
 
 Recent decisions (${recentDecisions.length} total):
 ${recentDecisions.slice(0, 10).map(d =>
-  `- Sol ${d.missionSol}: ${d.triggerType} | risk=${d.riskScore.toFixed(2)} | ${d.winningAgent} | ${d.actionsEnacted.length} actions${d.actualOutcome ? ` | outcome: ${d.actualOutcome}` : ''}`
+  `- Sol ${d.missionSol}: ${d.triggerType} | risk=${d.riskScore.toFixed(2)} | mode=${d.decisionMode} | handler=${d.handledBy} | ${d.actionsEnacted.length} actions${d.actualOutcome ? ` | outcome: ${d.actualOutcome}` : ''}`
 ).join('\n')}
 
 Incidents this period:
@@ -104,7 +103,7 @@ Override attempts: ${profile.overrideAttempts.length}
 
 Write a clear, warm, informative report for the crew covering:
 1. What crops grew and were harvested this week
-2. What was rationed and why each conflict was resolved as it was
+2. What requests were accepted or blocked and why
 3. Any emergency events and their resolution
 4. Nutritional coverage trends
 5. What to expect next week
