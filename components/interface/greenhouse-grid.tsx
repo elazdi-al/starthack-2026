@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- sprites need plain <img> inside CSS-transformed layers */
 
-import { type ReactNode, memo, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence, motion } from "motion/react";
 import { X, Crosshair } from "@phosphor-icons/react";
@@ -21,14 +22,20 @@ import {
 } from "@/lib/greenhouse-store";
 import { CropVideoPreview } from "@/components/interface/crop-video-preview";
 import { useAnimationConfig } from "@/lib/use-animation-config";
+import {
+  INTERIOR_SPRITES,
+  SHELL_SPRITES,
+  SITE_PROPS,
+  TERRAIN_SPRITES,
+  type InteriorSprite,
+  type ShellPanel,
+  type SiteSprite,
+} from "@/lib/greenhouse-sprites";
 
 const TILE = 80;
 const GAP = 3;
 const COLS = 12;
 const ROWS = 9;
-const STEP = TILE + GAP;
-const GRID_WIDTH = COLS * TILE + (COLS - 1) * GAP;
-const GRID_HEIGHT = ROWS * TILE + (ROWS - 1) * GAP;
 const GREENHOUSE_EJECT_EASE = [0.42, 0, 1, 1] as const;
 const GREENHOUSE_PANEL_TRANSITIONS = {
   north: { duration: 2.0, ease: GREENHOUSE_EJECT_EASE },
@@ -98,186 +105,33 @@ const GROWTH_LABEL: Record<number, string> = {
   5: "Harvest ready",
 };
 
-const PREVIEW_COLORS = {
-  leaf1: "#5c865c",
-  leaf2: "#79a26f",
-  leaf3: "#93b686",
-  leaf4: "#496f4d",
-  stem: "#789160",
-  fruit1: "#ca5447",
-  fruit2: "#e26b58",
-  fruit3: "#b8473e",
-  potato1: "#a17a56",
-  potato2: "#bb9567",
-  potato3: "#896343",
-  root1: "#d26a2f",
-  root2: "#e18a44",
-  root3: "#b65423",
-  radish1: "#cf5f7b",
-  radish2: "#ea86a1",
-  radish3: "#af4c66",
-  grain1: "#dcc77d",
-  grain2: "#c5ab61",
-  pod1: "#759755",
-  pod2: "#8db367",
-  pod3: "#628149",
-  lettuce1: "#8db77a",
-  lettuce2: "#769f68",
-  kale1: "#62896a",
-  kale2: "#547559",
-  kale3: "#456048",
-} as const;
+/** Growth 0-2 shows the seedling sprite, 3-5 the mature plant. */
+function cropSpriteStage(growth?: number): "young" | "mature" {
+  return growth !== undefined && growth <= 2 ? "young" : "mature";
+}
 
-const DepthPoly = memo(function DepthPoly({
-  points,
-  fill,
-  shadow,
-}: {
-  points: string;
-  fill: string;
-  shadow: string;
-}) {
-  return (
-    <>
-      <polygon points={points} fill={shadow} transform="translate(2 4)" />
-      <polygon points={points} fill={fill} />
-    </>
-  );
-});
-
+/** Pre-rendered 3D crop sprite (see lib/greenhouse-sprites.ts for how sprites are made). */
 const CropPreview = memo(function CropPreview({
   crop,
   className,
   size,
+  growth,
 }: {
   crop: CropType;
   className?: string;
   size?: number;
+  growth?: number;
 }) {
-  const svgClassName = className ? `crop-preview-svg ${className}` : "crop-preview-svg";
-  const sizeStyle = size ? { width: size, height: size } as const : undefined;
-
-  if (crop === "radish") {
-    return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-        <DepthPoly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
-        <DepthPoly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
-        <DepthPoly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
-        <DepthPoly points="44,28 59,41 29,41" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
-        <DepthPoly points="44,31 64,39 51,69" fill={PREVIEW_COLORS.radish1} shadow="#8c3f55" />
-        <DepthPoly points="44,31 38,73 24,40" fill={PREVIEW_COLORS.radish2} shadow="#b45e7a" />
-        <DepthPoly points="39,56 44,76 30,65" fill={PREVIEW_COLORS.radish3} shadow="#763245" />
-      </svg>
-    );
-  }
-
-  if (crop === "potato") {
-    return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-        <DepthPoly points="44,14 54,30 34,30" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
-        <DepthPoly points="28,28 44,38 24,46" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
-        <DepthPoly points="60,28 64,46 44,38" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
-        <DepthPoly points="41,28 47,54 37,54" fill={PREVIEW_COLORS.stem} shadow="#556847" />
-        <DepthPoly points="28,46 42,42 44,60 31,66 22,58" fill={PREVIEW_COLORS.potato1} shadow="#6e5239" />
-        <DepthPoly points="45,43 58,45 62,58 51,66 40,60" fill={PREVIEW_COLORS.potato2} shadow="#826748" />
-        <DepthPoly points="38,54 49,56 50,67 40,73 31,67" fill={PREVIEW_COLORS.potato3} shadow="#60452e" />
-      </svg>
-    );
-  }
-
-  if (crop === "wheat") {
-    return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-        <DepthPoly points="37,18 43,72 34,72" fill={PREVIEW_COLORS.stem} shadow="#556847" />
-        <DepthPoly points="49,14 55,70 46,70" fill={PREVIEW_COLORS.stem} shadow="#556847" />
-        <DepthPoly points="43,9 54,17 42,24" fill={PREVIEW_COLORS.grain1} shadow="#a18d57" />
-        <DepthPoly points="51,18 63,26 50,34" fill={PREVIEW_COLORS.grain2} shadow="#8f7a45" />
-        <DepthPoly points="39,18 29,26 40,34" fill={PREVIEW_COLORS.grain2} shadow="#8f7a45" />
-        <DepthPoly points="44,26 55,34 43,42" fill={PREVIEW_COLORS.grain1} shadow="#a18d57" />
-        <DepthPoly points="50,34 61,42 49,50" fill={PREVIEW_COLORS.grain2} shadow="#8f7a45" />
-        <DepthPoly points="38,35 28,43 39,49" fill={PREVIEW_COLORS.grain1} shadow="#a18d57" />
-      </svg>
-    );
-  }
-
-  if (crop === "tomato") {
-    return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-        <DepthPoly points="44,10 53,26 35,26" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
-        <DepthPoly points="28,24 47,39 20,43" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
-        <DepthPoly points="60,24 68,43 41,39" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
-        <DepthPoly points="44,26 50,64 38,64" fill={PREVIEW_COLORS.stem} shadow="#556847" />
-        <DepthPoly points="44,39 61,51 48,70" fill={PREVIEW_COLORS.fruit1} shadow="#8f3b33" />
-        <DepthPoly points="29,50 44,39 40,68" fill={PREVIEW_COLORS.fruit2} shadow="#a64d40" />
-        <DepthPoly points="43,50 58,59 45,77" fill={PREVIEW_COLORS.fruit3} shadow="#80312a" />
-      </svg>
-    );
-  }
-
-  if (crop === "soybean") {
-    return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-        <DepthPoly points="44,12 55,29 33,29" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
-        <DepthPoly points="28,24 49,39 24,46" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
-        <DepthPoly points="60,24 64,46 40,39" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
-        <DepthPoly points="44,27 50,63 38,63" fill={PREVIEW_COLORS.stem} shadow="#556847" />
-        <DepthPoly points="28,45 41,41 48,49 37,58 25,54" fill={PREVIEW_COLORS.pod1} shadow="#52693d" />
-        <DepthPoly points="42,49 55,45 63,53 52,62 40,58" fill={PREVIEW_COLORS.pod2} shadow="#67824e" />
-        <DepthPoly points="35,56 45,54 50,61 42,68 33,65" fill={PREVIEW_COLORS.pod3} shadow="#485f35" />
-      </svg>
-    );
-  }
-
-  if (crop === "spinach") {
-    return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-        <DepthPoly points="44,14 57,34 31,34" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
-        <DepthPoly points="26,30 46,41 23,56" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
-        <DepthPoly points="62,30 65,55 42,41" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
-        <DepthPoly points="43,29 60,57 29,57" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
-        <DepthPoly points="44,42 51,71 37,71" fill={PREVIEW_COLORS.stem} shadow="#556847" />
-      </svg>
-    );
-  }
-
-  if (crop === "kale") {
-    return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-        <DepthPoly points="44,12 57,28 31,28" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
-        <DepthPoly points="23,30 46,40 22,55" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
-        <DepthPoly points="65,30 66,55 42,40" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
-        <DepthPoly points="44,24 61,54 27,54" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
-        <DepthPoly points="31,41 45,63 23,66" fill={PREVIEW_COLORS.kale1} shadow="#45614d" />
-        <DepthPoly points="57,41 65,67 43,63" fill={PREVIEW_COLORS.kale2} shadow="#3e5541" />
-        <DepthPoly points="44,39 54,73 34,73" fill={PREVIEW_COLORS.kale3} shadow="#304338" />
-      </svg>
-    );
-  }
-
-  if (crop === "lettuce") {
-    return (
-      <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-        <DepthPoly points="44,16 56,34 32,34" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
-        <DepthPoly points="23,31 47,44 21,54" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
-        <DepthPoly points="65,31 67,54 41,44" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
-        <DepthPoly points="44,30 58,57 30,57" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
-        <DepthPoly points="32,42 48,62 24,64" fill={PREVIEW_COLORS.lettuce1} shadow="#658258" />
-        <DepthPoly points="56,42 64,63 41,61" fill={PREVIEW_COLORS.lettuce2} shadow="#54714b" />
-        <DepthPoly points="44,42 52,71 36,71" fill={PREVIEW_COLORS.stem} shadow="#556847" />
-      </svg>
-    );
-  }
-
   return (
-    <svg viewBox="0 0 88 88" aria-hidden="true" className={svgClassName} style={sizeStyle}>
-      <DepthPoly points="44,10 53,24 35,24" fill={PREVIEW_COLORS.leaf1} shadow="#355339" />
-      <DepthPoly points="31,18 40,32 22,32" fill={PREVIEW_COLORS.leaf2} shadow="#4b6849" />
-      <DepthPoly points="57,18 66,32 48,32" fill={PREVIEW_COLORS.leaf3} shadow="#627d60" />
-      <DepthPoly points="44,28 59,41 29,41" fill={PREVIEW_COLORS.leaf4} shadow="#314a33" />
-      <DepthPoly points="44,31 63,39 50,73" fill={PREVIEW_COLORS.root1} shadow="#93481f" />
-      <DepthPoly points="44,31 38,75 25,39" fill={PREVIEW_COLORS.root2} shadow="#a96431" />
-      <DepthPoly points="37,55 44,75 31,64" fill={PREVIEW_COLORS.root3} shadow="#7e3c18" />
-    </svg>
+    <img
+      src={`/images/greenhouse/crops/${crop}-${cropSpriteStage(growth)}.webp`}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      decoding="async"
+      className={className ? `crop-preview-svg ${className}` : "crop-preview-svg"}
+      style={size ? { width: size, height: size } : undefined}
+    />
   );
 });
 
@@ -302,7 +156,7 @@ const CropTooltip = memo(function CropTooltip({
     <div className="crop-tooltip-card">
       <div className="crop-tooltip-top">
         <div className="crop-tooltip-model">
-          <CropPreview crop={data.crop} />
+          <CropPreview crop={data.crop} growth={data.growth} />
         </div>
         <div className="crop-tooltip-copy">
           <div className="crop-tooltip-heading">
@@ -458,73 +312,55 @@ export function MarsBackdrop({ dustStormActive }: { dustStormActive: boolean }) 
   );
 }
 
-function MarsGroundShadow({ dustStormActive }: { dustStormActive: boolean }) {
+/** Projects a grid-plane offset (CSS px, before the iso transform) into screen space. */
+function planeToScreen(x: number, y: number) {
+  return { x: 0.7071 * (x + y), y: 0.54 * 0.7071 * (y - x) };
+}
+
+function SpriteImg({ sprite, className }: { sprite: SiteSprite; className?: string }) {
   return (
-    <div
+    <img
+      src={sprite.src}
+      alt=""
       aria-hidden="true"
-      className="pointer-events-none absolute left-1/2 top-1/2 -z-10"
-      style={{
-        width: GRID_WIDTH + 220,
-        height: GRID_HEIGHT + 220,
-        transform: "translate(-50%, -50%)",
-      }}
-    >
-      <div
-        className="absolute left-1/2 top-1/2 h-[66%] w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[54px]"
-        style={{
-          background: dustStormActive
-            ? "radial-gradient(circle, rgb(var(--mars-shadow-core) / 0.28) 0%, rgb(var(--mars-shadow-core) / 0.12) 38%, rgb(var(--mars-shadow-core) / 0) 72%)"
-            : "radial-gradient(circle, rgb(var(--mars-shadow-core) / 0.18) 0%, rgb(var(--mars-shadow-core) / 0.08) 40%, rgb(var(--mars-shadow-core) / 0) 72%)",
-        }}
-      />
-      <div
-        className="absolute left-1/2 top-1/2 h-[44%] w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[28px]"
-        style={{
-          background: dustStormActive
-            ? "rgb(var(--mars-shadow-warm) / 0.16)"
-            : "rgb(var(--mars-shadow-warm) / 0.1)",
-        }}
-      />
-    </div>
+      draggable={false}
+      decoding="async"
+      className={`absolute max-w-none select-none ${className ?? ""}`}
+      style={{ left: sprite.left, top: sprite.top, width: sprite.width, height: sprite.height }}
+    />
   );
 }
 
-function MarsPreparedPad() {
+/** Mars terrain + base props, anchored to the greenhouse centre beneath the crop grid. */
+const MarsSite = memo(function MarsSite({ dustStormActive }: { dustStormActive: boolean }) {
   return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute left-1/2 top-1/2 -z-10"
-      style={{
-        width: GRID_WIDTH + 72,
-        height: GRID_HEIGHT + 72,
-        transform: "translate(-50%, -50%)",
-      }}
-    >
+    <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 h-0 w-0">
+      {/* display:none keeps the inactive theme's terrain from being decoded */}
+      <div className="dark:hidden">
+        <SpriteImg sprite={TERRAIN_SPRITES.light.far} />
+        <SpriteImg sprite={TERRAIN_SPRITES.light.near} />
+      </div>
+      <div className="hidden dark:block">
+        <SpriteImg sprite={TERRAIN_SPRITES.dark.far} />
+        <SpriteImg sprite={TERRAIN_SPRITES.dark.near} />
+      </div>
+      {SITE_PROPS.map((sprite) => (
+        <SpriteImg key={sprite.src} sprite={sprite} className="dark:brightness-[0.72] dark:saturate-[0.85]" />
+      ))}
+      {/* Dust storm: a flat tint instead of a CSS filter over the whole (huge) terrain layer */}
       <div
-        className="absolute inset-0 rounded-[28px]"
+        className="absolute bg-[#b9773f] transition-opacity duration-1000"
         style={{
-          background: [
-            "radial-gradient(circle at 50% 34%, rgb(var(--mars-pad-highlight) / 0.56) 0%, rgb(var(--mars-pad-highlight) / 0) 34%)",
-            "linear-gradient(180deg, rgb(var(--mars-pad-top) / 0.96) 0%, rgb(var(--mars-pad-bottom) / 0.94) 100%)",
-          ].join(", "),
-          border: "1px solid rgb(var(--mars-pad-border) / 0.28)",
-          boxShadow: [
-            "0 22px 40px rgb(var(--mars-shadow-core) / 0.28)",
-            "0 0 0 14px rgb(var(--mars-pad-ring) / 0.18)",
-            "inset 0 1px 0 rgb(var(--mars-pad-highlight) / 0.72)",
-            "inset 0 -10px 18px rgb(var(--mars-pad-border) / 0.1)",
-          ].join(", "),
-        }}
-      />
-      <div
-        className="absolute inset-[16px] rounded-[20px]"
-        style={{
-          border: "1px solid rgb(var(--mars-pad-inner) / 0.34)",
+          left: TERRAIN_SPRITES.light.far.left,
+          top: TERRAIN_SPRITES.light.far.top,
+          width: TERRAIN_SPRITES.light.far.width,
+          height: TERRAIN_SPRITES.light.far.height,
+          opacity: dustStormActive ? 0.22 : 0,
         }}
       />
     </div>
   );
-}
+});
 
 export function GreenhouseGrid({
   introStage = "open",
@@ -766,6 +602,58 @@ export function GreenhouseGrid({
     isPanning.current = false;
   }, []);
 
+  // Pan/zoom only touch the wrapper transform; keep the heavy scene out of those re-renders.
+  const scene = useMemo(
+    () => (
+      <>
+        <MarsSite dustStormActive={dustStormActive} />
+        <div
+          className={interactive ? "pointer-events-auto relative" : "pointer-events-none relative"}
+          style={{ transform: "scaleY(0.54) rotate(-45deg)" }}
+        >
+          <div
+            className="relative rounded-[18px] p-2"
+            style={{
+              border: "1px solid rgb(var(--mars-module-border) / 0.18)",
+              background: "var(--greenhouse-floor)",
+              boxShadow: "0 0 0 1px rgb(var(--mars-module-inset) / 0.4) inset",
+            }}
+          >
+            <Corner position="top-left" />
+            <Corner position="top-right" />
+            <Corner position="bottom-left" />
+            <Corner position="bottom-right" />
+
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: `repeat(${COLS}, ${TILE}px)`,
+                gridTemplateRows: `repeat(${ROWS}, ${TILE}px)`,
+                gap: GAP,
+              }}
+            >
+              {grid.map((row, r) =>
+                row.map((tile, c) => (
+                  <GridTile
+                    key={`${r}-${c}`}
+                    data={tile}
+                    row={r}
+                    col={c}
+                    focused={tile.kind === "crop" && tile.crop === focusedCrop}
+                    interactionsEnabled={cropInteractionsEnabled}
+                    onSelect={handleSelect}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+        <GreenhouseShell visible={overlayVisible} />
+      </>
+    ),
+    [grid, focusedCrop, cropInteractionsEnabled, handleSelect, interactive, dustStormActive, overlayVisible],
+  );
+
   return (
     <div
       ref={containerRef}
@@ -781,61 +669,14 @@ export function GreenhouseGrid({
 
       <TooltipProvider delay={120} closeDelay={0}>
         <div
+          className="relative"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "center center",
             willChange: "transform",
           }}
         >
-          <div
-            className={interactive ? "pointer-events-auto relative" : "pointer-events-none relative"}
-            style={{ transform: "scaleY(0.54) rotate(-45deg)" }}
-          >
-            <MarsGroundShadow dustStormActive={dustStormActive} />
-            <MarsPreparedPad />
-            <div
-              className="relative rounded-[18px] p-2"
-              style={{
-                border: "1px solid rgb(var(--mars-module-border) / 0.18)",
-                background: "rgb(var(--mars-module-surface) / 0.68)",
-                boxShadow: [
-                  "0 18px 36px rgb(var(--mars-shadow-core) / 0.18)",
-                  "0 0 0 1px rgb(var(--mars-module-inset) / 0.4) inset",
-                  "inset 0 0 80px rgba(255, 255, 255, 0.12)",
-                ].join(", "),
-                backdropFilter: "blur(1.5px)",
-              }}
-            >
-              <Corner position="top-left" />
-              <Corner position="top-right" />
-              <Corner position="bottom-left" />
-              <Corner position="bottom-right" />
-              <GreenhouseOverlay visible={overlayVisible} />
-
-              <div
-                className="grid"
-                style={{
-                  gridTemplateColumns: `repeat(${COLS}, ${TILE}px)`,
-                  gridTemplateRows: `repeat(${ROWS}, ${TILE}px)`,
-                  gap: GAP,
-                }}
-              >
-                {grid.map((row, r) =>
-                  row.map((tile, c) => (
-                    <GridTile
-                      key={`${r}-${c}`}
-                      data={tile}
-                      row={r}
-                      col={c}
-                      focused={tile.kind === "crop" && tile.crop === focusedCrop}
-                      interactionsEnabled={cropInteractionsEnabled}
-                      onSelect={handleSelect}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
+          {scene}
         </div>
       </TooltipProvider>
 
@@ -865,312 +706,35 @@ export function GreenhouseGrid({
   );
 }
 
-function GreenhouseOverlay({ visible }: { visible: boolean }) {
+const SHELL_ORDER: ShellPanel[] = ["north", "east", "roof", "west", "south"];
+
+/** Where each panel flies to when the shell opens (same plane offsets as before, in screen space). */
+const SHELL_EJECT: Record<ShellPanel, { x: number; y: number }> = {
+  north: planeToScreen(0, -3600),
+  west: planeToScreen(-3600, 0),
+  roof: planeToScreen(3520, -3520),
+  east: planeToScreen(3600, 0),
+  south: planeToScreen(0, 3600),
+};
+
+const GreenhouseShell = memo(function GreenhouseShell({ visible }: { visible: boolean }) {
   const anim = useAnimationConfig();
-  const inset = 6;
-  const rise = 110;
-  const roofPeak = 56;
-  const startCol = 0;
-  const startRow = 0;
-  const colSpan = COLS;
-  const rowSpan = ROWS;
-
-  const x = startCol * STEP + inset;
-  const y = startRow * STEP + inset;
-  const width = colSpan * TILE + (colSpan - 1) * GAP - inset * 2;
-  const height = rowSpan * TILE + (rowSpan - 1) * GAP - inset * 2;
-
-  const baseTL: [number, number] = [x, y];
-  const baseTR: [number, number] = [x + width, y];
-  const baseBR: [number, number] = [x + width, y + height];
-  const baseBL: [number, number] = [x, y + height];
-
-  const eaveTL: [number, number] = [x + rise, y - rise];
-  const eaveTR: [number, number] = [x + width + rise, y - rise];
-  const eaveBR: [number, number] = [x + width + rise, y + height - rise];
-  const eaveBL: [number, number] = [x + rise, y + height - rise];
-
-  const ridgeL: [number, number] = [x + rise + roofPeak, y - rise + height / 2 - roofPeak];
-  const ridgeR: [number, number] = [x + width + rise + roofPeak, y - rise + height / 2 - roofPeak];
-
-  const poly = (...points: [number, number][]) => points.map(([px, py]) => `${px},${py}`).join(" ");
-  const rafterFractions = [0.18, 0.38, 0.58, 0.78];
-  const floorGradientId = "greenhouse-floor-fill";
-  const frontGradientId = "greenhouse-glass-front";
-  const sideGradientId = "greenhouse-glass-side";
-  const roofBackGradientId = "greenhouse-roof-back";
-  const roofFrontGradientId = "greenhouse-roof-front";
-
   return (
-    <svg
-      aria-hidden="true"
-      className="pointer-events-none absolute left-2 top-2 z-20 overflow-visible"
-      width={GRID_WIDTH}
-      height={GRID_HEIGHT}
-      viewBox={`0 0 ${GRID_WIDTH} ${GRID_HEIGHT}`}
-      fill="none"
-    >
-      <defs>
-        <linearGradient id={floorGradientId} x1={x} y1={y} x2={x + width} y2={y + height}>
-          <stop offset="0%" style={{ stopColor: "var(--greenhouse-floor-start)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--greenhouse-floor-end)" }} />
-        </linearGradient>
-        <linearGradient id={frontGradientId} x1={x} y1={y} x2={x + width} y2={y + height}>
-          <stop offset="0%" style={{ stopColor: "var(--greenhouse-glass-front-start)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--greenhouse-glass-front-end)" }} />
-        </linearGradient>
-        <linearGradient id={sideGradientId} x1={x} y1={y} x2={x + rise} y2={y + height}>
-          <stop offset="0%" style={{ stopColor: "var(--greenhouse-glass-side-start)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--greenhouse-glass-side-end)" }} />
-        </linearGradient>
-        <linearGradient id={roofBackGradientId} x1={x + rise} y1={y - rise} x2={x + width + rise} y2={y - rise + height / 2}>
-          <stop offset="0%" style={{ stopColor: "var(--greenhouse-roof-back-start)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--greenhouse-roof-back-end)" }} />
-        </linearGradient>
-        <linearGradient id={roofFrontGradientId} x1={x + rise} y1={y + height - rise} x2={x + width + rise} y2={y - rise + height / 2}>
-          <stop offset="0%" style={{ stopColor: "var(--greenhouse-roof-front-start)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--greenhouse-roof-front-end)" }} />
-        </linearGradient>
-        <filter id="greenhouse-shadow" x="-20%" y="-20%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="10" />
-        </filter>
-      </defs>
-
-      <>
-          <motion.g
-            initial={false}
-            animate={
-              visible
-                ? { x: 0, y: 0, rotate: 0 }
-                : { x: 0, y: -3600, rotate: 0 }
-            }
-            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.north : anim.instant}
-            style={{ transformBox: "fill-box", transformOrigin: "center" }}
-          >
-            <polygon
-              points={poly(baseTL, baseTR, eaveTR, eaveTL)}
-              fill={`url(#${frontGradientId})`}
-              style={{ stroke: "var(--greenhouse-line-soft)" }}
-              strokeWidth="0.9"
-            />
-          </motion.g>
-
-          <motion.g
-            initial={false}
-            animate={
-              visible
-                ? { x: 0, y: 0, rotate: 0 }
-                : { x: -3600, y: 0, rotate: 0 }
-            }
-            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.west : anim.instant}
-            style={{ transformBox: "fill-box", transformOrigin: "center" }}
-          >
-            <polygon
-              points={poly(baseTL, baseBL, eaveBL, eaveTL)}
-              fill={`url(#${sideGradientId})`}
-              style={{ stroke: "var(--greenhouse-line-soft)" }}
-              strokeWidth="0.9"
-            />
-            <line
-              x1={baseBL[0]}
-              y1={baseBL[1]}
-              x2={eaveBL[0]}
-              y2={eaveBL[1]}
-              style={{ stroke: "var(--greenhouse-line-strong)" }}
-              strokeWidth="1.3"
-              strokeLinecap="round"
-            />
-          </motion.g>
-
-          <motion.g
-            initial={false}
-            animate={
-              visible
-                ? { x: 0, y: 0, rotate: 0 }
-                : { x: rise * 32, y: -rise * 32, rotate: 0 }
-            }
-            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.roof : anim.instant}
-            style={{ transformBox: "fill-box", transformOrigin: "center" }}
-          >
-            <polygon
-              points={poly(eaveTL, eaveTR, ridgeR, ridgeL)}
-              fill={`url(#${roofBackGradientId})`}
-              style={{ stroke: "var(--greenhouse-line-soft)" }}
-              strokeWidth="0.85"
-            />
-            <polygon
-              points={poly(eaveBL, eaveBR, ridgeR, ridgeL)}
-              fill={`url(#${roofFrontGradientId})`}
-              style={{ stroke: "var(--greenhouse-line-mid)" }}
-              strokeWidth="0.9"
-            />
-            <polygon
-              points={poly(eaveTL, eaveBL, ridgeL)}
-              fill={`url(#${sideGradientId})`}
-              style={{ stroke: "var(--greenhouse-line-soft)" }}
-              strokeWidth="0.85"
-            />
-            <polygon
-              points={poly(eaveTR, eaveBR, ridgeR)}
-              fill={`url(#${sideGradientId})`}
-              style={{ stroke: "var(--greenhouse-line-soft)" }}
-              strokeWidth="0.8"
-            />
-            <line
-              x1={ridgeL[0]}
-              y1={ridgeL[1]}
-              x2={ridgeR[0]}
-              y2={ridgeR[1]}
-              style={{ stroke: "var(--greenhouse-line-mid)" }}
-              strokeWidth="1.2"
-              strokeLinecap="round"
-            />
-            <line
-              x1={eaveBL[0]}
-              y1={eaveBL[1]}
-              x2={eaveBR[0]}
-              y2={eaveBR[1]}
-              style={{ stroke: "var(--greenhouse-line-mid)" }}
-              strokeWidth="1.2"
-              strokeLinecap="round"
-            />
-            <line
-              x1={eaveBL[0]}
-              y1={eaveBL[1]}
-              x2={ridgeL[0]}
-              y2={ridgeL[1]}
-              style={{ stroke: "var(--greenhouse-line-soft)" }}
-              strokeWidth="1.05"
-              strokeLinecap="round"
-            />
-            <line
-              x1={eaveBR[0]}
-              y1={eaveBR[1]}
-              x2={ridgeR[0]}
-              y2={ridgeR[1]}
-              style={{ stroke: "var(--greenhouse-line-soft)" }}
-              strokeWidth="1.05"
-              strokeLinecap="round"
-            />
-            {rafterFractions.map((fraction) => {
-              const postBaseX = x + width * fraction;
-              const frontPostTopX = postBaseX + rise;
-              const roofJointX = postBaseX + rise + roofPeak;
-              const postTopY = y + height - rise;
-              const backPostBaseY = y;
-              const backPostTopY = y - rise;
-              const roofJointY = y - rise + height / 2 - roofPeak;
-
-              return (
-                <g key={fraction}>
-                  <line
-                    x1={postBaseX}
-                    y1={backPostBaseY}
-                    x2={frontPostTopX}
-                    y2={backPostTopY}
-                    style={{ stroke: "var(--greenhouse-line-soft)" }}
-                    strokeWidth="0.8"
-                    strokeLinecap="round"
-                  />
-                  <line
-                    x1={frontPostTopX}
-                    y1={backPostTopY}
-                    x2={roofJointX}
-                    y2={roofJointY}
-                    style={{ stroke: "var(--greenhouse-line-soft)" }}
-                    strokeWidth="0.75"
-                    strokeLinecap="round"
-                  />
-                  <line
-                    x1={frontPostTopX}
-                    y1={postTopY}
-                    x2={roofJointX}
-                    y2={roofJointY}
-                    style={{ stroke: "var(--greenhouse-line-soft)" }}
-                    strokeWidth="0.78"
-                    strokeLinecap="round"
-                  />
-                </g>
-              );
-            })}
-          </motion.g>
-
-          <motion.g
-            initial={false}
-            animate={
-              visible
-                ? { x: 0, y: 0, rotate: 0 }
-                : { x: 3600, y: 0, rotate: 0 }
-            }
-            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.east : anim.instant}
-            style={{ transformBox: "fill-box", transformOrigin: "center" }}
-          >
-            <polygon
-              points={poly(baseTR, baseBR, eaveBR, eaveTR)}
-              fill={`url(#${sideGradientId})`}
-              style={{ stroke: "var(--greenhouse-line-soft)" }}
-              strokeWidth="0.85"
-            />
-            <line
-              x1={baseBR[0]}
-              y1={baseBR[1]}
-              x2={eaveBR[0]}
-              y2={eaveBR[1]}
-              style={{ stroke: "var(--greenhouse-line-mid)" }}
-              strokeWidth="1.25"
-              strokeLinecap="round"
-            />
-          </motion.g>
-
-          <motion.g
-            initial={false}
-            animate={
-              visible
-                ? { x: 0, y: 0, rotate: 0 }
-                : { x: 0, y: 3600, rotate: 0 }
-            }
-            transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS.south : anim.instant}
-            style={{ transformBox: "fill-box", transformOrigin: "center" }}
-          >
-            <polygon
-              points={poly(baseBL, baseBR, eaveBR, eaveBL)}
-              fill={`url(#${frontGradientId})`}
-              style={{ stroke: "var(--greenhouse-line-mid)" }}
-              strokeWidth="1"
-            />
-            {rafterFractions.map((fraction) => {
-              const postBaseX = x + width * fraction;
-              const frontPostTopX = postBaseX + rise;
-              const frontPostBaseY = y + height;
-              const postTopY = y + height - rise;
-
-              return (
-                <line
-                  key={`front-${fraction}`}
-                  x1={postBaseX}
-                  y1={frontPostBaseY}
-                  x2={frontPostTopX}
-                  y2={postTopY}
-                  style={{ stroke: "var(--greenhouse-line-mid)" }}
-                  strokeWidth="0.9"
-                  strokeLinecap="round"
-                />
-              );
-            })}
-            <line
-              x1={baseBL[0]}
-              y1={baseBL[1]}
-              x2={baseBR[0]}
-              y2={baseBR[1]}
-              style={{ stroke: "var(--greenhouse-line-strong)" }}
-              strokeWidth="1.45"
-              strokeLinecap="round"
-            />
-          </motion.g>
-        </>
-    </svg>
+    <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-0 w-0">
+      {SHELL_ORDER.map((panel) => (
+        <motion.div
+          key={panel}
+          className="absolute left-0 top-0"
+          initial={false}
+          animate={visible ? { x: 0, y: 0 } : SHELL_EJECT[panel]}
+          transition={anim.enabled ? GREENHOUSE_PANEL_TRANSITIONS[panel] : anim.instant}
+        >
+          <SpriteImg sprite={SHELL_SPRITES[panel]} className="dark:brightness-[0.85]" />
+        </motion.div>
+      ))}
+    </div>
   );
-}
+});
 
 /**
  * Simple deterministic hash for procedural generation.
@@ -1230,11 +794,11 @@ const GROWTH_TO_COUNT: Record<number, number> = {
  * Scaled down for 80px tiles (from 120px).
  */
 const SIZE_TIERS: Record<number, [number, number, number]> = {
-  1: [14, 18, 24],
-  2: [16, 22, 28],
-  3: [18, 24, 30],
-  4: [20, 26, 32],
-  5: [22, 28, 34],
+  1: [18, 22, 28],
+  2: [20, 26, 32],
+  3: [22, 30, 36],
+  4: [24, 32, 38],
+  5: [26, 34, 40],
 };
 
 const TIER_PERMS: [number, number, number][] = [
@@ -1263,6 +827,45 @@ function generatePlants(row: number, col: number, growth: number): PlantInstance
   });
 }
 
+/** Equipment standing on path tiles, keyed by "row-col". */
+const PATH_PROPS: Record<string, InteriorSprite> = {
+  "1-3": "astronaut",
+  "0-10": "rack",
+  "3-0": "bench",
+  "6-4": "cart",
+  "6-10": "toolbox",
+  "8-6": "reel",
+};
+
+/** Front-to-back stacking: tiles lower on screen (higher row, lower col) paint last. */
+function tileDepth(row: number, col: number) {
+  return row - col + COLS;
+}
+
+/**
+ * A 3D sprite anchored at the tile centre. The wrapper cancels the grid's
+ * `scaleY(0.54) rotate(-45deg)` so the pre-rendered image stays screen-aligned.
+ */
+function TileSprite({ name, className }: { name: InteriorSprite; className?: string }) {
+  const s = INTERIOR_SPRITES[name];
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-1/2 top-1/2 h-0 w-0"
+      style={{ transform: "rotate(45deg) scaleY(1.72414)" }}
+    >
+      <img
+        src={s.src}
+        alt=""
+        draggable={false}
+        decoding="async"
+        className={`absolute max-w-none select-none ${className ?? ""}`}
+        style={{ left: s.left, top: s.top, width: s.width, height: s.height }}
+      />
+    </div>
+  );
+}
+
 const GridTile = memo(function GridTile({
   data,
   row,
@@ -1278,14 +881,15 @@ const GridTile = memo(function GridTile({
   interactionsEnabled: boolean;
   onSelect: (tile: TileData) => void;
 }) {
+  const depth = { "--tile-z": tileDepth(row, col) } as CSSProperties;
+
   if (data.kind === "path") {
+    const prop = PATH_PROPS[`${row}-${col}`];
     return (
-      <div className="relative cursor-default rounded border border-black/2.5 bg-black/1 transition-colors duration-150 hover:bg-black/2 dark:border-white/8 dark:bg-white/5 dark:hover:bg-white/7">
-        {data.sensor && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-[7px] w-[7px] rounded-full border border-black/7 dark:border-white/14" />
-          </div>
-        )}
+      <div className="relative z-(--tile-z) cursor-default" style={depth}>
+        <div className="greenhouse-grating absolute inset-0 rounded-[3px] dark:brightness-[0.5]" />
+        {data.sensor && <TileSprite name="sensor" className="dark:brightness-[0.8]" />}
+        {prop && <TileSprite name={prop} className="dark:brightness-[0.8]" />}
       </div>
     );
   }
@@ -1300,29 +904,26 @@ const GridTile = memo(function GridTile({
       onClick={canInteract ? () => onSelect(data) : undefined}
       tabIndex={canInteract ? undefined : -1}
       aria-disabled={!canInteract}
-      className={`crop-tile-button group/crop-tile relative h-full w-full rounded border transition-[background-color,border-color,transform,box-shadow] duration-200 ${
+      className={`crop-tile-button group/crop-tile relative z-(--tile-z) h-full w-full rounded border transition-[background-color,border-color] duration-200 ${
         focused && planted
-          ? "grid-tile-focused border-yellow-500/40 bg-yellow-500/8 dark:border-yellow-400/35 dark:bg-yellow-400/6"
-          : planted
-            ? interactionsEnabled
-              ? "border-emerald-800/8 bg-emerald-700/7 hover:border-emerald-700/14 hover:bg-emerald-700/10 dark:border-emerald-300/14 dark:bg-emerald-300/8 dark:hover:border-emerald-300/18 dark:hover:bg-emerald-300/12"
-              : "border-emerald-800/8 bg-emerald-700/7 dark:border-emerald-300/14 dark:bg-emerald-300/8"
-            : interactionsEnabled
-              ? "border-green-800/5.5 bg-green-800/4.5 hover:border-emerald-700/10 hover:bg-emerald-700/8 dark:border-white/7 dark:bg-white/4 dark:hover:border-white/10 dark:hover:bg-white/7"
-              : "border-green-800/5.5 bg-green-800/4.5 dark:border-white/7 dark:bg-white/4"
-      } ${
-        canInteract
-          ? "cursor-pointer hover:z-30 hover:shadow-[0_12px_28px_rgba(122,168,141,0.08)] focus-visible:z-30"
-          : "cursor-default"
-      }`}
-      style={{ pointerEvents: interactionsEnabled ? undefined : "none" }}
+          ? "grid-tile-focused border-yellow-500/60 bg-yellow-400/25 dark:border-yellow-400/45 dark:bg-yellow-400/12"
+          : canInteract
+            ? "border-transparent hover:border-emerald-600/35 hover:bg-emerald-500/12 dark:hover:border-emerald-300/30 dark:hover:bg-emerald-300/10"
+            : "border-transparent"
+      } ${canInteract ? "cursor-pointer hover:z-30 focus-visible:z-30" : "cursor-default"}`}
+      style={{ ...depth, pointerEvents: interactionsEnabled ? undefined : "none" }}
     >
+      <TileSprite
+        name={planted ? "pot" : "potEmpty"}
+        className="crop-tile-pot dark:brightness-[0.72] dark:saturate-[0.9]"
+      />
+
       {data.status && planted && (
         <div
-          className={`absolute right-2.5 top-2.5 h-[5px] w-[5px] rounded-full ${
+          className={`absolute right-1.5 top-1.5 z-10 h-[5px] w-[5px] rounded-full ${
             data.status === "ok"
-              ? "bg-green-700/35 dark:bg-green-400/40"
-              : "bg-amber-500/50 dark:bg-amber-400/55"
+              ? "bg-green-600/70 dark:bg-green-400/60"
+              : "bg-amber-500/80 dark:bg-amber-400/70"
           }`}
         />
       )}
@@ -1341,16 +942,16 @@ const GridTile = memo(function GridTile({
                 zIndex: p.z,
               }}
             >
-              <CropPreview crop={data.crop!} className="crop-preview-svg--tile" size={p.size} />
+              <CropPreview crop={data.crop!} growth={data.growth} className="crop-preview-svg--tile" size={p.size} />
             </div>
           ))}
         </div>
       )}
 
       {planted && (
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden rounded-b-sm bg-green-800/6 dark:bg-white/10">
+        <div className="absolute bottom-0 left-0 right-0 z-10 h-[2px] overflow-hidden rounded-b-sm bg-black/10 dark:bg-white/10">
           <div
-            className="h-full bg-green-800/18 dark:bg-emerald-300/28"
+            className="h-full bg-sky-500/60 dark:bg-sky-300/50"
             style={{ width: `${data.water}%` }}
           />
         </div>
@@ -1469,7 +1070,7 @@ const CropDialog = memo(function CropDialog({
                         stageProgress={cropEnv?.stageProgress ?? 0}
                       >
                         {hoverMeta ? (
-                          <CropPreview crop={data.crop!} />
+                          <CropPreview crop={data.crop!} growth={data.growth} />
                         ) : (
                           <div className="h-6 w-6 rounded-full bg-green-800/12 dark:bg-green-400/15" />
                         )}

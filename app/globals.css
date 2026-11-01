@@ -208,6 +208,7 @@
     inset 0 1px 0 var(--glass-panel-highlight),
     0 1px 2px rgb(0 0 0 / 0.04);
   --greenhouse-shadow: rgba(105, 138, 118, 0.065);
+  --greenhouse-floor: #d9d8d2;
   --greenhouse-floor-start: rgba(236, 247, 241, 0.4);
   --greenhouse-floor-end: rgba(214, 234, 224, 0.14);
   --greenhouse-glass-front-start: rgba(255, 255, 255, 0.29);
@@ -351,6 +352,7 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 1px 2px rgba(0, 0, 0, 0.24);
   --greenhouse-shadow: rgba(8, 10, 14, 0.18);
+  --greenhouse-floor: #3a3d40;
   --greenhouse-floor-start: rgba(224, 231, 236, 0.22);
   --greenhouse-floor-end: rgba(126, 138, 148, 0.08);
   --greenhouse-glass-front-start: rgba(248, 250, 251, 0.16);
@@ -863,13 +865,31 @@
       translate(-50%, calc(-100% + var(--crop-plant-lift, 0px)))
       rotate(45deg)
       scaleY(1.72414)
-      perspective(120px)
-      rotateX(-14deg)
+      translateY(var(--pot-lift, -12px))
       scale(var(--crop-plant-scale, 1));
     transform-origin: center bottom;
     transition:
       transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
       filter 180ms ease;
+  }
+
+  .greenhouse-grating {
+    background: url("/images/greenhouse/interior/grating.webp") center / 100% 100%;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+  }
+
+  .crop-tile-pot {
+    transition: filter 180ms ease, translate 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .crop-tile-button:hover .crop-tile-pot,
+  .crop-tile-button:focus-visible .crop-tile-pot {
+    filter: brightness(1.06) drop-shadow(0 0 6px rgb(198 240 90 / 0.55));
+  }
+
+  .dark .crop-tile-button:hover .crop-tile-pot,
+  .dark .crop-tile-button:focus-visible .crop-tile-pot {
+    filter: brightness(0.82) drop-shadow(0 0 6px rgb(198 240 90 / 0.4));
   }
 
   .crop-preview-svg--tile {
